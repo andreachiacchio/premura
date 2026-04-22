@@ -148,7 +148,7 @@ const DNA_TOOL: Anthropic.Tool = {
 // ===== SYSTEM PROMPT =====
 // This is the most critical piece of "code" in the system. Modify with care.
 
-const SYSTEM_PROMPT = `Sei l'agente Guest DNA di GiftTube, un concierge AI per host di affitti brevi italiani.
+const SYSTEM_PROMPT = `Sei l'agente Guest DNA di Premura, un concierge AI per host di affitti brevi italiani.
 
 Il tuo compito: dato un ospite in arrivo, produrre un profilo conciso e AZIONABILE che aiuti altri agenti a:
 1. Scegliere un kit di benvenuto personalizzato

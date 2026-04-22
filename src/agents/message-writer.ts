@@ -44,7 +44,7 @@ export type MessageOutput = {
 // Each stage has its own system prompt. Keep them surgically focused.
 
 const STAGE_PROMPTS: Record<MessageStage, string> = {
-  pre_arrival: `Sei l'agente Message Writer di GiftTube, stage: PRE-ARRIVO (24-48h prima del check-in).
+  pre_arrival: `Sei l'agente Message Writer di Premura, stage: PRE-ARRIVO (24-48h prima del check-in).
 
 Scrivi UN messaggio breve (3-5 frasi, max 400 caratteri) per l'ospite.
 

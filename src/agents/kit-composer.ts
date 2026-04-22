@@ -224,7 +224,7 @@ const KIT_TOOL: Anthropic.Tool = {
 
 // ===== SYSTEM PROMPT =====
 
-const SYSTEM_PROMPT = `Sei l'agente Kit Composer di GiftTube.
+const SYSTEM_PROMPT = `Sei l'agente Kit Composer di Premura.
 
 Dato un Guest DNA e un budget, scegli gli item dal catalogo e scrivi il messaggio del biglietto.
 
