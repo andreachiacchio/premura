@@ -408,8 +408,8 @@ p  { margin: 0; }
 }
 .alert-banner svg { color: var(--terracotta-2); }
 
-/* Leo card — il cuore della home */
-.leo-card {
+/* Agent card — il cuore della home */
+.agent-card {
   margin: 20px;
   position: relative;
   background:
@@ -421,7 +421,7 @@ p  { margin: 0; }
   overflow: hidden;
   box-shadow: var(--shadow-lg);
 }
-.leo-card::before {
+.agent-card::before {
   /* Decorative hairline arc */
   content: '';
   position: absolute;
@@ -431,7 +431,7 @@ p  { margin: 0; }
   border: 1px solid rgba(212,165,116,.35);
   pointer-events: none;
 }
-.leo-card::after {
+.agent-card::after {
   content: '';
   position: absolute;
   right: -20px; top: -80px;
@@ -440,7 +440,7 @@ p  { margin: 0; }
   border: 1px solid rgba(212,165,116,.15);
   pointer-events: none;
 }
-.leo-eyebrow {
+.agent-eyebrow {
   display: flex; align-items: center; gap: 10px;
   font-size: 11px;
   letter-spacing: .16em;
@@ -448,12 +448,12 @@ p  { margin: 0; }
   color: var(--gold-soft);
   font-weight: 600;
 }
-.leo-eyebrow .pulse-dot {
+.agent-eyebrow .pulse-dot {
   background: var(--gold);
 }
-.leo-eyebrow .pulse-dot::after { border-color: var(--gold); }
+.agent-eyebrow .pulse-dot::after { border-color: var(--gold); }
 
-.leo-action {
+.agent-action {
   font-family: 'Fraunces', serif;
   font-size: 24px;
   font-weight: 400;
@@ -463,28 +463,28 @@ p  { margin: 0; }
   min-height: 62px;
   transition: opacity .4s var(--ease), transform .4s var(--ease);
 }
-.leo-action.fading { opacity: 0; transform: translateY(4px); }
-.leo-sub {
+.agent-action.fading { opacity: 0; transform: translateY(4px); }
+.agent-sub {
   color: rgba(253,250,243,.7);
   font-size: 13px;
   margin-top: 10px;
 }
-.leo-footer {
+.agent-footer {
   display: flex; align-items: center; justify-content: space-between;
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid rgba(253,250,243,.12);
 }
-.leo-stat {
+.agent-stat {
   display: flex; flex-direction: column; gap: 2px;
 }
-.leo-stat-num {
+.agent-stat-num {
   font-family: 'Fraunces', serif;
   font-size: 18px;
   font-weight: 500;
   color: var(--gold-soft);
 }
-.leo-stat-label {
+.agent-stat-label {
   font-size: 11px;
   color: rgba(253,250,243,.55);
   text-transform: uppercase;
@@ -1233,29 +1233,29 @@ p  { margin: 0; }
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
     </button>
 
-    <div class="leo-card">
-      <div class="leo-eyebrow">
+    <div class="agent-card">
+      <div class="agent-eyebrow">
         <span class="pulse-dot"></span>
         <span>Leo sta lavorando</span>
       </div>
-      <div class="leo-action" id="leo-action">
+      <div class="agent-action" id="agent-action">
         Sto preparando l'arrivo di Anna, domani alle 15:00.
       </div>
-      <div class="leo-sub" id="leo-sub">
+      <div class="agent-sub" id="agent-sub">
         Guest DNA pronto, kit composto, briefing inviato a Rosa.
       </div>
-      <div class="leo-footer">
-        <div class="leo-stat">
-          <span class="leo-stat-num mono-num">3</span>
-          <span class="leo-stat-label">Ospiti attivi</span>
+      <div class="agent-footer">
+        <div class="agent-stat">
+          <span class="agent-stat-num mono-num">3</span>
+          <span class="agent-stat-label">Ospiti attivi</span>
         </div>
-        <div class="leo-stat">
-          <span class="leo-stat-num mono-num">12</span>
-          <span class="leo-stat-label">Azioni oggi</span>
+        <div class="agent-stat">
+          <span class="agent-stat-num mono-num">12</span>
+          <span class="agent-stat-label">Azioni oggi</span>
         </div>
-        <div class="leo-stat">
-          <span class="leo-stat-num mono-num">0</span>
-          <span class="leo-stat-label">Serve te</span>
+        <div class="agent-stat">
+          <span class="agent-stat-num mono-num">0</span>
+          <span class="agent-stat-label">Serve te</span>
         </div>
       </div>
     </div>
@@ -1685,7 +1685,7 @@ function goTo(id) {
     window.scrollTo({ top: 0, behavior: 'instant' });
     // Trigger per animazioni una-tantum
     if (id === 'detail') triggerConfidence();
-    if (id === 'home')   rotateLeoAction();
+    if (id === 'home')   rotateAgentAction();
   }
 }
 
@@ -1745,8 +1745,8 @@ document.getElementById('connect-btn').addEventListener('click', function () {
   }, 1200);
 });
 
-// ─── Home: Leo rotazione azione corrente ──────────────────
-const leoActions = [
+// ─── Home: Agent rotazione azione corrente ──────────────────
+const agentActions = [
   {
     action: "Sto preparando l'arrivo di Anna, domani alle 15:00.",
     sub: "Guest DNA pronto, kit composto, briefing inviato a Rosa."
@@ -1764,24 +1764,24 @@ const leoActions = [
     sub: "Invio tra 4 ore, dopo il suo volo per Boston."
   }
 ];
-let leoIdx = 0, leoTimer;
-function rotateLeoAction() {
-  clearInterval(leoTimer);
-  const el    = document.getElementById('leo-action');
-  const elSub = document.getElementById('leo-sub');
-  leoTimer = setInterval(() => {
-    leoIdx = (leoIdx + 1) % leoActions.length;
+let agentIdx = 0, agentTimer;
+function rotateAgentAction() {
+  clearInterval(agentTimer);
+  const el    = document.getElementById('agent-action');
+  const elSub = document.getElementById('agent-sub');
+  agentTimer = setInterval(() => {
+    agentIdx = (agentIdx + 1) % agentActions.length;
     el.classList.add('fading');
     elSub.classList.add('fading');
     setTimeout(() => {
-      el.textContent    = leoActions[leoIdx].action;
-      elSub.textContent = leoActions[leoIdx].sub;
+      el.textContent    = agentActions[agentIdx].action;
+      elSub.textContent = agentActions[agentIdx].sub;
       el.classList.remove('fading');
       elSub.classList.remove('fading');
     }, 400);
   }, 4000);
 }
-rotateLeoAction();
+rotateAgentAction();
 
 // ─── Home: data italiana dinamica ─────────────────────────
 (function () {
