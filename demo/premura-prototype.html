@@ -1,0 +1,1869 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#1F3A4D" />
+<title>Premura — il concierge che non dorme mai</title>
+
+<!-- Tipografia: Fraunces per i titoli editoriali, Inter per il body -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,0..100&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ─── Design tokens ──────────────────────────────────────── */
+:root {
+  --ivory:        #F5EFE4;
+  --ivory-warm:   #EFE6D2;
+  --paper:        #FDFAF3;
+  --paper-deep:   #F8F1E1;
+  --ink:          #1F3A4D;
+  --ink-soft:     #4A5F72;
+  --ink-mute:     #8A98A5;
+  --ink-ghost:    #B8C1CC;
+  --terracotta:   #C65D3A;
+  --terracotta-2: #A84A2B;
+  --terracotta-soft:#E9C5B4;
+  --gold:         #D4A574;
+  --gold-soft:    #ECD8B7;
+  --gold-deep:    #B38850;
+  --line:         #E5DCC8;
+  --line-soft:    #EFE8D8;
+  --ok:           #4E7A57;
+  --warn:         #C9A35B;
+  --alert:        #C65D3A;
+  --shadow-sm:    0 1px 2px rgba(31,58,77,.04), 0 2px 6px rgba(31,58,77,.03);
+  --shadow-md:    0 2px 8px rgba(31,58,77,.06), 0 12px 28px rgba(31,58,77,.06);
+  --shadow-lg:    0 4px 14px rgba(31,58,77,.08), 0 24px 48px rgba(31,58,77,.10);
+  --radius-sm:    10px;
+  --radius:       16px;
+  --radius-lg:    24px;
+  --ease:         cubic-bezier(.2,.8,.2,1);
+}
+
+/* ─── Reset & base ──────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--ivory);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, select, textarea { font: inherit; color: inherit; }
+img, svg { display: block; max-width: 100%; }
+
+h1, h2, h3, h4 { font-family: 'Fraunces', Georgia, serif; font-weight: 500; letter-spacing: -0.01em; margin: 0; color: var(--ink); }
+h1 { font-size: clamp(34px, 6vw, 52px); line-height: 1.05; letter-spacing: -0.025em; font-variation-settings: "SOFT" 50; }
+h2 { font-size: clamp(24px, 3.5vw, 30px); line-height: 1.15; }
+h3 { font-size: 20px; line-height: 1.2; }
+h4 { font-size: 16px; font-weight: 600; }
+p  { margin: 0; }
+
+.mono-num { font-variant-numeric: tabular-nums; }
+
+/* ─── Layout: mobile-first, centered on desktop ─────────── */
+.app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--ivory);
+  position: relative;
+  box-shadow: 0 0 0 1px var(--line-soft);
+}
+@media (min-width: 900px) {
+  body {
+    background:
+      radial-gradient(ellipse at top, #EDE2CB, var(--ivory) 60%);
+    padding: 40px 0;
+  }
+  .app {
+    border-radius: 28px;
+    min-height: calc(100vh - 80px);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+  }
+}
+
+/* ─── Screen router ─────────────────────────────────────── */
+.screen {
+  display: none;
+  animation: screenIn .45s var(--ease);
+}
+.screen.active { display: block; }
+@keyframes screenIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Global utilities ──────────────────────────────────── */
+.container { padding: 0 20px; }
+.stack > * + * { margin-top: 16px; }
+.stack-lg > * + * { margin-top: 24px; }
+.eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .16em;
+  font-weight: 600;
+  color: var(--ink-mute);
+}
+
+/* Pulsing dot */
+.pulse-dot {
+  width: 8px; height: 8px;
+  border-radius: 999px;
+  background: var(--terracotta);
+  position: relative;
+  flex-shrink: 0;
+}
+.pulse-dot::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  border: 1px solid var(--terracotta);
+  opacity: .4;
+  animation: pulse 1.8s ease-out infinite;
+}
+@keyframes pulse {
+  0%   { transform: scale(.6); opacity: .7; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* State dots */
+.state-dot { display: inline-block; width: 10px; height: 10px; border-radius: 999px; flex-shrink: 0; }
+.state-dot.ok    { background: var(--ok); box-shadow: 0 0 0 3px rgba(78,122,87,.14); }
+.state-dot.warn  { background: var(--warn); box-shadow: 0 0 0 3px rgba(201,163,91,.18); }
+.state-dot.alert { background: var(--alert); box-shadow: 0 0 0 3px rgba(198,93,58,.18); animation: blink 1.6s ease-in-out infinite; }
+@keyframes blink { 50% { box-shadow: 0 0 0 6px rgba(198,93,58,.10); } }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px 22px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 15px;
+  transition: transform .15s var(--ease), box-shadow .2s var(--ease), background .2s;
+  white-space: nowrap;
+}
+.btn:active { transform: scale(.97); }
+.btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: var(--shadow-md);
+}
+.btn-primary:hover { background: #17303f; }
+.btn-accent {
+  background: var(--terracotta);
+  color: var(--paper);
+  box-shadow: var(--shadow-md);
+}
+.btn-accent:hover { background: var(--terracotta-2); }
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.btn-ghost:hover { background: var(--paper-deep); }
+.btn-block { display: flex; width: 100%; }
+
+/* ==========================================================
+   LANDING / ONBOARDING
+   ========================================================== */
+#screen-landing { min-height: 100vh; min-height: 100dvh; display: none; flex-direction: column; }
+#screen-landing.active { display: flex; }
+.landing-top {
+  padding: 20px 20px 0;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.wordmark {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+  display: flex; align-items: center; gap: 8px;
+}
+.wordmark::before {
+  content: '';
+  width: 10px; height: 10px; border-radius: 999px;
+  background: var(--terracotta);
+  display: inline-block;
+}
+.skip-link {
+  font-size: 12px;
+  color: var(--ink-mute);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--ink-ghost);
+  padding-bottom: 1px;
+}
+.skip-link:hover { color: var(--ink); border-color: var(--ink); }
+
+.landing-hero {
+  padding: 48px 24px 32px;
+  text-align: left;
+}
+.landing-hero .eyebrow { margin-bottom: 16px; }
+.landing-hero h1 em {
+  font-style: normal;
+  font-family: 'Fraunces', serif;
+  color: var(--terracotta);
+  font-variation-settings: "SOFT" 100, "opsz" 144;
+}
+.landing-hero .lede {
+  margin-top: 22px;
+  font-size: 17px;
+  color: var(--ink-soft);
+  line-height: 1.55;
+  max-width: 38ch;
+}
+
+.landing-card {
+  margin: 8px 20px 0;
+  background: var(--paper);
+  border-radius: var(--radius-lg);
+  padding: 28px 24px 24px;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+}
+.landing-card .eyebrow { color: var(--gold-deep); }
+.landing-price {
+  display: flex; align-items: baseline; gap: 6px; margin-top: 10px;
+  font-family: 'Fraunces', serif;
+}
+.landing-price .num { font-size: 52px; font-weight: 500; letter-spacing: -0.02em; color: var(--ink); }
+.landing-price .per { font-size: 16px; color: var(--ink-soft); font-family: 'Inter', sans-serif; }
+.landing-trial {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--gold-soft);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  margin-top: 12px;
+}
+.landing-trial::before { content: ''; width: 6px; height: 6px; border-radius: 999px; background: var(--gold-deep); }
+
+.stepper {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line-soft);
+}
+.stepper-label {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-bottom: 12px;
+}
+.stepper-value { font-family: 'Fraunces', serif; font-size: 20px; color: var(--ink); font-weight: 500; }
+.stepper-controls {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--ivory-warm);
+  border-radius: 999px;
+  padding: 6px;
+}
+.stepper-btn {
+  width: 40px; height: 40px;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 20px;
+  display: grid; place-items: center;
+  box-shadow: var(--shadow-sm);
+  transition: transform .15s var(--ease);
+}
+.stepper-btn:active { transform: scale(.9); }
+.stepper-btn:disabled { opacity: .35; cursor: not-allowed; }
+.stepper-count {
+  flex: 1; text-align: center;
+  font-family: 'Fraunces', serif; font-size: 28px;
+  font-weight: 500;
+}
+
+.landing-bullets {
+  list-style: none; padding: 0; margin: 32px 24px 0;
+  display: grid; gap: 14px;
+}
+.landing-bullets li {
+  display: flex; gap: 12px; align-items: flex-start;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+.landing-bullets li::before {
+  content: '';
+  width: 18px; height: 18px; flex-shrink: 0;
+  background: var(--ivory-warm);
+  border-radius: 999px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M2.5 6.5l2.5 2.5 5-6' stroke='%23C65D3A' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-size: 12px 12px;
+  background-repeat: no-repeat;
+  background-position: center;
+  margin-top: 3px;
+}
+
+.landing-cta {
+  padding: 32px 20px 24px;
+  display: grid; gap: 10px;
+}
+.landing-cta .btn { padding: 18px 24px; font-size: 16px; }
+.landing-cta small {
+  text-align: center; display: block;
+  color: var(--ink-mute); font-size: 12px;
+}
+
+.landing-footer {
+  margin-top: auto;
+  padding: 20px;
+  border-top: 1px solid var(--line-soft);
+  display: flex; justify-content: space-between; align-items: center;
+  color: var(--ink-mute); font-size: 12px;
+}
+
+/* ==========================================================
+   TOP BAR (screen header, reused)
+   ========================================================== */
+.topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 20px 12px;
+  position: sticky; top: 0; z-index: 10;
+  background: linear-gradient(to bottom, var(--ivory) 80%, rgba(245,239,228,0));
+}
+.topbar-back {
+  width: 40px; height: 40px; border-radius: 999px;
+  display: grid; place-items: center;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  transition: transform .15s var(--ease);
+}
+.topbar-back:active { transform: scale(.93); }
+.topbar-title {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-weight: 500;
+}
+.topbar-meta {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ink-mute);
+}
+
+/* ==========================================================
+   HOME DASHBOARD
+   ========================================================== */
+.home-hero {
+  padding: 28px 20px 12px;
+}
+.home-hello {
+  font-family: 'Fraunces', serif;
+  font-size: 34px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.home-hello em { color: var(--terracotta); font-style: normal; font-variation-settings: "SOFT" 80; }
+.home-date {
+  margin-top: 6px;
+  color: var(--ink-mute);
+  font-size: 13px;
+  text-transform: capitalize;
+}
+
+/* Alert banner (appare se c'è un ospite 🔴) */
+.alert-banner {
+  margin: 12px 20px 0;
+  background: linear-gradient(135deg, #FBE5DB 0%, #F5D2C2 100%);
+  border: 1px solid var(--terracotta-soft);
+  color: var(--terracotta-2);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex; align-items: center; gap: 14px;
+  text-align: left;
+  width: calc(100% - 40px);
+  transition: transform .15s var(--ease);
+}
+.alert-banner:hover { transform: translateY(-1px); }
+.alert-banner .state-dot { margin: 2px 0 0; }
+.alert-banner-body { flex: 1; }
+.alert-banner-title {
+  font-weight: 600;
+  color: var(--terracotta-2);
+  font-size: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.alert-banner-sub {
+  color: var(--terracotta-2);
+  opacity: .8;
+  font-size: 13px;
+  margin-top: 2px;
+}
+.alert-banner svg { color: var(--terracotta-2); }
+
+/* Leo card — il cuore della home */
+.leo-card {
+  margin: 20px;
+  position: relative;
+  background:
+    radial-gradient(circle at top right, rgba(212,165,116,.28), transparent 50%),
+    linear-gradient(135deg, #1F3A4D 0%, #2A4A60 100%);
+  color: var(--paper);
+  border-radius: var(--radius-lg);
+  padding: 24px 22px 22px;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+.leo-card::before {
+  /* Decorative hairline arc */
+  content: '';
+  position: absolute;
+  right: -40px; top: -60px;
+  width: 180px; height: 180px;
+  border-radius: 999px;
+  border: 1px solid rgba(212,165,116,.35);
+  pointer-events: none;
+}
+.leo-card::after {
+  content: '';
+  position: absolute;
+  right: -20px; top: -80px;
+  width: 220px; height: 220px;
+  border-radius: 999px;
+  border: 1px solid rgba(212,165,116,.15);
+  pointer-events: none;
+}
+.leo-eyebrow {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 11px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--gold-soft);
+  font-weight: 600;
+}
+.leo-eyebrow .pulse-dot {
+  background: var(--gold);
+}
+.leo-eyebrow .pulse-dot::after { border-color: var(--gold); }
+
+.leo-action {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.3;
+  margin-top: 14px;
+  letter-spacing: -0.01em;
+  min-height: 62px;
+  transition: opacity .4s var(--ease), transform .4s var(--ease);
+}
+.leo-action.fading { opacity: 0; transform: translateY(4px); }
+.leo-sub {
+  color: rgba(253,250,243,.7);
+  font-size: 13px;
+  margin-top: 10px;
+}
+.leo-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(253,250,243,.12);
+}
+.leo-stat {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.leo-stat-num {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--gold-soft);
+}
+.leo-stat-label {
+  font-size: 11px;
+  color: rgba(253,250,243,.55);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+}
+
+/* Metriche */
+.metrics {
+  padding: 8px 20px 4px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.metric {
+  background: var(--paper);
+  border-radius: var(--radius);
+  padding: 14px 12px 12px;
+  border: 1px solid var(--line-soft);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.metric-label {
+  font-size: 11px;
+  color: var(--ink-mute);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  font-weight: 600;
+}
+.metric-value {
+  font-family: 'Fraunces', serif;
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 500;
+  color: var(--ink);
+  margin-top: 6px;
+}
+.metric-sub {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 12px;
+  color: var(--ok);
+  margin-top: 4px;
+  font-weight: 500;
+}
+.metric-sub.down { color: var(--terracotta-2); }
+.metric-sub svg { width: 12px; height: 12px; }
+.metric-spark { margin-top: 6px; height: 18px; opacity: .7; }
+.metric-stars { letter-spacing: 1px; color: var(--gold-deep); font-size: 12px; margin-top: 2px; }
+
+/* Guest list */
+.guests-section { padding: 28px 20px 96px; }
+.section-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.section-head h2 { font-size: 22px; }
+.section-head .eyebrow { color: var(--ink-mute); }
+
+.guest-card {
+  display: flex; align-items: stretch; gap: 0;
+  background: var(--paper);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  position: relative;
+  transition: transform .18s var(--ease), border-color .2s, box-shadow .2s;
+  text-align: left;
+  width: 100%;
+}
+.guest-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--gold);
+  box-shadow: var(--shadow-md);
+}
+.guest-card.state-alert {
+  background: linear-gradient(135deg, #FCEBE0 0%, #F9DDCD 100%);
+  border-color: var(--terracotta-soft);
+}
+.guest-avatar {
+  width: 46px; height: 46px;
+  border-radius: 999px;
+  background: var(--ivory-warm);
+  color: var(--ink);
+  display: grid; place-items: center;
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-right: 14px;
+  position: relative;
+  border: 1px solid var(--line);
+}
+.guest-avatar .flag {
+  position: absolute;
+  bottom: -2px; right: -2px;
+  font-size: 14px;
+  background: var(--paper);
+  padding: 1px 2px;
+  border-radius: 999px;
+  line-height: 1;
+  box-shadow: var(--shadow-sm);
+}
+.guest-body { flex: 1; min-width: 0; }
+.guest-name {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink);
+}
+.guest-struct {
+  font-size: 12px;
+  color: var(--ink-mute);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.guest-status {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-top: 6px;
+  display: flex; align-items: center; gap: 6px;
+}
+.guest-arrow {
+  color: var(--ink-ghost);
+  font-size: 22px;
+  line-height: 1;
+  align-self: center;
+  margin-left: 8px;
+  transition: color .15s, transform .15s var(--ease);
+}
+.guest-card:hover .guest-arrow { color: var(--terracotta); transform: translateX(2px); }
+
+/* ==========================================================
+   DETTAGLIO OSPITE
+   ========================================================== */
+.detail-hero {
+  padding: 8px 20px 24px;
+  display: flex; gap: 18px; align-items: flex-start;
+}
+.detail-avatar {
+  width: 72px; height: 72px; border-radius: 999px;
+  background: var(--ivory-warm);
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 28px;
+  color: var(--ink);
+  display: grid; place-items: center;
+  flex-shrink: 0;
+  position: relative;
+  border: 1px solid var(--line);
+}
+.detail-avatar .flag {
+  position: absolute;
+  bottom: -4px; right: -4px;
+  font-size: 20px;
+  background: var(--paper);
+  padding: 2px 4px;
+  border-radius: 999px;
+  line-height: 1;
+  box-shadow: var(--shadow-sm);
+}
+.detail-name {
+  font-family: 'Fraunces', serif;
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+.detail-archetype {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--terracotta-2);
+  background: var(--terracotta-soft);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.detail-meta {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-top: 10px;
+  display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap;
+}
+.detail-meta .sep { width: 3px; height: 3px; border-radius: 999px; background: var(--ink-ghost); }
+
+.confidence {
+  margin: 0 20px 24px;
+  padding: 14px 16px;
+  background: var(--paper);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+}
+.confidence-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px;
+  color: var(--ink-mute);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  margin-bottom: 10px;
+}
+.confidence-bar {
+  height: 6px; background: var(--ivory-warm);
+  border-radius: 999px; overflow: hidden;
+}
+.confidence-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold) 0%, var(--terracotta) 100%);
+  border-radius: 999px;
+  width: 0;
+  transition: width 1.2s var(--ease);
+}
+.confidence-sub {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+/* Sezione generica */
+.section {
+  padding: 0 20px 24px;
+}
+.section h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 20px;
+  margin-bottom: 14px;
+  font-weight: 500;
+}
+
+.risk-grid { display: grid; gap: 10px; }
+.risk {
+  background: var(--paper);
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--gold);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.risk.severity-high { border-left-color: var(--terracotta); }
+.risk.severity-medium { border-left-color: var(--gold-deep); }
+.risk-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 6px;
+}
+.risk-kind { font-weight: 600; font-size: 14px; }
+.risk-sev {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .12em;
+  padding: 3px 8px; border-radius: 999px; font-weight: 700;
+}
+.risk-sev.high { background: var(--terracotta-soft); color: var(--terracotta-2); }
+.risk-sev.medium { background: var(--gold-soft); color: var(--gold-deep); }
+.risk-sev.low { background: var(--line-soft); color: var(--ink-soft); }
+.risk-why { font-size: 13px; color: var(--ink-soft); line-height: 1.45; margin-bottom: 10px; }
+.risk-action {
+  font-size: 13px;
+  display: flex; gap: 8px; align-items: flex-start;
+  padding: 10px 12px;
+  background: var(--ivory-warm);
+  border-radius: 10px;
+  color: var(--ink);
+}
+.risk-action::before {
+  content: '→';
+  color: var(--terracotta);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* Timeline 5 fasi */
+.timeline {
+  position: relative;
+  padding-left: 8px;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 14px; top: 12px; bottom: 12px;
+  width: 1px;
+  background: var(--line);
+}
+.phase {
+  position: relative;
+  padding: 0 0 18px 44px;
+  display: block;
+}
+.phase:last-child { padding-bottom: 0; }
+.phase::before {
+  content: '';
+  position: absolute;
+  left: 9px; top: 2px;
+  width: 12px; height: 12px;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 2px solid var(--line);
+}
+.phase.done::before {
+  background: var(--ok);
+  border-color: var(--ok);
+  box-shadow: 0 0 0 4px rgba(78,122,87,.12);
+}
+.phase.doing::before {
+  background: var(--terracotta);
+  border-color: var(--terracotta);
+  box-shadow: 0 0 0 4px rgba(198,93,58,.14);
+  animation: blink 1.6s ease-in-out infinite;
+}
+.phase.scheduled::before {
+  background: var(--paper);
+  border-color: var(--ink-ghost);
+}
+.phase-title {
+  font-family: 'Fraunces', serif;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.phase-title .tag {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+.phase.done .tag { background: rgba(78,122,87,.14); color: var(--ok); }
+.phase.doing .tag { background: var(--terracotta-soft); color: var(--terracotta-2); }
+.phase.scheduled .tag { background: var(--line-soft); color: var(--ink-mute); }
+.phase-body { font-size: 13px; color: var(--ink-soft); margin-top: 4px; line-height: 1.5; }
+.phase-time { font-size: 11px; color: var(--ink-mute); margin-top: 4px; text-transform: uppercase; letter-spacing: .06em; }
+
+/* WhatsApp preview */
+.chat {
+  background: #E7DDC8;
+  background-image:
+    radial-gradient(circle at 15% 20%, rgba(255,255,255,.35) 1px, transparent 1.5px),
+    radial-gradient(circle at 75% 65%, rgba(255,255,255,.3) 1px, transparent 1.5px),
+    radial-gradient(circle at 40% 80%, rgba(255,255,255,.25) 1px, transparent 1.5px);
+  background-size: 80px 80px, 120px 120px, 100px 100px;
+  border-radius: var(--radius);
+  padding: 16px 14px;
+  display: grid; gap: 10px;
+}
+.bubble {
+  max-width: 82%;
+  padding: 9px 12px 8px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.4;
+  position: relative;
+  box-shadow: 0 1px 0.5px rgba(11,20,26,.08);
+  word-wrap: break-word;
+}
+.bubble-sent { align-self: flex-end; margin-left: auto; background: #DCF8C6; color: #111B21; border-bottom-right-radius: 4px; }
+.bubble-recv { align-self: flex-start; background: #FFFFFF; color: #111B21; border-bottom-left-radius: 4px; }
+.bubble-time { font-size: 10px; color: rgba(17,27,33,.5); text-align: right; margin-top: 2px; letter-spacing: .02em; }
+.bubble-signature { font-size: 11px; color: rgba(17,27,33,.55); font-style: italic; margin-top: 4px; }
+
+/* ==========================================================
+   ALERT URGENTE
+   ========================================================== */
+#screen-alert .topbar {
+  background: linear-gradient(to bottom, #FBE5DB 80%, rgba(251,229,219,0));
+}
+#screen-alert { background: linear-gradient(to bottom, #FBE5DB 0%, var(--ivory) 220px); }
+.alert-hero {
+  padding: 8px 20px 20px;
+}
+.alert-hero-eyebrow {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; letter-spacing: .2em;
+  color: var(--terracotta-2); font-weight: 700;
+  text-transform: uppercase;
+}
+.alert-hero h1 {
+  font-size: 32px;
+  margin-top: 12px;
+  line-height: 1.1;
+}
+.alert-hero h1 em { color: var(--terracotta); font-style: normal; }
+.alert-context {
+  margin: 4px 20px 16px;
+  padding: 16px 18px;
+  background: var(--paper);
+  border-radius: var(--radius);
+  border: 1px solid var(--terracotta-soft);
+  box-shadow: var(--shadow-sm);
+}
+.alert-context-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.alert-context-row:last-child { border-bottom: none; padding-bottom: 0; }
+.alert-context-row:first-child { padding-top: 0; }
+.alert-context-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--ink-mute);
+  font-weight: 600;
+  width: 90px;
+  flex-shrink: 0;
+}
+.alert-context-value {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.suggestion {
+  margin: 0 20px 20px;
+  background: var(--paper);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+.suggestion-head {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line-soft);
+  display: flex; align-items: center; gap: 10px;
+  background: var(--paper-deep);
+}
+.suggestion-head .pulse-dot { background: var(--terracotta); }
+.suggestion-head .pulse-dot::after { border-color: var(--terracotta); }
+.suggestion-title {
+  font-family: 'Fraunces', serif;
+  font-size: 16px;
+  font-weight: 500;
+}
+.suggestion-body { padding: 18px; }
+.suggestion-intro {
+  font-size: 13px; color: var(--ink-soft);
+  margin-bottom: 12px;
+}
+.draft {
+  background: var(--ivory-warm);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.55;
+  border-left: 3px solid var(--gold);
+}
+.draft-meta {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--ink-mute);
+}
+.suggestion-actions {
+  padding: 0 18px 18px;
+  display: grid; gap: 8px;
+}
+.mini-actions {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+.mini-btn {
+  padding: 12px 8px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  transition: background .15s;
+}
+.mini-btn:hover { background: var(--paper-deep); }
+
+/* ==========================================================
+   SETTINGS KIT
+   ========================================================== */
+.settings-intro {
+  padding: 12px 20px 20px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.field-group {
+  margin: 0 20px 20px;
+  background: var(--paper);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+.field-label {
+  font-family: 'Fraunces', serif;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.field-hint {
+  font-size: 12px;
+  color: var(--ink-mute);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+.budget-display {
+  margin-top: 20px;
+  text-align: center;
+}
+.budget-big {
+  font-family: 'Fraunces', serif;
+  font-size: 56px;
+  line-height: 1;
+  font-weight: 500;
+  color: var(--terracotta);
+  letter-spacing: -0.02em;
+}
+.budget-sub { font-size: 13px; color: var(--ink-mute); margin-top: 6px; }
+.budget-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: var(--ivory-warm);
+  border-radius: 999px;
+  margin-top: 22px;
+  outline: none;
+}
+.budget-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px; height: 28px;
+  border-radius: 999px;
+  background: var(--terracotta);
+  border: 3px solid var(--paper);
+  box-shadow: var(--shadow-md);
+  cursor: grab;
+  transition: transform .15s var(--ease);
+}
+.budget-slider::-webkit-slider-thumb:active { transform: scale(1.15); cursor: grabbing; }
+.budget-slider::-moz-range-thumb {
+  width: 28px; height: 28px;
+  border-radius: 999px;
+  background: var(--terracotta);
+  border: 3px solid var(--paper);
+  cursor: grab;
+}
+.budget-ticks {
+  display: flex; justify-content: space-between;
+  margin-top: 10px;
+  padding: 0 2px;
+  font-size: 11px;
+  color: var(--ink-mute);
+}
+.budget-ticks span { position: relative; }
+
+.theme-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+.theme-opt {
+  padding: 14px 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  text-align: left;
+  display: flex; flex-direction: column; gap: 4px;
+  transition: all .15s;
+}
+.theme-opt.active {
+  border-color: var(--terracotta);
+  background: var(--terracotta-soft);
+}
+.theme-opt-icon { font-size: 22px; margin-bottom: 4px; }
+.theme-opt-name {
+  font-family: 'Fraunces', serif;
+  font-size: 14px;
+  font-weight: 500;
+}
+.theme-opt-desc { font-size: 11px; color: var(--ink-mute); }
+
+.cleaner-fields { display: grid; gap: 12px; margin-top: 14px; }
+.cleaner-field { display: flex; flex-direction: column; gap: 4px; }
+.cleaner-field label { font-size: 12px; color: var(--ink-mute); font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+.cleaner-field input {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--ivory);
+  font-size: 14px;
+  color: var(--ink);
+}
+.cleaner-field input:focus {
+  outline: none;
+  border-color: var(--terracotta);
+  background: var(--paper);
+}
+
+.anti-disinter {
+  display: flex; gap: 12px; align-items: flex-start;
+  margin: 0 20px 24px;
+  padding: 16px;
+  background: var(--gold-soft);
+  border-radius: var(--radius);
+  border: 1px solid var(--gold);
+}
+.anti-disinter-icon {
+  width: 32px; height: 32px; flex-shrink: 0;
+  background: var(--paper);
+  border-radius: 999px;
+  display: grid; place-items: center;
+  font-size: 16px;
+}
+.anti-disinter-text {
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.55;
+}
+.anti-disinter-text strong { color: var(--ink); }
+
+/* ==========================================================
+   BOTTOM TAB BAR
+   ========================================================== */
+.tabbar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  background: rgba(253,250,243,.92);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-top: 1px solid var(--line);
+  padding: 8px 8px calc(env(safe-area-inset-bottom, 0) + 8px);
+  z-index: 20;
+}
+.tabbar-btn {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 8px 0 4px;
+  color: var(--ink-mute);
+  gap: 2px;
+  border-radius: 10px;
+  transition: color .15s, background .15s;
+}
+.tabbar-btn.active { color: var(--terracotta); }
+.tabbar-btn:active { background: var(--paper-deep); }
+.tabbar-btn svg { width: 22px; height: 22px; }
+.tabbar-btn span { font-size: 10px; font-weight: 600; letter-spacing: .04em; }
+
+/* Hide tabbar on sub-screens */
+.screen[data-subscreen] .tabbar { display: none; }
+
+/* Loading state for onboarding CTA (fake) */
+.btn-loading {
+  position: relative; color: transparent !important; pointer-events: none;
+}
+.btn-loading::after {
+  content: '';
+  position: absolute; inset: 0;
+  margin: auto;
+  width: 18px; height: 18px;
+  border: 2px solid rgba(253,250,243,.3);
+  border-top-color: var(--paper);
+  border-radius: 999px;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Entrance stagger for home metrics */
+.metric { opacity: 0; transform: translateY(6px); animation: metricIn .5s var(--ease) forwards; }
+.metric:nth-child(1) { animation-delay: .1s; }
+.metric:nth-child(2) { animation-delay: .18s; }
+.metric:nth-child(3) { animation-delay: .26s; }
+@keyframes metricIn { to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+
+<body>
+
+<main class="app">
+
+  <!-- ================================================= -->
+  <!-- SCHERMATA 1 — LANDING / ONBOARDING               -->
+  <!-- ================================================= -->
+  <section class="screen active" id="screen-landing">
+    <div class="landing-top">
+      <div class="wordmark">Premura</div>
+      <a class="skip-link" data-go="home">salta → entra nella demo</a>
+    </div>
+
+    <div class="landing-hero">
+      <div class="eyebrow">Premura · per host indipendenti</div>
+      <h1>Il concierge<br>che <em>non dorme mai.</em></h1>
+      <p class="lede">Per host che vogliono recensioni 10 senza fare nulla. Leo studia ogni ospite, scrive messaggi su misura, prepara un pensiero in casa e intercetta i problemi prima che diventino recensioni.</p>
+    </div>
+
+    <div class="landing-card">
+      <div class="eyebrow">Abbonamento</div>
+      <div class="landing-price">
+        <span class="num mono-num" id="price-num">9,99</span>
+        <span class="per">€ / mese · per struttura</span>
+      </div>
+      <span class="landing-trial">30 giorni gratis · senza carta</span>
+
+      <div class="stepper">
+        <div class="stepper-label">
+          <span>Quante strutture gestisci?</span>
+          <span class="stepper-value" id="stepper-val">1 struttura</span>
+        </div>
+        <div class="stepper-controls">
+          <button class="stepper-btn" id="dec" aria-label="Togli una struttura">−</button>
+          <div class="stepper-count mono-num" id="count">1</div>
+          <button class="stepper-btn" id="inc" aria-label="Aggiungi una struttura">+</button>
+        </div>
+      </div>
+    </div>
+
+    <ul class="landing-bullets">
+      <li>Collega Booking e Airbnb in due tap — lettura unificata, nessun channel manager</li>
+      <li>Leo firma ogni messaggio, nella lingua dell'ospite, nel tuo tono</li>
+      <li>Kit al costo, zero markup — vedi ogni centesimo, firmato in calligrafia</li>
+      <li>Tu vedi solo tre stati: tutto ok, ti aggiorno, serve te</li>
+    </ul>
+
+    <div class="landing-cta">
+      <button class="btn btn-accent btn-block" id="connect-btn">Collega Booking + Airbnb</button>
+      <small>Nessuna carta richiesta · cancelli quando vuoi</small>
+    </div>
+
+    <div class="landing-footer">
+      <span>Fatto a Napoli</span>
+      <span>v0.1 · prototype</span>
+    </div>
+  </section>
+
+  <!-- ================================================= -->
+  <!-- SCHERMATA 2 — HOME DASHBOARD                     -->
+  <!-- ================================================= -->
+  <section class="screen" id="screen-home">
+    <div class="home-hero">
+      <div class="home-hello">Buongiorno, <em>Andrea</em></div>
+      <div class="home-date" id="home-date">Mercoledì 22 aprile</div>
+    </div>
+
+    <button class="alert-banner" data-go="alert">
+      <span class="state-dot alert"></span>
+      <div class="alert-banner-body">
+        <div class="alert-banner-title">Klaus a Villa Cristina — rumore alle 23:47</div>
+        <div class="alert-banner-sub">Leo ha preparato una risposta, serve il tuo via</div>
+      </div>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+
+    <div class="leo-card">
+      <div class="leo-eyebrow">
+        <span class="pulse-dot"></span>
+        <span>Leo sta lavorando</span>
+      </div>
+      <div class="leo-action" id="leo-action">
+        Sto preparando l'arrivo di Anna, domani alle 15:00.
+      </div>
+      <div class="leo-sub" id="leo-sub">
+        Guest DNA pronto, kit composto, briefing inviato a Rosa.
+      </div>
+      <div class="leo-footer">
+        <div class="leo-stat">
+          <span class="leo-stat-num mono-num">3</span>
+          <span class="leo-stat-label">Ospiti attivi</span>
+        </div>
+        <div class="leo-stat">
+          <span class="leo-stat-num mono-num">12</span>
+          <span class="leo-stat-label">Azioni oggi</span>
+        </div>
+        <div class="leo-stat">
+          <span class="leo-stat-num mono-num">0</span>
+          <span class="leo-stat-label">Serve te</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-label">Questo mese</div>
+        <div class="metric-value mono-num">24</div>
+        <div class="metric-sub">
+          <svg viewBox="0 0 12 12" fill="none"><path d="M2 8l3-3 2 2 3-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Ospiti gestiti
+        </div>
+        <svg class="metric-spark" viewBox="0 0 60 20" preserveAspectRatio="none">
+          <polyline points="0,14 10,12 20,13 30,9 40,7 50,4 60,5" fill="none" stroke="var(--gold-deep)" stroke-width="1.5"/>
+        </svg>
+      </div>
+
+      <div class="metric">
+        <div class="metric-label">Media recensioni</div>
+        <div class="metric-value mono-num">9,3</div>
+        <div class="metric-stars">★★★★★</div>
+        <div class="metric-sub">
+          <svg viewBox="0 0 12 12" fill="none"><path d="M3 8l3-3 3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          +1,1 vs marzo
+        </div>
+      </div>
+
+      <div class="metric">
+        <div class="metric-label">Revenue extra</div>
+        <div class="metric-value mono-num">€412</div>
+        <div class="metric-sub">stimato da Leo</div>
+        <svg class="metric-spark" viewBox="0 0 60 20" preserveAspectRatio="none">
+          <polyline points="0,16 10,14 20,11 30,12 40,8 50,6 60,3" fill="none" stroke="var(--terracotta)" stroke-width="1.5"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="guests-section">
+      <div class="section-head">
+        <h2>Prossimi ospiti</h2>
+        <span class="eyebrow">3 attivi</span>
+      </div>
+
+      <!-- Klaus — 🔴 alert -->
+      <button class="guest-card state-alert" data-go="alert">
+        <div class="guest-avatar">
+          K<span class="flag">🇩🇪</span>
+        </div>
+        <div class="guest-body">
+          <div class="guest-name">
+            <span class="state-dot alert"></span>
+            Klaus Werner
+          </div>
+          <div class="guest-struct">Villa Cristina · notte 3 di 5</div>
+          <div class="guest-status">Segnalazione rumore — serve risposta</div>
+        </div>
+        <span class="guest-arrow">›</span>
+      </button>
+
+      <!-- Anna — 🟢 all good -->
+      <button class="guest-card" data-go="detail">
+        <div class="guest-avatar">
+          A<span class="flag">🇳🇱</span>
+        </div>
+        <div class="guest-body">
+          <div class="guest-name">
+            <span class="state-dot ok"></span>
+            Anna van Dijsseldonk
+          </div>
+          <div class="guest-struct">La Goccia di S.Gennaro · 3 notti</div>
+          <div class="guest-status">Arrivo domani 15:00 · kit in arrivo da Rosa</div>
+        </div>
+        <span class="guest-arrow">›</span>
+      </button>
+
+      <!-- Emily — 🟡 waiting -->
+      <button class="guest-card">
+        <div class="guest-avatar">
+          E<span class="flag">🇺🇸</span>
+        </div>
+        <div class="guest-body">
+          <div class="guest-name">
+            <span class="state-dot warn"></span>
+            Emily Parker
+          </div>
+          <div class="guest-struct">Via dei Tribunali · check-out stamattina</div>
+          <div class="guest-status">Sondaggio post-stay inviato · feedback atteso</div>
+        </div>
+        <span class="guest-arrow">›</span>
+      </button>
+    </div>
+
+    <nav class="tabbar">
+      <button class="tabbar-btn active" data-tab="home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-7 9 7v10a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"/></svg>
+        <span>Home</span>
+      </button>
+      <button class="tabbar-btn" data-tab="guests">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M1 21a8 8 0 0 1 16 0"/><circle cx="17" cy="6" r="3" opacity=".5"/><path d="M21 15a6 6 0 0 0-5-3" opacity=".5"/></svg>
+        <span>Ospiti</span>
+      </button>
+      <button class="tabbar-btn" data-tab="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Kit</span>
+      </button>
+    </nav>
+  </section>
+
+  <!-- ================================================= -->
+  <!-- SCHERMATA 3 — DETTAGLIO OSPITE (Anna)            -->
+  <!-- ================================================= -->
+  <section class="screen" id="screen-detail" data-subscreen="true">
+    <div class="topbar">
+      <button class="topbar-back" data-go="home" aria-label="Indietro">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="topbar-title">Dettaglio ospite</div>
+      <div class="topbar-meta">🟢 Tutto ok</div>
+    </div>
+
+    <div class="detail-hero">
+      <div class="detail-avatar">
+        A<span class="flag">🇳🇱</span>
+      </div>
+      <div>
+        <div class="detail-name">Anna<br>van Dijsseldonk</div>
+        <span class="detail-archetype">Coppia olandese · turismo lento · prima volta in Italia</span>
+        <div class="detail-meta">
+          <span>La Goccia di S.Gennaro</span>
+          <span class="sep"></span>
+          <span>3 notti</span>
+          <span class="sep"></span>
+          <span>Check-in domani 15:00</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="confidence">
+      <div class="confidence-head">
+        <span>Quanto Leo la conosce</span>
+        <span class="mono-num" id="conf-val">82%</span>
+      </div>
+      <div class="confidence-bar">
+        <div class="confidence-fill" id="conf-fill"></div>
+      </div>
+      <div class="confidence-sub">LinkedIn pubblico, due recensioni lasciate ad altri host, pattern olandese. Nessun quiz necessario.</div>
+    </div>
+
+    <section class="section">
+      <h3>Tre rischi previsti</h3>
+      <div class="risk-grid">
+        <div class="risk severity-high">
+          <div class="risk-head">
+            <div class="risk-kind">Rumore serale</div>
+            <span class="risk-sev high">Alto</span>
+          </div>
+          <div class="risk-why">
+            Centro storico di Napoli, quartiere vivo fino a mezzanotte. Gli olandesi tendono a essere severi sul rumore, e in una recensione precedente Anna ha menzionato "much louder than expected".
+          </div>
+          <div class="risk-action">
+            Leo lascerà tappi Mack in camera e menzionerà "l'anima viva di Napoli" nel messaggio di pre-arrivo.
+          </div>
+        </div>
+
+        <div class="risk severity-medium">
+          <div class="risk-head">
+            <div class="risk-kind">Tre piani senza ascensore</div>
+            <span class="risk-sev medium">Medio</span>
+          </div>
+          <div class="risk-why">
+            La struttura ha 45 gradini. Anna viaggia con valigia media, non segnalato nelle note. Rischio disappunto al check-in se non anticipato.
+          </div>
+          <div class="risk-action">
+            Leo lo menzionerà nel messaggio T-48h con un sorriso, proponendo aiuto Rosa per le valigie.
+          </div>
+        </div>
+
+        <div class="risk severity-medium">
+          <div class="risk-head">
+            <div class="risk-kind">Colazione</div>
+            <span class="risk-sev medium">Medio</span>
+          </div>
+          <div class="risk-why">
+            Dal quiz pattern olandese: apprezzano colazione presente. La Goccia non la fornisce.
+          </div>
+          <div class="risk-action">
+            Kit include caffè e sfogliatelle fresche da Poppella. Nota con orari bar di zona.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h3>Timeline · le 5 fasi di Leo</h3>
+      <div class="timeline">
+        <div class="phase done">
+          <div class="phase-title">Studio <span class="tag">Fatto</span></div>
+          <div class="phase-body">Guest DNA generato. Archetipo: coppia olandese, turismo lento, prima volta. Lingua preferita: nederlandese.</div>
+          <div class="phase-time">Ieri · 18:22</div>
+        </div>
+        <div class="phase done">
+          <div class="phase-title">Contatto <span class="tag">Fatto</span></div>
+          <div class="phase-body">Messaggio T-48h inviato in nederlandese. Anna ha risposto "dankjewel!" — opt-in WhatsApp accettato.</div>
+          <div class="phase-time">Oggi · 09:14</div>
+        </div>
+        <div class="phase doing">
+          <div class="phase-title">Cura <span class="tag">In corso</span></div>
+          <div class="phase-body">Kit tema "Napoli autentica" composto (€11,75). Briefing inviato a Rosa. Consegna attesa stasera entro le 19.</div>
+          <div class="phase-time">Ora</div>
+        </div>
+        <div class="phase scheduled">
+          <div class="phase-title">Presenza <span class="tag">Domani</span></div>
+          <div class="phase-body">Check-in emotivo serale al giorno 2 (lunedì 24 aprile). Leo monitorerà il sentiment in tempo reale.</div>
+          <div class="phase-time">Programmato · lun 21:30</div>
+        </div>
+        <div class="phase scheduled">
+          <div class="phase-title">Chiusura <span class="tag">Tra 4 giorni</span></div>
+          <div class="phase-body">Sondaggio privato 24h dopo check-out. Se positivo, nudge alla recensione pubblica.</div>
+          <div class="phase-time">Programmato · gio 11:00</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h3>Ultimi messaggi</h3>
+      <div class="chat">
+        <div class="bubble bubble-sent">
+          Hoi Anna! Ik ben Leo, de concierge van La Goccia di S.Gennaro 🌿 Ik heb alvast wat kleine attenties voor jullie klaargezet. Napels leeft ook 's avonds — geen zorgen, er liggen ook oordopjes in huis.
+          <div class="bubble-time">09:14</div>
+        </div>
+        <div class="bubble bubble-recv">
+          Wat lief! Dankjewel, we kijken er enorm naar uit 🙏
+          <div class="bubble-time">09:27</div>
+        </div>
+        <div class="bubble bubble-sent">
+          De trap is drie verdiepingen zonder lift — Rosa helpt graag met de koffers, laat het gewoon weten. Tot morgen!
+          <div class="bubble-time">09:29</div>
+          <div class="bubble-signature">— Leo</div>
+        </div>
+      </div>
+    </section>
+
+    <div style="height: 40px;"></div>
+  </section>
+
+  <!-- ================================================= -->
+  <!-- SCHERMATA 4 — ALERT URGENTE (Klaus)              -->
+  <!-- ================================================= -->
+  <section class="screen" id="screen-alert" data-subscreen="true">
+    <div class="topbar">
+      <button class="topbar-back" data-go="home" aria-label="Indietro">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="topbar-title">Alert urgente</div>
+      <div class="topbar-meta">🔴 Serve te</div>
+    </div>
+
+    <div class="alert-hero">
+      <div class="alert-hero-eyebrow">
+        <span class="state-dot alert"></span>
+        Serve il tuo intervento
+      </div>
+      <h1>Klaus ha scritto<br><em>alle 23:47.</em></h1>
+    </div>
+
+    <div class="alert-context">
+      <div class="alert-context-row">
+        <span class="alert-context-label">Ospite</span>
+        <span class="alert-context-value">Klaus Werner 🇩🇪 · Villa Cristina · notte 3/5</span>
+      </div>
+      <div class="alert-context-row">
+        <span class="alert-context-label">Cosa ha detto</span>
+        <span class="alert-context-value">"Es ist sehr laut draußen. Wir können nicht schlafen."</span>
+      </div>
+      <div class="alert-context-row">
+        <span class="alert-context-label">Leo legge</span>
+        <span class="alert-context-value">Sentiment negativo, probabile 7/10 se non intervieni in 30 min.</span>
+      </div>
+      <div class="alert-context-row">
+        <span class="alert-context-label">Perché a te</span>
+        <span class="alert-context-value">Richiesta indiretta di sconto — sopra la soglia che hai delegato a Leo.</span>
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-head">
+        <span class="pulse-dot"></span>
+        <div class="suggestion-title">Risposta suggerita da Leo</div>
+      </div>
+      <div class="suggestion-body">
+        <div class="suggestion-intro">
+          In tedesco, tono caldo ma diretto. Include un gesto concreto (late check-out + voucher €30 per la prossima). Tu approvi con un tap.
+        </div>
+        <div class="draft">
+          Lieber Klaus, das tut mir wirklich leid. Der Vomero ist normalerweise ruhig, aber am Samstag gibt es manchmal ein Event am Platz. Ich habe eben mit den Nachbarn gesprochen — es sollte in 20 Minuten enden.<br><br>
+          Als Entschuldigung: morgen späten Check-out bis 14 Uhr und ein 30€ Gutschein für eine nächste Reise. Schlaf gut.
+          <div class="draft-meta">
+            <span>312 caratteri · tedesco · tono caldo</span>
+            <span>— Leo</span>
+          </div>
+        </div>
+      </div>
+      <div class="suggestion-actions">
+        <button class="btn btn-accent btn-block" onclick="simulateSendAlert(this)">Invia così com'è</button>
+        <div class="mini-actions">
+          <button class="mini-btn">Modifica prima</button>
+          <button class="mini-btn">Chiama Klaus</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="height: 40px;"></div>
+  </section>
+
+  <!-- ================================================= -->
+  <!-- SCHERMATA 5 — SETTINGS KIT                       -->
+  <!-- ================================================= -->
+  <section class="screen" id="screen-settings">
+    <div class="topbar">
+      <button class="topbar-back" data-go="home" aria-label="Indietro">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="topbar-title">Kit & cleaner</div>
+      <div class="topbar-meta">Salva automaticamente</div>
+    </div>
+
+    <p class="settings-intro">
+      Imposta una volta, Leo fa il resto. Nessun markup sul kit: paghi il costo vivo più €0,75 di servizio, €2 a Rosa, €1 di biglietto.
+    </p>
+
+    <div class="field-group">
+      <div class="field-label">Budget massimo per kit</div>
+      <div class="field-hint">Leo sta dentro questa cifra qualsiasi ospite arrivi. Include prodotti, biglietto scritto a mano e consegna.</div>
+      <div class="budget-display">
+        <div class="budget-big mono-num" id="budget-display">€12</div>
+        <div class="budget-sub" id="budget-label">Equilibrato · copre quasi tutto</div>
+      </div>
+      <input type="range" min="3" max="20" step="1" value="12" class="budget-slider" id="budget-slider" />
+      <div class="budget-ticks">
+        <span>€3</span><span>€6</span><span>€12</span><span>€16</span><span>€20</span>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <div class="field-label">Stile del kit</div>
+      <div class="field-hint">Leo sceglie gli item specifici sulla base dell'ospite, ma entro questo tema.</div>
+      <div class="theme-grid">
+        <button class="theme-opt" data-theme="auto">
+          <span class="theme-opt-icon">✨</span>
+          <span class="theme-opt-name">Auto</span>
+          <span class="theme-opt-desc">Leo decide caso per caso</span>
+        </button>
+        <button class="theme-opt active" data-theme="napoletano">
+          <span class="theme-opt-icon">🌋</span>
+          <span class="theme-opt-name">Napoletano classico</span>
+          <span class="theme-opt-desc">Falanghina, sfogliatelle, taralli</span>
+        </button>
+        <button class="theme-opt" data-theme="elegante">
+          <span class="theme-opt-icon">🕯️</span>
+          <span class="theme-opt-name">Elegante</span>
+          <span class="theme-opt-desc">Bollicine, cioccolato, mascherina seta</span>
+        </button>
+        <button class="theme-opt" data-theme="famiglia">
+          <span class="theme-opt-icon">🧸</span>
+          <span class="theme-opt-name">Famiglia</span>
+          <span class="theme-opt-desc">Succhi, merendine, piccolo gioco</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <div class="field-label">Cleaner di fiducia</div>
+      <div class="field-hint">Riceve il kit e lo sistema in casa. Viene pagata automaticamente a fine mese.</div>
+      <div class="cleaner-fields">
+        <div class="cleaner-field">
+          <label for="c-name">Nome</label>
+          <input type="text" id="c-name" value="Rosa Esposito" />
+        </div>
+        <div class="cleaner-field">
+          <label for="c-wa">WhatsApp</label>
+          <input type="tel" id="c-wa" value="+39 333 1234567" />
+        </div>
+        <div class="cleaner-field">
+          <label for="c-fee">Compenso per kit</label>
+          <input type="text" id="c-fee" value="€2,00" />
+        </div>
+      </div>
+    </div>
+
+    <div class="anti-disinter">
+      <div class="anti-disinter-icon">🎁</div>
+      <div class="anti-disinter-text">
+        <strong>I kit specifici non sono visibili prima dell'invio.</strong><br>
+        Leo sceglie gli item per te — vedrai solo tema, budget speso e foto finale di Rosa.
+      </div>
+    </div>
+
+    <div style="height: 20px;"></div>
+
+    <nav class="tabbar">
+      <button class="tabbar-btn" data-tab="home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-7 9 7v10a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"/></svg>
+        <span>Home</span>
+      </button>
+      <button class="tabbar-btn" data-tab="guests">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M1 21a8 8 0 0 1 16 0"/><circle cx="17" cy="6" r="3" opacity=".5"/><path d="M21 15a6 6 0 0 0-5-3" opacity=".5"/></svg>
+        <span>Ospiti</span>
+      </button>
+      <button class="tabbar-btn active" data-tab="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Kit</span>
+      </button>
+    </nav>
+  </section>
+
+</main>
+
+<script>
+// ─── Router di schermata ────────────────────────────────────
+const screens = document.querySelectorAll('.screen');
+
+function goTo(id) {
+  screens.forEach(s => s.classList.remove('active'));
+  const target = document.getElementById('screen-' + id);
+  if (target) {
+    target.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    // Trigger per animazioni una-tantum
+    if (id === 'detail') triggerConfidence();
+    if (id === 'home')   rotateLeoAction();
+  }
+}
+
+document.addEventListener('click', (e) => {
+  const trigger = e.target.closest('[data-go]');
+  if (trigger) {
+    e.preventDefault();
+    goTo(trigger.dataset.go);
+  }
+
+  const tab = e.target.closest('[data-tab]');
+  if (tab) {
+    const tabId = tab.dataset.tab;
+    // Ospiti → home (stessa schermata in questo prototipo)
+    goTo(tabId === 'guests' ? 'home' : tabId);
+    document.querySelectorAll('.tabbar-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll(`.tabbar-btn[data-tab="${tabId}"]`).forEach(b => b.classList.add('active'));
+  }
+});
+
+// ─── Landing: stepper prezzi dinamico ──────────────────────
+const dec     = document.getElementById('dec');
+const inc     = document.getElementById('inc');
+const count   = document.getElementById('count');
+const priceN  = document.getElementById('price-num');
+const stepVal = document.getElementById('stepper-val');
+
+function priceFor(n) {
+  if (n === 1) return '9,99';
+  if (n <= 5)  return '7,99';
+  return '5,99';
+}
+function updateStepper() {
+  const n = parseInt(count.textContent, 10);
+  priceN.textContent = priceFor(n);
+  stepVal.textContent = n === 1 ? '1 struttura' : `${n} strutture`;
+  dec.disabled = n <= 1;
+  inc.disabled = n >= 20;
+}
+dec.addEventListener('click', () => {
+  const n = Math.max(1, parseInt(count.textContent, 10) - 1);
+  count.textContent = n;
+  updateStepper();
+});
+inc.addEventListener('click', () => {
+  const n = Math.min(20, parseInt(count.textContent, 10) + 1);
+  count.textContent = n;
+  updateStepper();
+});
+
+// ─── Landing: "Collega Booking + Airbnb" → fake OAuth ─────
+document.getElementById('connect-btn').addEventListener('click', function () {
+  this.classList.add('btn-loading');
+  setTimeout(() => {
+    this.classList.remove('btn-loading');
+    goTo('home');
+  }, 1200);
+});
+
+// ─── Home: Leo rotazione azione corrente ──────────────────
+const leoActions = [
+  {
+    action: "Sto preparando l'arrivo di Anna, domani alle 15:00.",
+    sub: "Guest DNA pronto, kit composto, briefing inviato a Rosa."
+  },
+  {
+    action: "Ho scritto a Rosa per il kit di Anna.",
+    sub: "Consegna prevista stasera entro le 19. Foto finale al termine."
+  },
+  {
+    action: "Sto monitorando Klaus a Villa Cristina.",
+    sub: "Ultimo messaggio analizzato 2 minuti fa. Sentiment sotto soglia."
+  },
+  {
+    action: "Genero il sondaggio post-stay per Emily.",
+    sub: "Invio tra 4 ore, dopo il suo volo per Boston."
+  }
+];
+let leoIdx = 0, leoTimer;
+function rotateLeoAction() {
+  clearInterval(leoTimer);
+  const el    = document.getElementById('leo-action');
+  const elSub = document.getElementById('leo-sub');
+  leoTimer = setInterval(() => {
+    leoIdx = (leoIdx + 1) % leoActions.length;
+    el.classList.add('fading');
+    elSub.classList.add('fading');
+    setTimeout(() => {
+      el.textContent    = leoActions[leoIdx].action;
+      elSub.textContent = leoActions[leoIdx].sub;
+      el.classList.remove('fading');
+      elSub.classList.remove('fading');
+    }, 400);
+  }, 4000);
+}
+rotateLeoAction();
+
+// ─── Home: data italiana dinamica ─────────────────────────
+(function () {
+  const giorni = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+  const mesi   = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+  const oggi   = new Date();
+  const el = document.getElementById('home-date');
+  if (el) el.textContent = `${giorni[oggi.getDay()]} ${oggi.getDate()} ${mesi[oggi.getMonth()]}`;
+})();
+
+// ─── Dettaglio: confidence bar animation on enter ────────
+function triggerConfidence() {
+  const fill = document.getElementById('conf-fill');
+  const val  = document.getElementById('conf-val');
+  if (!fill) return;
+  fill.style.width = '0%';
+  requestAnimationFrame(() => {
+    setTimeout(() => fill.style.width = '82%', 100);
+  });
+}
+
+// ─── Alert: finto invio ──────────────────────────────────
+function simulateSendAlert(btn) {
+  btn.classList.add('btn-loading');
+  setTimeout(() => {
+    btn.classList.remove('btn-loading');
+    btn.textContent = '✓ Inviato · Leo monitora la risposta';
+    btn.style.background = 'var(--ok)';
+    setTimeout(() => goTo('home'), 1100);
+  }, 900);
+}
+
+// ─── Settings: budget slider ──────────────────────────────
+const slider = document.getElementById('budget-slider');
+const bDisp  = document.getElementById('budget-display');
+const bLabel = document.getElementById('budget-label');
+const bLabels = {
+  3:  'Simbolico · biglietto + un piccolo pensiero',
+  4:  'Essenziale · biglietto + un prodotto',
+  5:  'Essenziale · biglietto + un prodotto',
+  6:  'Leggero · due piccole attenzioni',
+  7:  'Leggero · due piccole attenzioni',
+  8:  'Standard · equilibrato',
+  9:  'Standard · equilibrato',
+  10: 'Standard · equilibrato',
+  11: 'Equilibrato · copre quasi tutto',
+  12: 'Equilibrato · copre quasi tutto',
+  13: 'Ricco · bottiglia + dolce + comfort',
+  14: 'Ricco · bottiglia + dolce + comfort',
+  15: 'Ricco · bottiglia + dolce + comfort',
+  16: 'Premium · prodotti artigianali locali',
+  17: 'Premium · prodotti artigianali locali',
+  18: 'Premium · prodotti artigianali locali',
+  19: 'Deluxe · suite e lune di miele',
+  20: 'Deluxe · suite e lune di miele'
+};
+if (slider) {
+  slider.addEventListener('input', () => {
+    const v = slider.value;
+    bDisp.textContent = '€' + v;
+    bLabel.textContent = bLabels[v] || 'Personalizzato';
+  });
+}
+
+// ─── Settings: scelta tema ───────────────────────────────
+document.querySelectorAll('.theme-opt').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.theme-opt').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+  });
+});
+
+// ─── Ctrl/Cmd + → per navigare tra schermate in demo ─────
+const order = ['landing', 'home', 'detail', 'alert', 'settings'];
+document.addEventListener('keydown', (e) => {
+  if (!(e.metaKey || e.ctrlKey)) return;
+  const active = document.querySelector('.screen.active')?.id.replace('screen-', '');
+  let i = order.indexOf(active);
+  if (i < 0) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); goTo(order[(i + 1) % order.length]); }
+  if (e.key === 'ArrowLeft')  { e.preventDefault(); goTo(order[(i - 1 + order.length) % order.length]); }
+});
+</script>
+</body>
+</html>
