@@ -6,8 +6,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', {
 });
 
 /**
- * Two types of charges in GiftTube:
- *  1. Monthly subscription €4.99/property (recurring, Stripe Subscriptions)
+ * Two types of charges in Premura:
+ *  1. Monthly subscription per property (recurring, Stripe Subscriptions) — tiered pricing €9.99/€7.99/€5.99 + 30-day no-card trial
  *  2. Per-kit charge at cost + €0.75 service fee (off-session via saved payment method)
  *
  * Per-kit charges use off_session=true because the host pre-authorized during onboarding.
@@ -33,7 +33,7 @@ export async function createCustomer(input: {
 
 export async function createSubscription(input: {
   customerId: string;
-  priceId: string; // €4.99/month recurring price ID
+  priceId: string; // Stripe Price ID for the tiered monthly subscription
   trialDays?: number;
 }): Promise<{ subscriptionId: string; status: string; clientSecret?: string }> {
   const sub = await stripe.subscriptions.create({
