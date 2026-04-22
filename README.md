@@ -1,102 +1,142 @@
-# GiftTube
+# Premura
 
-> Il concierge invisibile per host di affitti brevi. €4.99/mese, zero configurazione.
+> Il primo tool che un host italiano di affitti brevi compra quando capisce che
+> non può più gestire tutto a mano. Agente AI concierge, zero configurazione.
 
-## Cosa fa
+## Posizionamento
 
-Per ogni ospite che prenota una struttura, GiftTube:
+Premura è **Livello 1**: serve l'host con 1-5 strutture, senza PMS, che oggi
+gestisce ospiti a mano. ~70% del mercato italiano (Hostaway Summer Snapshot 2025).
 
-1. **Analizza** i dati pubblici dell'ospite (OSINT leggero: nazionalità, recensioni lasciate altrove, profilo pubblico)
-2. **Invia un micro-quiz** di 60 secondi via canale Booking/Airbnb se i dati non sono sufficienti
-3. **Genera una Guest DNA card** con archetipo, rischi specifici, tono consigliato
-4. **Ordina un kit di benvenuto personalizzato** (vino/dolci/biglietto scritto a mano) a casa della cleaner dell'host
-5. **Invia istruzioni alla cleaner** via WhatsApp (lei sistema il kit durante la pulizia pre-check-in)
-6. **Manda messaggi contestuali** all'ospite (pre-arrivo, check-in emotivo giorno 2, post-stay recovery)
-7. **Intercetta feedback negativo** prima che diventi recensione pubblica
+Non competiamo con Smoobu, Hostaway, Guesty o Hospitable. Quelli sono Livello 2,
+channel manager seri per chi ha 10+ strutture. Premura è quello che l'host compra
+**PRIMA** di loro — o **AL POSTO DI** loro per sempre se resta piccolo.
 
-L'host fa UNA cosa: collega Booking/Airbnb all'onboarding. Tutto il resto è automatico.
+Hospitable ha appena lanciato un piano Essentials gratis proprio su questa fascia:
+conferma che il segmento è enorme e sottoservito.
 
-## Perché è diverso
+## Cosa fa — le 5 fasi
 
-| Competitor | Cosa fanno | Cosa NON fanno |
-|------------|-----------|---------------|
-| Hostaway, Guesty | Template di messaggi automatici | Nessun kit fisico, nessun sondaggio AI-driven |
-| Besty, Nowistay | AI chatbot per FAQ ospiti | Nessuna esecuzione autonoma nel mondo fisico |
-| Operto, Uplisting | Pre-arrival surveys statici | I sondaggi non si trasformano in azioni |
-| **GiftTube** | **Sondaggio → interpretazione AI → kit fisico consegnato** | — |
+Per ogni prenotazione, l'agente esegue automaticamente:
 
-Il gap verificato ad aprile 2026: nessun tool chiude il loop "sondaggio → azione fisica autonoma".
+1. **Studio** — analizza l'ospite (nazionalità, recensioni pubbliche altrove,
+   pattern di prenotazione). Output: Guest DNA con archetipo, rischi, tono.
+2. **Contatto** — T-48h dal check-in, messaggio WhatsApp personalizzato con
+   opt-in. Micro-quiz di 60 secondi (4 swipe stile Tinder). Fallback canale
+   Booking/Airbnb se opt-in negato.
+3. **Cura** — compone kit fisico personalizzato da DNA + quiz. Ordina
+   ingredienti (Amazon/Cortilia/fornitori locali) a casa della cleaner. Briefa
+   cleaner via WhatsApp. Cleaner sistema kit e manda foto.
+4. **Presenza** — giorno 2 sera, check-in emotivo su WhatsApp. Se OK, silenzio.
+   Se problema piccolo, risolve solo. Se problema grosso, escalation urgente
+   all'host con azione concreta suggerita.
+5. **Chiusura** — T+24h dopo il check-out, sondaggio privato. Feedback negativo
+   → recovery. Feedback positivo → nudge alla recensione pubblica.
 
-## Modello economico
+## UX dell'host — solo 3 stati
 
-- **Abbonamento host**: €4.99/mese per struttura
-- **Kit fisico**: l'host paga al costo (~€10-12) + service fee €0.75
-- **Cleaner**: riceve €2 per kit sistemato, pagamento mensile automatico
-- **Noi**: non anticipiamo mai. Scaling illimitato.
+L'host **non** vede timeline, log, task list. Vede **solo 3 stati** per ogni ospite:
 
-A 10.000 host attivi: ~€95k/mese margine netto.
+- **Verde** — tutto ok, Premura sta gestendo (zero azioni)
+- **Giallo** — ti aggiorno ma sto lavorando io
+- **Rosso** — urgente, serve tuo intervento (con azione suggerita)
+
+La card principale della home recita *"STA LAVORANDO PER TE"* con descrizione
+live di cosa l'agente sta facendo in quel momento.
+
+## Prezzi
+
+| Strutture | Prezzo |
+|-----------|--------|
+| 1         | €9,99 / mese |
+| 2-5       | €7,99 / mese per struttura |
+| 6+        | €5,99 / mese per struttura |
+
+**Trial 30 giorni gratis, senza carta richiesta.**
+
+## Kit — zero markup
+
+L'host paga il kit a costo trasparente. Nessun margine sul prodotto fisico.
+
+- Prodotti: al costo vivo
+- Service fee: €0,75 per kit
+- Cleaner: €2 per kit sistemato
+- Biglietto scritto a mano: €1
+- Slider budget host: da €3 (simbolico) a €20 (premium)
+
+Trasparenza totale sui centesimi: è un pilastro etico non negoziabile.
+
+## Decisioni blindate
+
+- Nome prodotto e agente: **Premura** (stesso nome, non "Leo" né altri)
+- Firma messaggi all'ospite: **nome della struttura** (es. "— La Goccia di
+  S.Gennaro"). L'ospite pensa di parlare con l'host umano, non con un brand
+  esterno.
+- Il kit specifico **non è visibile all'host** prima dell'invio
+  (anti-disintermediazione). L'host vede solo budget, tema, "kit inviato".
+- L'host **non configura** template messaggi. Premura scrive tutto sempre
+  diverso basandosi su DNA + contesto + quiz.
+- Canale messaggi primario: WhatsApp Business con opt-in. Fallback
+  Booking/Airbnb solo se opt-in negato.
+- Aggregazione **read-only** di Booking + Airbnb. Non è un channel manager.
+
+## Cosa NON è Premura
+
+- **Non è un channel manager** — non sincronizza disponibilità, non scrive
+  su Booking/Airbnb. Solo lettura.
+- **Non è un PMS** — niente pulizie complesse, niente reportistica
+  contabile, niente calendar editing multi-property.
+- **Non è un chatbot dichiarato** — l'ospite chatta col nome della struttura,
+  non con un brand terzo.
+- **Non richiede configurazione** — l'host imposta cleaner + budget una volta
+  sola. Il resto è automatico.
 
 ## Stack tecnico
 
-- **Backend**: Node.js + TypeScript + Fastify
-- **Orchestrazione**: n8n (workflow visuali) + Claude Agent SDK (decisioni AI)
-- **AI**: Claude Sonnet 4.7 via Anthropic API (Guest DNA, messaggi, kit selection)
-- **Database**: PostgreSQL (dati strutturati) + Redis (cache/queue)
-- **Integrazioni**:
-  - Booking.com Connectivity API + Airbnb API (input prenotazioni)
-  - Amazon SP-API Italia + Cortilia + Glovo Business (kit fisico)
-  - WhatsApp Business Cloud API (cleaner + ospiti)
-  - Stripe (abbonamenti + pagamento kit)
-- **Hosting**: Railway/Render per MVP, migrazione a AWS post-MRR €10k
+- **Linguaggio**: TypeScript strict
+- **Runtime**: Node.js 22 LTS
+- **Framework**: Fastify
+- **Database**: PostgreSQL 16 + Drizzle ORM
+- **Queue**: BullMQ su Redis
+- **AI**: Anthropic SDK — `claude-opus-4-7` per decisioni importanti,
+  `claude-haiku-4-5-20251001` per task semplici
+- **Testing**: Vitest
+- **Linting**: Biome
+- **Integrazioni previste**: Booking.com Connectivity API, Airbnb API (lettura),
+  Amazon SP-API Italia, Cortilia, WhatsApp Business Cloud API, Stripe
 
 ## Struttura repo
 
 ```
-gifttube/
+premura/
 ├── src/
-│   ├── agents/         # Claude-powered agents (GuestDNA, KitComposer, MessageWriter)
-│   ├── workflows/      # Business logic orchestration
-│   ├── integrations/   # API wrappers (Booking, Airbnb, Amazon, WhatsApp)
-│   ├── api/            # REST endpoints (host dashboard + webhooks)
-│   ├── db/             # Schema, migrations, queries
-│   └── utils/          # Shared helpers
-├── n8n-workflows/      # Exported n8n JSON (visual workflows)
-├── docs/               # Architecture, API docs, operational playbooks
-├── scripts/            # One-off scripts (seed data, migration helpers)
-├── tests/              # Unit + integration tests
-└── config/             # Environment configs
+│   ├── agents/         # Agenti Claude (guest-dna, kit-composer, message-writer, recovery)
+│   ├── workflows/      # Orchestrazione business logic
+│   ├── integrations/   # Wrapper API esterne
+│   ├── api/            # REST endpoints (webhooks, dashboard, cleaner)
+│   ├── db/             # Schema Drizzle, migrations, queries
+│   └── utils/          # Claude wrapper, logger, errori
+├── demo/               # Prototipo HTML navigabile
+├── docs/               # Architettura, validation, playbook
+└── tests/              # Unit + integration (Testcontainers)
 ```
 
-## Roadmap
+## Estetica
 
-### Fase 0 — Validation (Settimana 1-2)
-Test manuale sulle 3 strutture di Andrea a Napoli. Zero codice.
-- 10 ospiti, kit ordinati a mano, consegna via cleaner (Maria)
-- Obiettivo: portare media recensioni da 8.2 → 9+ in 30 giorni
+- Typography: Fraunces (titoli), Inter (body)
+- Palette: avorio `#F5EFE4`, terracotta `#C65D3A`, blu profondo `#1F3A4D`,
+  oro `#D4A574`
+- Tono: elegante, caldo, italiano. Non il solito SaaS freddo.
+- Riferimenti: Notion (pulizia), Linear (precisione), Airbnb (calore).
+- Mobile-first, navigabile anche da desktop.
 
-### Fase 1 — MVP tecnico (Settimana 3-8)
-- Onboarding + connessione Booking/Airbnb
-- Guest DNA agent (Claude-powered)
-- Quiz pre-arrivo via canale piattaforma
-- Dashboard host minimale
-- Workflow n8n per orchestrazione
+## Stato
 
-### Fase 2 — Logistica (Settimana 9-12)
-- Integrazione Amazon SP-API Italia
-- WhatsApp Business → cleaner
-- Handwrytten / network calligrafi
-- Fallback Glovo Business per last-minute
-
-### Fase 3 — Scale (Mese 4-6)
-- Partnership fornitori locali (Napoli, Roma, Milano)
-- Payment automation Stripe Connect per cleaner
-- Dashboard analytics per host
-- Soft launch gruppi Facebook host italiani
+Pre-MVP. In corso: allineamento brand + prototipo UX.
 
 ## Contatti
 
-Fondatore: Andrea · Napoli, Italia
-Stato: Pre-MVP, validation in corso
+Fondatore: Andrea Chiacchio · Napoli, Italia
 
 ## Licenza
 
