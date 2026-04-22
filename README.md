@@ -130,6 +130,18 @@ premura/
 - Riferimenti: Notion (pulizia), Linear (precisione), Airbnb (calore).
 - Mobile-first, navigabile anche da desktop.
 
+## Getting started
+
+```bash
+git clone <repo-url> gifttube
+cd gifttube
+pnpm install
+pnpm dev
+```
+
+Per la lista completa dei comandi (test, migrations, lint, typecheck) e le
+convenzioni di codice, vedi [`CLAUDE.md`](./CLAUDE.md).
+
 ## Stato
 
 Pre-MVP. In corso: allineamento brand + prototipo UX.
