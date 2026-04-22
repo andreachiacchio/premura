@@ -1,7 +1,7 @@
 {
   "name": "gifttube",
   "version": "0.1.0",
-  "description": "The invisible concierge for short-term rental hosts",
+  "description": "Premura — agente AI concierge per host italiani di affitti brevi",
   "private": true,
   "type": "module",
   "engines": {
