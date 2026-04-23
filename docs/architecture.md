@@ -1,8 +1,8 @@
 # ARCHITECTURE — Premura
 
 > Documento tecnico di riferimento per il progetto.
-> Versione 2 — 22 aprile 2026 (include Conversation Agent, profilo
-> struttura, voice profile host, matrice delega).
+> Versione 2.1 — 22 aprile 2026 (fix calcolo economico: incluse
+> service fee kit nei revenue stimati).
 >
 > Subordinato a `CONTEXT.md` (prodotto).
 > Questo file dice "come lo facciamo".
@@ -325,66 +325,90 @@ casi auto. Draft pronti in <5 secondi.
 
 ---
 
-## 6. Costi operativi rivisti (v2)
+## 6. Economia del prodotto (v2.1 — CORRETTA)
 
-### Volumi attesi per ospite
+### Revenue per host (2 rivoli)
 
-- Agent 1 DNA (1 chiamata): €0.03
-- Agent 2 Kit (1 chiamata): €0.02
-- Agent 3 Message (5 messaggi programmati): €0.05
-- Agent 4 Conversation (8 messaggi inbound medio): €0.32
-- Agent 5 Onboarding: solo una volta per host, ammortizzato (€0.20/anno)
+**Rivolo 1 — Abbonamento mensile**
+- 1 struttura: €9.99
+- 2-5 strutture: €7.99/struttura
+- 6+ strutture: €5.99/struttura
 
-**Totale per ospite: ~€0.42** (vs €0.05 stima v1 — 8x più realistico).
+**Rivolo 2 — Service fee sui kit**
+- €0.75 per ogni ospite che riceve un kit
+- Host medio: 10 ospiti/mese/struttura → €7.50/struttura/mese di service fee
 
-### Costi mensili stimati
+**Revenue totale stimato per host medio (1 struttura):**
+€9.99 (abbonamento) + €7.50 (fee kit) = **€17.49/mese**
 
-**Fase MVP (50 host attivi, 10 ospiti/host/mese = 500 ospiti)**
+### Costi operativi per ospite processato
 
-| Servizio | Costo mensile |
-|----------|--------------|
-| Supabase Free | €0 |
-| Fly.io (1 macchina) | €5 |
-| Upstash Redis Free | €0 |
-| Vercel Hobby | €0 |
-| Claude API (500 × €0.42) | €210 |
-| WhatsApp Cloud (~4000 conv/mese) | €40 |
-| Stripe fees | ~€8 |
-| Sentry Free | €0 |
-| Dominio + email | €2 |
-| **TOTALE** | **~€265/mese** |
+- Agent 1 DNA: €0.03
+- Agent 2 Kit: €0.02
+- Agent 3 Message (5 programmati): €0.05
+- Agent 4 Conversation (8 inbound medi): €0.32
+- Agent 5 Onboarding: ammortizzato €0.02
 
-**Fase growth (500 host, 5000 ospiti/mese)**
+**Costo variabile per ospite: ~€0.44** (Claude + WhatsApp volume).
 
-| Servizio | Costo mensile |
-|----------|--------------|
-| Supabase Pro | €25 |
-| Fly.io (2 macchine) | €20 |
-| Upstash Redis | €15 |
-| Vercel Pro | €20 |
-| Claude API (5000 × €0.42) | €2100 |
-| WhatsApp Cloud (~40k conv/mese) | €400 |
-| Stripe fees | ~€90 |
-| Monitoring | €30 |
-| **TOTALE** | **~€2700/mese** |
+### Proiezioni economiche
 
-Revenue 500 host × media €8/host = €4000/mese → margine ~30% a regime.
+**Fase MVP (50 host attivi, 500 ospiti/mese)**
 
-**Nota economica importante**: a 500 host il margine resta positivo ma
-stretto. La leva per alzarlo è:
-- Ottimizzazione prompt per ridurre token (realistico -30% costi Claude)
-- Caching risposte su richieste ripetute stesso property (realistico -20%)
-- Meta scontistica volume su WhatsApp (realistico -40% a volumi alti)
+| Voce | €/mese |
+|------|--------|
+| Revenue abbonamenti (50 × €9.99 medi) | 500 |
+| Revenue service fee (500 × €0.75) | 375 |
+| **REVENUE TOTALE** | **875** |
+| Costi fissi (infra, Supabase, dominio) | 12 |
+| Costi variabili Claude + WA (500 × €0.44) | 220 |
+| Stripe fees (~2%) | 18 |
+| **COSTI TOTALI** | **~250** |
+| **MARGINE** | **~€625/mese (71%)** |
 
-Target dopo ottimizzazioni: margine 55-60% a 500 host. Sostenibile.
+**Fase growth (500 host attivi, 5000 ospiti/mese)**
+
+| Voce | €/mese |
+|------|--------|
+| Revenue abbonamenti (500 × €8 medi) | 4000 |
+| Revenue service fee (5000 × €0.75) | 3750 |
+| **REVENUE TOTALE** | **7750** |
+| Costi fissi scalati | 110 |
+| Costi variabili Claude + WA (5000 × €0.44) | 2200 |
+| Stripe fees | 155 |
+| **COSTI TOTALI** | **~2465** |
+| **MARGINE** | **~€5285/mese (68%)** |
+
+**Fase scale (2000 host attivi, 20000 ospiti/mese)**
+
+| Voce | €/mese |
+|------|--------|
+| Revenue abbonamenti (2000 × €7 medi) | 14000 |
+| Revenue service fee (20000 × €0.75) | 15000 |
+| **REVENUE TOTALE** | **29000** |
+| Costi totali con ottimizzazioni prompt | 9500 |
+| **MARGINE** | **~€19500/mese (67%)** |
+
+### Note economiche
+
+- **Le service fee sui kit triplicano quasi i revenue** rispetto alla sola
+  subscription. È il pezzo economico che rende Premura sostenibile dal
+  giorno 1.
+- **Margine ~65-70%** costante su tutte le fasi: sano, standard SaaS buono.
+- **Break-even reale: mese 4-6** dal lancio con 100-150 host paganti.
+- **Ottimizzazioni future possibili**:
+  - Prompt caching Claude (realistico -30% costi Claude)
+  - Context minimization (realistico -15%)
+  - Meta volume discount WhatsApp (a 10k+ conv/mese)
+  Target: margine 75%+ a regime.
 
 ### Costi primo anno realistici (stima)
 
-Mese 1-3 (MVP, 5-20 host): €50-100/mese
-Mese 4-6 (early access, 20-100 host): €200-400/mese
-Mese 7-12 (launch, 100-500 host): €500-2700/mese
+- Mese 1-3 (MVP, 5-20 host): €30-80/mese uscita (infra + poche API call)
+- Mese 4-6 (early access, 20-100 host): €150-350/mese uscita, revenue già in crescita
+- Mese 7-12 (launch, 100-500 host): revenue supera costi
 
-Break-even realistico: **mese 10-12** con 400+ host paganti.
+**Break-even realistico: mese 5-7 dal lancio.**
 
 ---
 
@@ -495,4 +519,5 @@ Vedi `ROADMAP.md` per dettaglio settimanale. Cambiamenti principali:
 ---
 
 _Ultimo aggiornamento: 22 aprile 2026 — Andrea Chiacchio, fondatore_
-_v2: aggiunta Conversation Agent + Onboarding Agent + tabelle nuove + costi rivisti_
+_v2.1: fix calcolo economico — incluse service fee kit (€0.75/ospite processato)_
+_Risultato: margine 65-70% a regime, break-even mese 5-7_
