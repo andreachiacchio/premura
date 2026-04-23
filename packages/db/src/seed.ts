@@ -25,6 +25,10 @@
 // introdotto, diventando city-scoped condiviso). Quindi lo cancelliamo
 // a mano PRIMA di cancellare l'host, altrimenti resterebbe con
 // host_id=null dopo ogni run.
+//
+// Multi-cleaner: Andrea ha 2 cleaner reali perché una singola persona
+// non può coprire Napoli + Praiano (~1h distanza). Karen lavora le 2
+// strutture di Napoli Centro, Paolo gestisce Villa Cristina a Praiano.
 
 import { config as loadEnv } from 'dotenv';
 
@@ -47,12 +51,17 @@ const ANDREA_EMAIL = 'andreachiacchio1992@gmail.com';
 // Placeholder phone: aggiornare in env o direttamente dopo primo signup reale.
 const PLACEHOLDER_PHONE = '+390000000000';
 
+// Alias per l'assegnazione cleaner → property. Risolto a UUID reale
+// dopo l'insert dei cleaner (vedi `cleanersByAlias` nello STEP 4).
+type CleanerAlias = 'karen' | 'paolo';
+
 const PROPERTIES_DATA: Array<{
   name: string;
   addressLine: string;
   city: string;
   kitBudgetEur: string;
   icalSources: IcalSource[];
+  cleanerAlias: CleanerAlias;
 }> = [
   {
     name: 'La Goccia',
@@ -63,6 +72,7 @@ const PROPERTIES_DATA: Array<{
       { source: 'booking', url: 'https://ical.placeholder/booking/la-goccia' },
       { source: 'airbnb', url: 'https://ical.placeholder/airbnb/la-goccia' },
     ],
+    cleanerAlias: 'karen',
   },
   {
     name: 'La Napoli Sotterranea',
@@ -76,6 +86,7 @@ const PROPERTIES_DATA: Array<{
         channelManagerName: 'smoobu',
       },
     ],
+    cleanerAlias: 'karen',
   },
   {
     name: 'Villa Cristina',
@@ -87,6 +98,7 @@ const PROPERTIES_DATA: Array<{
       { source: 'booking', url: 'https://ical.placeholder/booking/villa-cristina-praiano' },
       { source: 'airbnb', url: 'https://ical.placeholder/airbnb/villa-cristina-praiano' },
     ],
+    cleanerAlias: 'paolo',
   },
 ];
 
@@ -171,7 +183,10 @@ async function seed() {
     );
     console.log(`[seed] Host creato: Andrea Chiacchio (${andrea.id})`);
 
-    // STEP 3 — Cleaner Karen (condivisa su tutte le 3 properties)
+    // STEP 3 — Cleaner × 2
+    //   Karen copre le 2 strutture Napoli Centro.
+    //   Paolo è responsabile operativo Praiano: pulizie + check-in +
+    //   coordinamento con Premura per Villa Cristina.
     const karen = requireOne(
       await tx
         .insert(cleaners)
@@ -188,14 +203,37 @@ async function seed() {
     );
     console.log(`[seed] Cleaner creata: Karen (${karen.id})`);
 
-    // STEP 4 — Properties × 3
+    const paolo = requireOne(
+      await tx
+        .insert(cleaners)
+        .values({
+          hostId: andrea.id,
+          fullName: 'Paolo',
+          // TODO aggiornare con numero reale Paolo (Andrea ce l'ha).
+          // Placeholder diverso dagli zero di Andrea/partner per
+          // distinguibilità nei log.
+          whatsappNumber: '+390000000001',
+          deliveryAddress: 'Indirizzo casa cleaner, Praiano', // TODO indirizzo vero
+          isActive: true,
+        })
+        .returning({ id: cleaners.id }),
+      'cleaner Paolo',
+    );
+    console.log(`[seed] Cleaner creato: Paolo (${paolo.id})`);
+
+    const cleanersByAlias: Record<CleanerAlias, string> = {
+      karen: karen.id,
+      paolo: paolo.id,
+    };
+
+    // STEP 4 — Properties × 3 (cleaner risolto per alias)
     for (const p of PROPERTIES_DATA) {
       const created = requireOne(
         await tx
           .insert(properties)
           .values({
             hostId: andrea.id,
-            cleanerId: karen.id,
+            cleanerId: cleanersByAlias[p.cleanerAlias],
             name: p.name,
             addressLine: p.addressLine,
             city: p.city,
@@ -205,7 +243,7 @@ async function seed() {
           .returning({ id: properties.id, name: properties.name }),
         `property ${p.name}`,
       );
-      console.log(`[seed] Property creata: ${created.name} (${created.id})`);
+      console.log(`[seed] Property creata: ${created.name} (${created.id}, cleaner: ${p.cleanerAlias})`);
     }
 
     // STEP 5 — Local partners × 3 (tutti Napoli, host_id = Andrea)
@@ -231,7 +269,7 @@ async function seed() {
   console.log('');
   console.log('[seed] === Riepilogo ===');
   console.log('  1 host     → Andrea Chiacchio');
-  console.log('  1 cleaner  → Karen (condivisa su tutte le properties)');
+  console.log('  2 cleaner  → Karen (Napoli) + Paolo (Praiano)');
   console.log('  3 properties → La Goccia, La Napoli Sotterranea, Villa Cristina');
   console.log('  3 partners → Pasticceria Poppella, Scaturchio, Enoteca Partenopea');
   console.log('[seed] Done.');
