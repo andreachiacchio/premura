@@ -20,6 +20,7 @@
     "lint:fix": "biome check --write .",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "db:studio": "drizzle-kit studio"
@@ -27,6 +28,7 @@
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@types/node": "^22.10.0",
+    "dotenv": "^16.4.5",
     "drizzle-kit": "^0.30.0",
     "testcontainers": "^10.16.0",
     "tsx": "^4.19.2",
