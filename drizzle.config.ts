@@ -5,7 +5,7 @@ export default defineConfig({
   out: './packages/db/src/migrations',
   dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? 'postgresql://gifttube:devpassword@localhost:5432/gifttube_dev',
+    url: process.env.DATABASE_URL ?? 'postgresql://premura:devpassword@localhost:5432/premura_dev',
   },
   verbose: true,
   strict: true,

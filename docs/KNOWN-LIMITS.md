@@ -81,4 +81,26 @@ rompe. Per i casi in cui il ritardo supera i 30s, il problema è più grave
 
 ---
 
+## 4. Password DB Supabase dev debole
+
+**Problema.** La password del superuser `postgres` del progetto Supabase
+dev è stata scelta corta e con pattern comune (data di nascita + simbolo).
+Entropia bassa, vulnerabile a dizionari mirati se il connection string
+trapelasse da un log / screenshot / Slack.
+
+**Impatto stimato.** Basso oggi (ambiente dev, nessun dato reale, nessuna
+esposizione pubblica), alto al lancio (dati ospiti reali, credenziali
+fornitori nel property_knowledge_base, GDPR).
+
+**Mitigazione.**
+- **Rotazione obbligatoria pre-launch**: generare password 32+ char random
+  via password manager, aggiornare `DATABASE_URL` in tutti gli ambienti
+  (`.env.local`, Fly.io secrets, Vercel secrets).
+- Nel frattempo: DATABASE_URL mai loggata, `.env.local` gitignored,
+  service role key usata solo server-side.
+- A regime: considerare IAM auth (Supabase supporta JWT-based connection)
+  al posto di password statica.
+
+---
+
 _Ultimo aggiornamento: 22 aprile 2026 — Andrea Chiacchio, fondatore_
