@@ -1,0 +1,69 @@
+import {
+  pgTable,
+  uuid,
+  varchar,
+  text,
+  timestamp,
+  boolean,
+  decimal,
+  jsonb,
+  index,
+} from 'drizzle-orm/pg-core';
+import { hosts } from './hosts';
+import { cleaners } from './cleaners';
+
+// Struttura dell'host. 1 host → N proprietà.
+// Tipicamente 1-5 per gli host target di Premura Livello 1.
+export const properties = pgTable(
+  'properties',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    hostId: uuid('host_id')
+      .notNull()
+      .references(() => hosts.id, { onDelete: 'cascade' }),
+
+    name: varchar('name', { length: 255 }).notNull(),
+    addressLine: text('address_line').notNull(),
+    city: varchar('city', { length: 128 }).notNull(),
+    postalCode: varchar('postal_code', { length: 16 }),
+    countryCode: varchar('country_code', { length: 2 }).notNull().default('IT'),
+
+    // Sorgenti iCal come jsonb array.
+    // Motivo: supportare channel manager (es. Smoobu, Hostaway) oltre a
+    // Booking/Airbnb direct. Un host potrebbe avere un solo URL Smoobu
+    // che aggrega tutto, oppure due URL separati Booking+Airbnb, oppure mix.
+    icalSources: jsonb('ical_sources').$type<IcalSource[]>().notNull().default([]),
+
+    // Kit settings (override host defaults se presenti)
+    kitBudgetEur: decimal('kit_budget_eur', { precision: 8, scale: 2 }),
+    kitEnabled: boolean('kit_enabled').notNull().default(true),
+
+    // Cleaner assegnata (può essere condivisa tra più properties)
+    cleanerId: uuid('cleaner_id').references(() => cleaners.id, { onDelete: 'set null' }),
+
+    // Note free-form. Superate da property_knowledge_base quando compilato,
+    // ma utili per note rapide non strutturate.
+    agentNotes: text('agent_notes'),
+
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('properties_host_idx').on(t.hostId),
+    index('properties_active_idx').on(t.isActive),
+    index('properties_city_idx').on(t.city),
+  ],
+);
+
+// Sorgente iCal per il polling prenotazioni (milestone 2.1).
+// `source` identifica la piattaforma originaria: Booking, Airbnb o
+// un channel manager generico (con nome specificato in channelManagerName).
+export type IcalSource = {
+  source: 'booking' | 'airbnb' | 'channel_manager';
+  url: string;
+  // Obbligatorio solo quando source === 'channel_manager' (es. "Smoobu", "Hostaway")
+  channelManagerName?: string;
+  // Etichetta opzionale mostrata all'host in UI
+  label?: string;
+};
