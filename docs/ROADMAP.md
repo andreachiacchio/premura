@@ -1,73 +1,63 @@
 # ROADMAP — Premura
 
 > Piano di sviluppo realistico, settimana per settimana.
-> Dal commit 0 al primo ospite reale pilotato dall'agente.
+> Versione 2 — 22 aprile 2026 (MVP esteso da 6 a 8 settimane per
+> integrare Conversation Agent e Onboarding conversazionale).
 >
-> Scopo: avere sempre visibilità su "a che punto siamo" e "cosa viene dopo".
-> Subordinato a `CONTEXT.md` (il cosa) e `ARCHITECTURE.md` (il come).
+> Subordinato a `CONTEXT.md` (cosa) e `architecture.md` (come).
 
 ---
 
 ## Principi della roadmap
 
-1. **Validare sempre con realtà.** Ogni fase si chiude con un test su dati veri (tue strutture, ospiti tuoi, cleaner tua).
-2. **Niente BigBang launch.** Si parte con 1 ospite reale, poi 5, poi 20, poi 100. Ogni step è occasione per scoprire cosa non funziona.
-3. **Il codice non è il prodotto.** Il prodotto è quello che vive in casa dell'ospite. Il codice serve solo a rendere ripetibile quello.
-4. **Tempo reale: 3-4 mesi a MVP lanciato**, con Andrea che lavora part-time (lavoro principale + Premura).
+1. **Validare sempre con realtà.** Ogni fase si chiude con un test su dati veri.
+2. **Niente BigBang launch.** Si parte con 1 ospite reale, poi 5, poi 20, poi 100.
+3. **Il codice non è il prodotto.** Il prodotto vive in casa dell'ospite.
+4. **Tempo realistico: 8 settimane a MVP** con Andrea part-time.
 
 ---
 
-## Fase 0 — Fondamenta (settimana 0, FATTO)
+## Fase 0 — Fondamenta (FATTO)
 
 ✅ Repository clonato e allineato al brand Premura
 ✅ Prototipo visuale `demo/premura-prototype.html` navigabile
-✅ CONTEXT.md, README.md, CLAUDE.md aggiornati
+✅ CONTEXT.md v2, architecture.md v2, ROADMAP.md v2 in repo
 ✅ File obsoleti GiftTube puliti
-✅ ARCHITECTURE.md e ROADMAP.md in repo
 ✅ Descrizione repo GitHub aggiornata
-
-**Dove siamo:** prototipo visibile, documenti fonte di verità in repo, Claude Code allineato.
 
 ---
 
 ## Fase 1 — Infrastruttura (settimana 1)
 
-**Obiettivo:** tutto lo scaffolding tecnico pronto per accogliere codice di business.
+**Obiettivo:** tutto lo scaffolding tecnico pronto per il codice di business.
 
 ### Milestone 1.1 — Setup servizi esterni
 
 - [ ] Creare Supabase project `premura-dev`
-  - Enable Auth (email + Google OAuth)
-  - Setup Storage bucket `kit-photos`
-- [ ] Registrare dominio (decidere: `.it`, `.app`, `.io`)
-  - Setup DNS base
-  - Email inbox per forwarding: `inbox@premura.<tld>`
-- [ ] Richiedere WhatsApp Business Cloud API (Meta)
-  - ⚠️ **da fare subito**, approvazione richiede 5-10 giorni
-  - Dominio + numero dedicato (può essere Andrea's mobile inizialmente)
-- [ ] Account Stripe attivato
-  - Configurare 3 Price objects (tier 1, 2-5, 6+)
-  - Setup Stripe Connect per payout cleaner
+- [ ] Registrare dominio (`.it`, `.app`, o `.io` — da decidere al volo)
+- [ ] Email inbox forwarding: `inbox@premura.<tld>`
+- [ ] **Richiedere WhatsApp Business Cloud API (Meta)** — URGENTE, approvazione 5-10 giorni
+- [ ] Account Stripe attivato con 3 Price objects
 - [ ] Account Fly.io, Anthropic API, Vercel (probabilmente già attivi)
 
 ### Milestone 1.2 — Scaffolding codice
 
-- [ ] Migrazione `src/` corrente da solo Fastify a monorepo con:
+- [ ] Migrazione `src/` corrente da solo Fastify a monorepo:
   - `apps/api` (Fastify backend)
   - `apps/web` (Next.js 15 App Router)
   - `packages/db` (Drizzle schema + Supabase client)
-  - `packages/agents` (Guest DNA, Kit Composer, Message Writer)
-  - `packages/integrations` (Stripe, WhatsApp, Amazon, Glovo)
-- [ ] Drizzle schema completo da `ARCHITECTURE.md` § 10
+  - `packages/agents` (5 agenti modulari)
+  - `packages/integrations` (Stripe, WhatsApp, Amazon, Glovo, email parser)
+- [ ] Drizzle schema completo (v1 + tabelle v2)
 - [ ] Migration iniziale su Supabase dev
-- [ ] Seed dati: 1 host (tu), 3 strutture, 1 cleaner (Karen), 3 partner locali Napoli
-- [ ] Dockerfile + `fly.toml` per deploy backend
-- [ ] Deploy su Fly staging
+- [ ] Seed dati: 1 host (Andrea), 3 strutture, 1 cleaner (Karen), 3 partner locali Napoli
+- [ ] Dockerfile + `fly.toml` per backend
+- [ ] Deploy Fly staging
 
 ### Milestone 1.3 — Frontend base
 
 - [ ] Next.js app creata
-- [ ] Design system: i colori, font, componenti del prototipo portati in Tailwind config
+- [ ] Design system: colori, font, componenti dal prototipo in Tailwind config
 - [ ] Layout base con sidebar navigation
 - [ ] Auth flow: magic link + Google OAuth funzionante
 - [ ] Deploy Vercel staging
@@ -81,187 +71,174 @@
 **Obiettivo:** le prenotazioni di Andrea entrano automaticamente nel sistema.
 
 ### Milestone 2.1 — iCal polling
-
-- [ ] Parser iCal (libreria `ical.js` o simile)
+- [ ] Parser iCal
 - [ ] Job BullMQ schedulato ogni 15 min
 - [ ] Upsert `bookings` con dedup per UID
-- [ ] UI settings: input 2 campi iCal per struttura
-- [ ] Video tutorial 30s: come trovare link iCal Booking + Airbnb
-- [ ] Feedback visivo "✓ trovate 12 prenotazioni" dopo paste
+- [ ] UI settings: 2 campi iCal per struttura
+- [ ] Video tutorial 30s: come trovare link iCal
+- [ ] Feedback visivo post-paste
 
-### Milestone 2.2 — Email forwarding (opzionale, nice to have)
-
-- [ ] Endpoint `POST /email/inbound` (da servizio come Mailgun o Postmark)
-- [ ] Parser email Booking + Airbnb (formati noti)
+### Milestone 2.2 — Email forwarding opzionale
+- [ ] Endpoint `POST /email/inbound` (Mailgun o Postmark)
+- [ ] Parser email Booking + Airbnb
 - [ ] Enrichment `bookings` con dati email
 
 ### Milestone 2.3 — Dashboard home 3-stati
+- [ ] Home "Sta lavorando per te"
+- [ ] Lista prossimi ospiti con badge stato
+- [ ] Dettaglio ospite base (replica prototipo)
 
-- [ ] Home "Sta lavorando per te" con:
-  - Lista prossimi ospiti (5-10 upcoming)
-  - Badge stato 🟢/🟡/🔴 per ogni ospite
-  - Card grande che mostra azione corrente Premura
-- [ ] Dettaglio ospite (replica prototipo)
-
-**Test chiusura fase:** Andrea incolla iCal Booking + Airbnb delle sue 3 strutture, vede tutte le prenotazioni future nel dashboard, stato 🟢 ovunque.
+**Test chiusura fase:** Andrea incolla iCal Booking + Airbnb delle sue 3 strutture, vede tutte le prenotazioni future.
 
 ---
 
-## Fase 3 — Agente Guest DNA (settimana 3)
+## Fase 3 — Agente Guest DNA + Onboarding (settimana 3)
 
-**Obiettivo:** per ogni nuova prenotazione, Premura genera Guest DNA automatico.
+**Obiettivo:** Guest DNA funzionante + onboarding conversazionale struttura.
 
-### Milestone 3.1 — Prompt + tool use
+### Milestone 3.1 — Guest DNA agent
+- [ ] Prompt Guest DNA in `packages/agents/guest-dna.ts`
+- [ ] Tool `web_search_guest_public_data` con cache
+- [ ] Output validato Zod, persistenza `guest_profiles`
+- [ ] Trigger: ogni booking nuovo → job `generate_guest_dna`
+- [ ] Observability: costo per chiamata loggato
 
-- [ ] Prompt Guest DNA in `packages/agents/guest-dna.ts` (già esistente, verificare e aggiornare)
-- [ ] Tool `web_search_guest_public_data` con cache per evitare doppie chiamate
-- [ ] Output strutturato validato Zod
-- [ ] Persistenza in `guest_profiles`
-- [ ] Audit log in `agent_actions`
-
-### Milestone 3.2 — Enrichment automatico
-
-- [ ] Trigger: ogni `booking` nuovo → job `generate_guest_dna`
-- [ ] Retry logic su fail Claude API
-- [ ] Observability: costo per chiamata loggato in Axiom
+### Milestone 3.2 — Onboarding Agent NUOVO v2
+- [ ] Prompt Onboarding Guide in `packages/agents/onboarding.ts`
+- [ ] UI chat interface (no form) per prima setup
+- [ ] Flusso conversazione 15-20 min guidato
+- [ ] Output: `property_knowledge_base` strutturato
+- [ ] Voice profile via 3-4 domande + opzionale analisi messaggi passati
+- [ ] Autopilot defaults proposti (matrice delega)
 
 ### Milestone 3.3 — UI dettaglio ospite
+- [ ] Pagina dettaglio ospite con Guest DNA visibile
+- [ ] 3 rischi previsti con mitigation
+- [ ] Bottone "rigenera Guest DNA"
 
-- [ ] Pagina dettaglio ospite mostra:
-  - Archetipo ospite
-  - Nazionalità + bandiera + lingua preferita
-  - 3 rischi previsti con mitigation
-  - Composizione famiglia
-  - Budget kit suggerito
-- [ ] Bottone "rigenera Guest DNA" (per test)
-
-**Test chiusura fase:** per ogni prenotazione futura di Andrea, Premura genera Guest DNA entro 2 minuti. Andrea vede il profilo, conferma se è plausibile.
+**Test chiusura fase:** Andrea fa onboarding conversazionale per La Goccia, profilo struttura compilato, voice profile estratto, Guest DNA generato per prossima prenotazione.
 
 ---
 
-## Fase 4 — Messaggistica ospite + cleaner (settimana 4)
+## Fase 4 — WhatsApp + Conversation Agent (settimana 4-5)
 
-**Obiettivo:** WhatsApp Cloud API integrata end-to-end.
+**Obiettivo:** messaggistica bidirezionale funzionante.
 
 ### Milestone 4.1 — Setup WhatsApp Cloud
-
-- [ ] Webhook ricezione messaggi WhatsApp
-- [ ] Template messaggi approvati da Meta (almeno 3: contatto, quiz, check-in)
+- [ ] Webhook ricezione WhatsApp
+- [ ] Template messaggi approvati da Meta (almeno 3)
 - [ ] Rate limit handling
 
-### Milestone 4.2 — Message Writer agent
-
+### Milestone 4.2 — Message Writer (outbound programmato)
 - [ ] Prompt Message Writer in `packages/agents/message-writer.ts`
-- [ ] Varianti di messaggio per ogni stage (Contatto, Presenza, Chiusura)
+- [ ] Varianti per ogni stage (Contatto, Presenza, Chiusura)
 - [ ] Lingua determinata da Guest DNA
-- [ ] Firma sempre con nome struttura (mai "Premura")
+- [ ] Firma con nome struttura
 
-### Milestone 4.3 — Quiz pre-arrivo
+### Milestone 4.3 — Conversation Agent NUOVO v2
+- [ ] Prompt Conversation Agent in `packages/agents/conversation.ts`
+- [ ] Classifier intent per messaggio inbound
+- [ ] Context builder (DNA + property_kb + voice_profile + matrix)
+- [ ] Engine decisione auto/draft/escalate
+- [ ] Invio automatico se auto
+- [ ] Creazione `pending_draft` se draft
+- [ ] Alert host con contesto se escalate
+- [ ] UI lato host: "Approva risposta" 1-tap per draft
+- [ ] Pannello Autopilot (matrice delega visuale)
 
+### Milestone 4.4 — Quiz pre-arrivo
 - [ ] Quiz dinamico 4 domande generato da Guest DNA
-- [ ] Interfaccia swipe/choice card (Tinder-style) — landing page dedicata Next.js
-- [ ] Submit risposte → update Guest DNA
-- [ ] Fallback testuale se ospite non clicca swipe
+- [ ] Landing page Tinder-style in Next.js
+- [ ] Submit → update Guest DNA
 
-### Milestone 4.4 — Comunicazione cleaner
-
-- [ ] Numero cleaner associato in settings
-- [ ] Template brief cleaner: "domani Anna arriva alle 15, kit n.4, consegna alle 10 a casa tua"
+### Milestone 4.5 — Comunicazione cleaner
+- [ ] Template brief cleaner
 - [ ] Ricezione foto kit via webhook WhatsApp
-- [ ] Conferma automatica "grazie €2 registrati"
+- [ ] Conferma automatica "€2 registrati"
 
-**Test chiusura fase:** Andrea simula un ospite, invia quiz, riceve risposte, vede il DNA aggiornato. Karen riceve messaggio WhatsApp di brief, risponde "ok", riceve conferma.
+**Test chiusura fase:** Andrea simula ospite, invia messaggi di vario tipo (info wifi, richiesta late checkout, lamentela). Premura risponde auto sui casi verdi, manda draft sui casi gialli, escala sui casi rossi.
 
 ---
 
-## Fase 5 — Composizione kit + Amazon (settimana 5)
+## Fase 5 — Composizione kit + logistica (settimana 6)
 
 **Obiettivo:** dato un Guest DNA, genera ordine Amazon reale.
 
 ### Milestone 5.1 — Kit Composer
-
 - [ ] Catalogo prodotti in DB (~50 SKU Amazon + 15 partner locali Napoli)
-- [ ] Prompt Kit Composer con vincoli (budget, allergie, età bambini)
+- [ ] Prompt Kit Composer con vincoli
 - [ ] Output validato Zod
-- [ ] UI preview kit: tema + costo + item (visibile solo a te admin, mai all'host)
+- [ ] UI preview admin (non host — anti-disintermediazione)
 
-### Milestone 5.2 — Amazon 1-click shopping list
+### Milestone 5.2 — Amazon 1-click + Partner locali
+- [ ] URL Amazon pre-popolato
+- [ ] Notifica WhatsApp host per conferma 1-tap
+- [ ] Template ordine WhatsApp a partner locali
+- [ ] Conferma partner manuale
 
-- [ ] Generazione URL carrello Amazon pre-popolato
-- [ ] Notifica WhatsApp a host: "conferma ordine kit Anna, 1 tap"
-- [ ] Callback dopo acquisto (OOB o manuale)
-- [ ] Aggiornamento status kit a "ordered"
+### Milestone 5.3 — Email parsing Booking/Airbnb
+- [ ] Parser email Booking per catturare messaggi inbound fallback
+- [ ] Parser email Airbnb per catturare messaggi inbound fallback
+- [ ] Routing verso Conversation Agent
 
-### Milestone 5.3 — Partner locali WhatsApp
-
-- [ ] Template ordine pre-compilato per partner
-- [ ] Invio automatico al partner 24h prima consegna
-- [ ] Conferma manuale partner (risponde "ok")
-- [ ] Status aggiornato
-
-**Test chiusura fase:** Andrea ha un ospite reale in arrivo, riceve proposta kit su WhatsApp, conferma con 1 tap, Amazon manda conferma ordine, arriva a casa Karen in 2 giorni.
+**Test chiusura fase:** un ospite reale riceve kit fisico in casa, vede foto mattina, risponde a messaggi, Premura gestisce tutto correttamente.
 
 ---
 
-## Fase 6 — Billing + pagamento cleaner (settimana 6)
+## Fase 6 — Billing + pagamento cleaner (settimana 7)
 
 **Obiettivo:** monetizzazione funzionante.
 
 ### Milestone 6.1 — Stripe Subscriptions
-
 - [ ] Checkout page con trial 30gg senza carta
 - [ ] Cambio tier automatico su add/remove struttura
 - [ ] Customer Portal per gestione fatture
-- [ ] Webhook Stripe: `invoice.paid`, `subscription.updated`, `trial_will_end`
+- [ ] Webhook Stripe
 
 ### Milestone 6.2 — Stripe Connect payout cleaner
-
-- [ ] Onboarding cleaner Connect (flusso Express)
-- [ ] Tracking `pending_payouts` per ogni kit completato
-- [ ] Job mensile: cumulo e trasferimento cleaner
-- [ ] Notifica WhatsApp cleaner "€X accreditati questo mese"
+- [ ] Onboarding cleaner Connect (Express)
+- [ ] Tracking `pending_payouts` per ogni kit
+- [ ] Job mensile: cumulo e trasferimento
+- [ ] Notifica WhatsApp cleaner
 
 ### Milestone 6.3 — Validazione pagamento 2 path
-
-- [ ] Path 1: foto cleaner → payout pending immediato
-- [ ] Path 2: fallback conferma ospite → verifica entro 24h
+- [ ] Path 1: foto cleaner → pending immediato
+- [ ] Path 2: fallback conferma ospite entro 24h
 - [ ] Rating qualità cleaner automatico
 
-**Test chiusura fase:** Andrea sottoscrive lui stesso un account trial (simula), usa Premura su 1 struttura reale per 30 giorni, paga a fine trial. Karen riceve primo payout.
+**Test chiusura fase:** Andrea sottoscrive trial, usa Premura 30 giorni reali, paga a fine trial. Karen riceve primo payout.
 
 ---
 
-## Fase 7 — Pilot su 3 strutture Napoli (settimane 7-10)
+## Fase 7 — Pilot 3 strutture Napoli (settimana 8-11)
 
-**Obiettivo:** Premura gira su La Goccia di S.Gennaro + altre 2 strutture Andrea per 30 giorni reali.
+**Obiettivo:** Premura gira su 3 strutture Andrea per 30 giorni reali.
 
 ### Cosa succede
-
-- Andrea usa Premura come unico modo di gestire ospiti nelle 3 strutture
+- Andrea usa Premura come unico modo di gestire ospiti
 - Karen è la cleaner pilota
-- 3 partner locali Napoli (Poppella, Scaturchio, enoteca) attivi
-- Tutti i 20-30 ospiti che passano nelle strutture in 30 giorni vengono pilotati da Premura
+- 3 partner locali Napoli attivi
+- Tutti i 20-30 ospiti di 30 giorni vengono pilotati
 
 ### Metriche da tracciare
-
 - % kit consegnati in tempo
 - % ospiti che rispondono al quiz
+- % messaggi inbound risposti automaticamente vs draft vs escalate
+- Tempo medio risposta conversation agent
 - Δ rating medio recensioni vs baseline
-- Tempo operativo Andrea per ospite (target: <5 min/ospite)
-- Problemi intercettati da Premura prima di diventare recensioni negative
-- Costi reali per ospite processato (Claude, WhatsApp, infra)
+- Problemi intercettati da Premura prima delle recensioni
+- Costi reali per ospite processato
 
 ### Goal: validazione economica + operativa
 
 Se dopo 30 giorni:
-- ✅ Rating medio +0.5 vs baseline → prodotto funziona
-- ✅ Karen non si lamenta → logistica funziona
-- ✅ Zero disastri (recensioni <8, problemi gravi mancati) → sistema stabile
-- ✅ Costi <€15/mese per struttura Andrea → economics funziona
+- ✅ Rating medio +0.5 vs baseline
+- ✅ Karen non si lamenta
+- ✅ Zero disastri
+- ✅ Costi <€15/mese per struttura Andrea
+- ✅ Conversation agent risponde correttamente >90% dei casi auto
 
-Allora si passa alla Fase 8.
-
-Se no, si debugga e si ripete.
+Allora passiamo alla Fase 8.
 
 ---
 
@@ -270,29 +247,25 @@ Se no, si debugga e si ripete.
 **Obiettivo:** aprire a 20-50 host del network Andrea.
 
 ### Azioni
-
-- [ ] Landing page pubblica Premura con form waitlist
-- [ ] Video demo 3 min (screen record di Andrea che usa il prodotto sulle sue strutture)
-- [ ] Outreach manuale a 50 host nel network Andrea (quelli con 1-5 strutture, NO PMS)
-- [ ] Onboarding in 1:1 con prime 5-10 persone (Andrea guida via videocall)
-- [ ] Raccolta feedback sistematica settimanale
+- [ ] Landing page pubblica Premura con waitlist
+- [ ] Video demo 3 min (screen record Andrea)
+- [ ] Outreach manuale 50 host del network
+- [ ] Onboarding 1:1 con prime 5-10 persone
+- [ ] Raccolta feedback sistematica
 
 ### Milestone tecniche emergenti
-
-Probabilmente emergeranno in questa fase:
 - Gestione multi-cleaner per host con più strutture
 - UI settings più avanzata
-- Bug fix vari su edge case veri
-- Miglioramenti ai prompt in base a risposte reali ospiti
-- Possibile integrazione Glovo (se serve)
-- Possibile integrazione InPost punti ritiro (se serve)
+- Bug fix edge case veri
+- Miglioramenti prompt in base a dati reali
+- Booking Partner API (se arriva approvazione)
+- Possibile integrazione Glovo/InPost se richiesto
 
 ### Metriche successo
-
 - 20+ host attivi a fine mese 4
 - Churn <10% mese 1→2
 - NPS >50
-- Revenue MRR ~€150-200 (piccolo ma reale)
+- MRR €150-200
 
 ---
 
@@ -301,52 +274,49 @@ Probabilmente emergeranno in questa fase:
 **Obiettivo:** aprire a tutti.
 
 ### Azioni
+- [ ] Rimozione waitlist
+- [ ] SEO base: blog, case study Andrea
+- [ ] Presenza gruppi Facebook host italiani
+- [ ] Partnership 1-2 micro-influencer host
+- [ ] Eventuale lancio in altre città
 
-- [ ] Rimozione waitlist, signup libero
-- [ ] SEO base: blog post, case study Andrea
-- [ ] Presenza su gruppi Facebook host italiani
-- [ ] Partnership con 1-2 micro-influencer host-host
-- [ ] Eventuale lancio in qualche città oltre Napoli
-
-### Milestone prodotto post-launch
-
-- [ ] Integrazione Cortilia (se food artigianale diventa richiesta)
-- [ ] App React Native (se user feedback la richiede forte)
-- [ ] Analytics avanzate per host (ROI calcolato, recensioni trend)
+### Milestone post-launch
+- [ ] Integrazione Cortilia (se food artigianale in crescita)
+- [ ] App React Native (se user feedback la chiede)
+- [ ] Analytics avanzate per host
 - [ ] Multi-property dashboard migliorato
 
 ### Target 6 mesi post-launch
-
 - 200-500 host paganti
 - MRR €2k-4k
-- Margine 85%+ (sostenibile da Andrea full-time se vuole)
+- Margine 55-60% post-ottimizzazioni
+- Break-even mese 10-12 dal lancio
 
 ---
 
-## Fasi future (senza date — aspettare segnali dal mercato)
+## Fasi future (senza date)
 
 ### Fase 10+ — Espansione
-
-- Multi-città: Milano, Roma, Firenze, Venezia (con partnership locali dedicate)
+- Multi-città: Milano, Roma, Firenze, Venezia
 - Multi-lingua UI (inglese per host stranieri con case in Italia)
-- API pubblica per integrazioni (channel manager vogliono aggiungere Premura come add-on)
+- API pubblica
 - White label per agenzie property management piccole
 
 ### Fase 11+ — Prodotti collegati
-
-- Premura Plus: assicurazione danni ospite (partnership con insurer)
-- Premura Fornitori: marketplace B2B per host, prodotti wholesale
-- Premura Insights: dataset anonimizzato vendibile a OTA o brand
+- Premura Plus: assicurazione danni ospite
+- Premura Fornitori: marketplace B2B per host
+- Premura Insights: dataset anonimizzato per OTA/brand
 
 ---
 
-## Cosa NON è roadmap (decisioni di principio)
+## Cosa NON è roadmap
 
-- **Niente fundraising nei primi 12 mesi.** Bootstrap con revenue, validazione prima.
-- **Niente feature per richiesta di 1 solo host.** Feature per pattern minimo 5 host.
-- **Niente "pivoting" facile.** Livello 1 è deciso. Se non funziona, si chiude o si rifonda, non si diventa Smoobu.
-- **Niente over-engineering.** Se un problema capita 1 volta ogni 100 ospiti, si risolve manualmente. Si automatizza al 10°.
+- **Niente fundraising nei primi 12 mesi.** Bootstrap con revenue.
+- **Niente feature per 1 host.** Pattern minimo 5 host.
+- **Niente pivoting facile.** Livello 1 deciso. Se non funziona, si chiude.
+- **Niente over-engineering.** Risolvere manuale fino a 10° occorrenza.
 
 ---
 
 _Ultimo aggiornamento: 22 aprile 2026 — Andrea Chiacchio, fondatore_
+_v2: MVP esteso 6→8 settimane, Fase 3.2 Onboarding Agent, Fase 4.3 Conversation Agent_

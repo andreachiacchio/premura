@@ -1,10 +1,10 @@
 # CONTEXT — Premura Livello 1
 
 > Questo file è la fonte di verità del progetto.
-> I file `CLAUDE.md` e `README.md` nella root contengono riferimenti OBSOLETI
-> a "GiftTube" e al prezzo "€4.99". Vanno aggiornati al nuovo posizionamento
-> descritto qui sotto. In caso di conflitto tra CONTEXT.md e altri file,
-> CONTEXT.md vince.
+> Versione 2 — 22 aprile 2026 (include capacità Conversazione,
+> profilo struttura, voice profile host, matrice delega).
+>
+> In caso di conflitto con qualsiasi altro file, CONTEXT.md vince.
 
 ---
 
@@ -19,91 +19,236 @@ quando capisce che non può più gestire tutto a mano.
   Quelli sono Livello 2 — channel manager seri per 10+ strutture.
   Premura è ciò che l'host compra **PRIMA** di loro, o **AL POSTO DI** loro
   per sempre se resta piccolo.
-- **Hospitable** ha appena lanciato un piano Essentials GRATIS proprio per
-  competere su questa fascia — conferma che il segmento è enorme e
-  sottoservito.
+- **Hospitable** ha lanciato un piano Essentials gratis per competere su
+  questa fascia — conferma che il segmento è enorme e sottoservito.
 
 ---
 
-## 2. Cosa fa Premura — le 5 fasi dell'agente
+## 2. Cosa fa Premura — 5 fasi + capacità continua
 
-Premura è un agente AI concierge autonomo. Per ogni prenotazione esegue
-automaticamente queste 5 fasi:
+Premura è un agente AI concierge autonomo. Per ogni prenotazione esegue 5
+fasi programmate nel tempo, e in parallelo mantiene una **capacità sempre
+attiva** di conversare con l'ospite dovunque scriva (WhatsApp, Booking inbox,
+Airbnb inbox).
 
-### Fase 1 — STUDIO
+### Fasi programmate (outbound, scheduled)
+
+#### Fase 1 — STUDIO
 Appena arriva una prenotazione, analizza l'ospite (nazionalità, recensioni
 pubbliche lasciate altrove, pattern di prenotazione).
 Output: **Guest DNA** con archetipo, rischi previsti, tono consigliato.
 
-### Fase 2 — CONTATTO
+#### Fase 2 — CONTATTO
 T-48h dal check-in: messaggio WhatsApp personalizzato con opt-in.
 Benvenuto caldo + **micro-quiz di 60 secondi** (4 swipe stile Tinder) per
 capire preferenze.
 Fallback su messaggi Booking/Airbnb se l'ospite non dà opt-in WhatsApp.
 
-### Fase 3 — CURA
+#### Fase 3 — CURA
 Compone kit fisico personalizzato basato su DNA + quiz.
-Ordina ingredienti (Amazon / Cortilia / fornitori locali) a casa della cleaner.
-Briefa cleaner via WhatsApp. Cleaner sistema kit + scatta foto.
-Ospite al check-in trova kit + riceve foto su WhatsApp.
+Ordina ingredienti (Amazon / partner locali / Glovo) a casa della cleaner.
+Briefa cleaner via WhatsApp. Cleaner sistema kit + scatta foto + scrive
+nome ospite su biglietto pre-stampato.
+**Mattina del check-in**: Premura manda foto kit + messaggio personalizzato
+su WhatsApp a ospite, firmato col nome della struttura.
 
-### Fase 4 — PRESENZA
-Giorno 2 sera: check-in emotivo su WhatsApp "come va?".
+#### Fase 4 — PRESENZA
+Giorno 2 sera di soggiorni ≥3 notti: check-in emotivo su WhatsApp "come va?".
 - Se OK: va avanti silenzioso.
 - Se problema piccolo: risolve solo (offre late check-out, sconto).
 - Se problema grosso: **ESCALATION** urgente all'host con alert +
   suggerimento azione concreta.
 
-### Fase 5 — CHIUSURA
+#### Fase 5 — CHIUSURA
 T+24h dopo check-out: sondaggio privato.
 - Feedback negativo: recovery (sconto futuro, scuse).
 - Feedback positivo: nudge forte verso recensione pubblica con link.
 
+### Capacità continua (sempre attiva)
+
+#### CONVERSAZIONE — dal booking al check-out
+In qualsiasi momento l'ospite può scrivere a Premura (su WhatsApp, Booking
+inbox, Airbnb inbox). Premura:
+
+1. **Legge** il messaggio in tempo reale
+2. **Capisce** di cosa si tratta (info struttura, richiesta servizio,
+   problema, small talk)
+3. **Decide** cosa fare basandosi su:
+   - Profilo struttura (wifi, check-in rules, parcheggio, ecc.)
+   - Voice profile host (tono, lingue, stile)
+   - Matrice delega (cosa può decidere da sé, cosa deve passare all'host)
+   - Guest DNA (chi è l'ospite, cosa ha chiesto prima)
+4. **Risponde** in autonomia, **draft da approvare**, o **escalation** a host,
+   a seconda della matrice delega
+
+L'ospite non percepisce una differenza tra "Premura in fase programmata"
+e "Premura che risponde a una domanda". Per lui è la stessa mano.
+Per il sistema sono moduli diversi.
+
 ---
 
-## 3. UX dell'host — solo 3 stati
+## 3. Tre concetti strutturali nuovi (critici)
 
-L'host **NON** vede timeline, log, task list. Vede **solo 3 stati** per ogni
-ospite:
+### A. Profilo struttura — il "manuale digitale"
 
-- Verde: tutto ok, Premura sta gestendo (zero azioni richieste)
-- Giallo: ti aggiorno ma sto lavorando io
-- Rosso: URGENTE, serve tuo intervento (con suggerimento azione)
+Ogni struttura ha un profilo informativo ricco e azionabile. È il manuale
+che Premura consulta per rispondere all'ospite. Compilato **una volta**
+in onboarding tramite **conversazione guidata** con Premura stesso (non form
+freddo).
 
-Sulla home la card principale recita **"STA LAVORANDO PER TE"** con
-descrizione live di cosa l'agente sta facendo in quel momento.
+Contiene (esempi):
+
+- **Arrivo**: indirizzo esatto, come arrivare da aeroporto/stazione, dove
+  parcheggiare (zona blu, garage), come prendere le chiavi (keybox con
+  codice, lockbox, persona)
+- **Check-in/out**: orari, regole flessibilità
+- **Dentro casa**: WiFi (SSID + password), come si accende AC/riscaldamento,
+  elettrodomestici (lavatrice, lavastoviglie), TV/Netflix
+- **Rifiuti**: giorni raccolta, dove buttare, differenziata
+- **Quartiere**: 5 ristoranti top personali, 3 bar colazione, supermercato
+  più vicino, farmacia, lavanderia, dove prendere un caffè decente
+- **Trasporti**: metro/bus più vicini, taxi consigliato, bike rental
+- **Emergenze**: idraulico di fiducia, elettricista, vicino a cui chiamare
+- **Regole casa**: fumo (dentro/fuori/balcone), animali, ospiti extra,
+  quiet hours, musica
+- **Extra**: lenzuola extra dove, asciugacapelli, ferro da stiro, cucina
+  essenziale
+
+L'onboarding della struttura dura **15-20 minuti** di chat conversazionale,
+non 2 ore di form. Premura chiede domande via chat tipo:
+
+> Premura: "Allora, parliamo di La Goccia di S.Gennaro. Prima cosa: come
+> arrivano gli ospiti? Descrivimelo come lo diresti a un amico."
+>
+> Host: "Arrivano dall'aeroporto con l'Alibus fino a Piazza Garibaldi, poi
+> 10 min a piedi o metro linea 2 fino a Cavour."
+>
+> Premura: "Perfetto. E le chiavi? Come le prendono?"
+>
+> ... e così via.
+
+Premura dietro le quinte struttura la conversazione in formato strutturato
+(JSON nel DB), pronto da consultare.
+
+### B. Voice profile host — il "tono"
+
+Premura deve scrivere **come scriverebbe l'host umano**. Non un tono
+generico da concierge hotel, non un tono corporate. Il tono specifico
+di Andrea, o Marco, o Laura, a seconda dell'host.
+
+Si estrae in 2 modi complementari:
+
+**Modo 1 — Domande in onboarding**
+Premura chiede 3-4 domande dirette:
+- "Dai del tu o del lei agli ospiti?"
+- "Usi emoji quando scrivi? Quali tipi?"
+- "Come firmi di solito? (tuo nome, 'la famiglia di...', nome struttura)"
+- "Se un ospite arriva in ritardo, come lo accogli?"
+
+**Modo 2 — Analisi messaggi passati (opzionale ma potente)**
+Se l'host dà accesso a Booking/Airbnb message history, Premura legge
+20-30 messaggi che l'host ha scritto in passato e ne estrae lo stile
+con Claude. Output: pattern linguistici, formalità, lunghezza media,
+uso punteggiatura.
+
+Risultato: ogni messaggio che Premura scrive è in **lingua ospite** ma
+con **tono host specifico**. Non esiste "la voce di Premura" generica.
+Esistono tante voci quante host.
+
+### C. Matrice delega — cosa Premura decide da sé
+
+Per ogni tipo di richiesta ospite, l'host imposta UNA VOLTA in onboarding
+(con default intelligenti) uno di 3 modi:
+
+- **🟢 Auto** — Premura risponde da sé, l'host vede solo il log
+- **🟡 Draft** — Premura scrive la risposta, l'host approva con 1 tap
+- **🔴 Escalate** — Premura avvisa l'host, rispondi tu
+
+Matrice default (l'host può cambiare):
+
+| Tipo richiesta | Default | Note |
+|----------------|---------|------|
+| Info wifi / parcheggio / check-in | 🟢 Auto | Dal profilo struttura |
+| Info quartiere / raccomandazioni | 🟢 Auto | Dal profilo struttura |
+| Early check-in ≤1h | 🟢 Auto | "Si può sì, fammi sapere" |
+| Early check-in >1h | 🟡 Draft | Serve conferma cleaner |
+| Late check-out ≤1h | 🟢 Auto | Soft rule |
+| Late check-out >1h | 🟡 Draft | Impatta pulizia |
+| Richiesta sconto | 🟡 Draft | Mai decidere da sé |
+| Extra services (pulizia, lenzuola) | 🟡 Draft | Costo extra |
+| Problema rotto / non funziona | 🔴 Escalate | Sempre a host |
+| Lamentela seria | 🔴 Escalate | Sempre a host |
+| Emergenza (acqua, elettricità) | 🔴 Escalate | Chiamata telefonica subito |
+| Small talk amichevole | 🟢 Auto | Rispondi caloroso |
+| Domande turistiche | 🟢 Auto | Tipo "quanto costa entrare al museo" |
+
+Nei primi giorni di uso, l'host può forzare tutto a Draft (paranoia iniziale).
+Dopo 10-20 ospiti gestiti senza disastri, passa serenamente ad Auto sui
+casi verdi.
 
 ---
 
-## 4. Decisioni blindate (NON cambiare senza discussione)
+## 4. UX dell'host — 3 stati + notifiche contestuali
 
+L'host **NON** vede timeline, log, task list lunghe. Vede:
+
+- 🟢 Tutto ok, Premura sta gestendo (zero azioni richieste)
+- 🟡 Ti aggiorno ma sto lavorando io (eventualmente con Draft da approvare)
+- 🔴 URGENTE, serve tuo intervento (con suggerimento azione)
+
+Sulla home card **"STA LAVORANDO PER TE"** con descrizione live di cosa
+l'agente sta facendo.
+
+Notifiche push mirate solo su 🟡 (draft da approvare) e 🔴 (urgente).
+Mai notifiche su 🟢.
+
+---
+
+## 5. Decisioni blindate (NON cambiare senza discussione)
+
+### Brand e tono
 - **Nome app/prodotto:** Premura
 - **Nome agente:** Premura (stesso del prodotto — NO "Leo", NO altri nomi)
 - **Firma messaggi all'ospite:** nome della struttura
   (es. "— La Goccia di S.Gennaro"). L'ospite deve pensare di parlare con
   l'host umano, non con un brand esterno.
+
+### Pricing
 - **Prezzi:**
   - €9.99 / mese — 1 struttura
   - €7.99 / mese — 2-5 strutture
   - €5.99 / mese — 6+ strutture
 - **Trial:** 30 giorni gratis **SENZA carta richiesta**
+
+### Kit fisico
 - **Kit:** al costo + €0.75 service fee + €2 cleaner + €1 biglietto.
-  **ZERO markup**. Trasparenza totale — è un pilastro etico non negoziabile.
+  **ZERO markup**. Trasparenza totale — pilastro etico non negoziabile.
 - **Budget kit scelto dall'host:** da €3 simbolico a €20 premium (slider)
-- **Canale messaggi primario:** WhatsApp Business con opt-in ospite.
-  Fallback Booking/Airbnb solo se opt-in negato.
 - **Il kit specifico NON è visibile all'host prima dell'invio**
   (anti-disintermediazione). L'host vede solo: budget, tema, "kit inviato".
-- **L'host NON configura template messaggi.** Premura scrive tutto sempre
-  diverso basandosi su DNA + contesto + quiz.
+- **Biglietto fisico**: cartoncino A6 pre-stampato, cleaner scrive solo
+  nome ospite a penna
+- **Messaggio "lungo" personalizzato**: WhatsApp la mattina check-in
+  (foto kit + testo)
+
+### Canali
+- **Canale messaggi primario:** WhatsApp Business con opt-in ospite.
+  Fallback Booking/Airbnb inbox se opt-in negato.
 - **Aggregazione READ-ONLY** delle prenotazioni da Booking + Airbnb
-  (legge entrambe, mostra lista unificata). NON è un channel manager
-  (non scrive, non sincronizza disponibilità). È un abilitatore per il
-  target Livello 1 che oggi gestisce a mano.
+  (iCal + email forwarding). NON è un channel manager.
+  **Conversazione INBOUND** attiva su tutti i canali (WhatsApp, Booking
+  inbox se integrato, Airbnb via email parsing).
+
+### Automazione
+- **L'host NON configura template messaggi.** Premura scrive tutto sempre
+  diverso basandosi su Guest DNA + profilo struttura + voice profile host.
+- **Matrice delega** imposta una volta in onboarding, poi regolabile.
+- **Pagamento cleaner:** €2/kit validato da foto cleaner (primario) o
+  conferma ospite (fallback 24h).
 
 ---
 
-## 5. Estetica
+## 6. Estetica
 
 - **Tipografia:** Fraunces per i titoli, Inter per il body (Google Fonts)
 - **Palette:** avorio `#F5EFE4`, terracotta `#C65D3A`, blu profondo `#1F3A4D`,
@@ -111,73 +256,50 @@ descrizione live di cosa l'agente sta facendo in quel momento.
 - **Tono:** elegante, caldo, italiano. NON il solito SaaS freddo.
 - **Riferimenti:** Notion (pulizia), Linear (precisione), Airbnb (calore)
 - **Mobile-first** ma navigabile anche da desktop
-- **Emoji:** usate solo dove aggiungono valore (bandiere, stati verde/giallo/rosso)
-- **Lingua:** italiano per UI e commenti
+- **Emoji:** usate solo dove aggiungono valore (bandiere, stati 🟢🟡🔴)
+- **Lingua UI:** italiano per app host
 
 ---
 
-## 6. Demo visiva
+## 7. Demo visiva
 
 Il prototipo HTML/CSS/JS cliccabile e navigabile è in:
 
     demo/premura-prototype.html
 
-File singolo autocontenuto (Google Fonts a parte). Apribile con doppio clic
-nel browser. Contiene 5 schermate: Landing/Onboarding, Home Dashboard,
-Dettaglio Ospite (Anna van Dijsseldonk, olandese), Alert Urgente
-(Klaus Werner, tedesco), Settings Kit.
+File singolo autocontenuto. Contiene 5 schermate: Landing/Onboarding, Home
+Dashboard, Dettaglio Ospite (Anna van Dijsseldonk), Alert Urgente (Klaus
+Werner), Settings Kit.
 
-**NOTA IMPORTANTE:** in questa versione del prototipo l'agente appare ancora
-firmato come "Leo" in alcuni punti (Home card + chat Anna). Da sistemare:
-sostituire "Leo" con "Premura" ovunque.
-
----
-
-## 7. File obsoleti da aggiornare
-
-Questi file parlano ancora di "GiftTube" e del vecchio prezzo "€4.99".
-Vanno riscritti al posizionamento attuale descritto sopra:
-
-- `README.md` — riscrivere intero al nuovo brand e pricing
-- `CLAUDE.md` — istruzioni per Claude Code, da allineare
-- `docs/` — rivedere contenuti
-- `package.json` — campo `name`, `description`
-- Descrizione del repo su GitHub (attualmente "The invisible concierge...
-  €4.99/month")
+**NOTA:** il prototipo mostra UI dei casi "outbound" principali. La UI delle
+feature nuove (profilo struttura, voice profile, matrice delega, draft
+approval) verrà progettata in Fase 2-3 dello sviluppo.
 
 ---
 
 ## 8. Cosa NON è Premura
 
-Distinzioni importanti per evitare scope creep:
-
 - **NON è un channel manager.** Non sincronizza disponibilità, non scrive
-  su Booking/Airbnb. Solo lettura.
+  su Booking/Airbnb. Legge calendari (iCal) e risponde a messaggi inbound.
 - **NON è un PMS.** Non gestisce pulizie complesse, non fa reportistica
   contabile, non gestisce multi-property calendar editing.
-- **NON è un chatbot per ospiti.** L'ospite chatta col "nome della struttura"
-  attraverso WhatsApp/Booking inbox, non con un bot dichiarato.
-- **NON è un tool che richiede configurazione.** L'host imposta cleaner +
-  budget una volta. Tutto il resto è automatico.
+- **NON è un chatbot dichiarato.** L'ospite chatta col "nome della struttura",
+  non con un bot visibile. L'illusione è che parli con l'host umano.
+- **NON è un tool che richiede configurazione continua.** L'host imposta
+  profilo struttura + voice profile + matrice delega **una volta**, poi
+  tocca zero.
 
 ---
 
-## 9. Prossimi step concreti (per Claude Code)
+## 9. Prossimi step per Claude Code
 
-Quando Claude Code apre questo repo, l'ordine di lavoro consigliato è:
+Quando Claude Code apre questo repo, l'ordine di lavoro è:
 
-1. **Leggere** `CONTEXT.md` (questo file) e `demo/premura-prototype.html`
-   per capire posizionamento e UX target.
-2. **Aggiornare** `README.md`, `CLAUDE.md`, `package.json` (campo name
-   e description) al nuovo brand Premura e pricing €9.99/€7.99/€5.99.
-3. **Rivedere** `docs/` per allineare architettura al nuovo posizionamento
-   (aggregazione read-only, no channel manager, ecc.).
-4. **Sistemare il prototipo**: nel file `demo/premura-prototype.html`
-   sostituire ogni occorrenza di "Leo" con "Premura" (o rimuovere firma,
-   lasciando firma = nome struttura per i messaggi all'ospite).
-5. Dopo aver aggiornato i file testuali, discutere con l'host fondatore
-   (Andrea) i prossimi step di sviluppo prodotto.
+1. Leggere CONTEXT.md (questo file), docs/architecture.md, docs/ROADMAP.md
+2. Seguire la ROADMAP fase per fase
+3. NON scrivere codice senza piano approvato dall'host per la fase corrente
 
 ---
 
 _Ultimo aggiornamento: 22 aprile 2026 — Andrea Chiacchio, fondatore_
+_v2: aggiunta capacità Conversazione, profilo struttura, voice profile, matrice delega_
