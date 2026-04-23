@@ -289,7 +289,7 @@ Allora passiamo alla Fase 8.
 ### Target 6 mesi post-launch
 - 200-500 host paganti
 - MRR €2k-4k
-- Margine 55-60% post-ottimizzazioni
+- Margine 65-70% (coerente con architecture.md v2.1)
 - Break-even mese 10-12 dal lancio
 
 ---
