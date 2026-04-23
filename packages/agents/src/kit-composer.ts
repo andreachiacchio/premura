@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Anthropic } from '@anthropic-ai/sdk';
-import { runClaude } from '@/utils/claude.js';
-import type { DnaSignals, DnaRisk, KitItem } from '@/db/schema.js';
+import { runClaude } from '@premura/shared';
+import type { DnaSignals, DnaRisk, KitItem } from '@premura/db';
 
 // ===== CATALOG =====
 // The catalog is intentionally small and curated. Quality > variety.

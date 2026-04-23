@@ -1,6 +1,6 @@
 import type { Anthropic } from '@anthropic-ai/sdk';
-import { runClaude } from '@/utils/claude.js';
-import type { DnaSignals, DnaRisk, KitItem } from '@/db/schema.js';
+import { runClaude } from '@premura/shared';
+import type { DnaSignals, DnaRisk, KitItem } from '@premura/db';
 
 export type MessageStage =
   | 'pre_arrival' // 24-48h prima, tono caldo, anticipa info chiave e sorpresa

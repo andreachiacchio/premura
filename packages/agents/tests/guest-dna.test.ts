@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock BEFORE importing the module under test
-vi.mock('@/utils/claude.js', () => ({
+vi.mock('@premura/shared', () => ({
   runClaude: vi.fn(),
 }));
 
-import { runClaude } from '@/utils/claude.js';
-import { generateGuestDna } from '@/agents/guest-dna.js';
+import { runClaude } from '@premura/shared';
+import { generateGuestDna } from '@premura/agents';
 
 describe('generateGuestDna', () => {
   beforeEach(() => {

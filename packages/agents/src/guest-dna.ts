@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Anthropic } from '@anthropic-ai/sdk';
-import { runClaude } from '@/utils/claude.js';
-import type { DnaSignals, DnaRisk } from '@/db/schema.js';
+import { runClaude } from '@premura/shared';
+import type { DnaSignals, DnaRisk } from '@premura/db';
 
 // ===== INPUT =====
 

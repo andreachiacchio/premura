@@ -1,0 +1,9 @@
+{
+  "name": "@premura/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'Next.js app — creata nel milestone 1.3 (Frontend base)'"
+  }
+}

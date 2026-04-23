@@ -1,32 +1,11 @@
 {
-  "compilerOptions": {
-    "target": "ES2023",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "lib": ["ES2023"],
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "noUncheckedIndexedAccess": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "verbatimModuleSyntax": true,
-    "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"],
-      "@agents/*": ["src/agents/*"],
-      "@workflows/*": ["src/workflows/*"],
-      "@integrations/*": ["src/integrations/*"],
-      "@db/*": ["src/db/*"],
-      "@utils/*": ["src/utils/*"]
-    },
-    "outDir": "dist",
-    "declaration": false,
-    "sourceMap": true
-  },
-  "include": ["src/**/*", "scripts/**/*", "tests/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "extends": "./tsconfig.base.json",
+  "include": [
+    "apps/*/src/**/*",
+    "packages/*/src/**/*",
+    "packages/*/tests/**/*",
+    "apps/*/tests/**/*",
+    "scripts/**/*"
+  ],
+  "exclude": ["node_modules", "**/dist"]
 }

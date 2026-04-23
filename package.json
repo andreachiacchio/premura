@@ -8,10 +8,11 @@
     "node": ">=22.0.0",
     "pnpm": ">=9.0.0"
   },
+  "packageManager": "pnpm@9.15.0",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/index.js",
+    "dev": "pnpm --filter @premura/api dev",
+    "dev:web": "pnpm --filter @premura/web dev",
+    "build": "pnpm -r --parallel build",
     "test": "vitest",
     "test:integration": "vitest --config vitest.integration.config.ts",
     "lint": "biome check .",
@@ -21,23 +22,6 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "db:studio": "drizzle-kit studio"
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.40.0",
-    "@fastify/cors": "^10.0.0",
-    "@fastify/helmet": "^13.0.0",
-    "@fastify/rate-limit": "^10.2.0",
-    "bullmq": "^5.34.0",
-    "dotenv": "^16.4.5",
-    "drizzle-orm": "^0.38.0",
-    "drizzle-zod": "^0.6.0",
-    "fastify": "^5.2.0",
-    "ioredis": "^5.4.1",
-    "pino": "^9.5.0",
-    "pino-pretty": "^13.0.0",
-    "postgres": "^3.4.5",
-    "stripe": "^17.5.0",
-    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

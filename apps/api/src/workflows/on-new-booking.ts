@@ -1,6 +1,4 @@
-import { generateGuestDna } from '@/agents/guest-dna.js';
-import { composeKit } from '@/agents/kit-composer.js';
-import { writeMessage } from '@/agents/message-writer.js';
+import { generateGuestDna, composeKit, writeMessage } from '@premura/agents';
 
 /**
  * Main workflow triggered by webhook from Booking.com or Airbnb
