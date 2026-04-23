@@ -103,4 +103,60 @@ fornitori nel property_knowledge_base, GDPR).
 
 ---
 
+## 5. Fly.io → Supabase: Session Pooler obbligato
+
+**Problema.** Fly.io espone egress IPv4 solo con Dedicated IPv4 add-on
+($4/mese). In default gratuito, le VM Fly raggiungono Internet IPv4 solo
+via shared egress limitato e nativamente via IPv6. Supabase su free/Pro
+tier espone la Direct Connection (`db.<project>.supabase.co:5432`) come
+**IPv6-only** — vedi il problema analogo incontrato in milestone 1.2.d
+dalla sandbox.
+
+**Impatto stimato.** Applicato alle VM Fly di produzione: `pnpm db:push`
+runtime + query applicative non raggiungerebbero il DB via Direct URL.
+Non bloccante oggi (siamo in staging), ma bloccherà il deploy prod se
+non indirizzato prima.
+
+**Mitigazione scelta.**
+- **L'app Fly userà il Session Pooler** Supabase
+  (`aws-<region>.pooler.supabase.com:5432`, IPv4 disponibile), stessa
+  scelta di `.env.local` in dev.
+- `DATABASE_URL` in Fly secrets punterà al pooler, non al direct.
+- Direct URL resta disponibile per migrations runtime se mai servisse
+  lanciarle dalla workstation Mac (IPv6 nativo a casa).
+
+**Migrazione futura.**
+- Quando passiamo a Supabase Pro con Dedicated IPv4 add-on (~$4/mese),
+  valutare uso del Direct URL per query applicative (niente overhead
+  pooler). Il Session Pooler resta adatto per lambda/serverless.
+
+---
+
+## 6. Runtime TypeScript via `tsx` (vs bundler)
+
+**Problema.** I workspace `@premura/*` esportano TS sorgente
+(`main: "./src/index.ts"`): Node nativo non può eseguirli senza transpile.
+Abbiamo 3 strategie possibili:
+- **A.** `tsx` a runtime in produzione (scelta attuale)
+- **B.** bundler (tsup/esbuild) che inlina i workspace in un singolo JS
+- **C.** ogni package compila a `dist/`, con project references
+
+Scelta A = minima modifica, coerenza dev↔prod. Costo: ~200-400ms cold
+start per il transpile iniziale di tsx.
+
+**Impatto stimato.** In staging/pilot Fase 7 con traffico basso e
+`auto_stop_machines=true`, l'overhead è mascherato dal cold boot Fly
+(~3-5s totali). A scala (post-launch Fase 9) diventa percepibile se le
+machines restano idle-stop.
+
+**Migrazione futura a tsup.**
+- Giustificata **post-pilot Fase 7** quando avremo metriche reali di
+  cold start e volume di richieste.
+- Aggiunta devDep `tsup`, config `tsup.config.ts` in `apps/api/`, build
+  script che produce `dist/index.js` con workspace deps inlinate.
+- Dockerfile perde lo stage runtime+tsx, CMD diventa
+  `["node", "dist/index.js"]`.
+
+---
+
 _Ultimo aggiornamento: 22 aprile 2026 — Andrea Chiacchio, fondatore_

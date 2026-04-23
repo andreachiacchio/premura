@@ -1,0 +1,41 @@
+# Fly.io config — Premura API staging.
+#
+# Deploy da repo ROOT (il Dockerfile ha bisogno del workspace intero):
+#
+#   flyctl deploy --config apps/api/fly.toml --dockerfile apps/api/Dockerfile
+#
+# Region mxp = Milano. Minimizza latenza con Supabase Frankfurt (~15-25ms).
+# Nota IPv4/IPv6: Fly egress è IPv6-only verso Supabase → app userà
+# Session Pooler (5432 IPv4), vedi docs/KNOWN-LIMITS.md §5.
+
+app = "premura-api-staging"
+primary_region = "mxp"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Risparmio su staging: macchine spente quando idle, riaccese on-demand.
+  # Prima request paga il cold start (~3-5s).
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "15s"
+    timeout = "5s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  cpu_kind = "shared"

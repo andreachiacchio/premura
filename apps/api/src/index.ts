@@ -16,7 +16,11 @@ const app = Fastify({
 await app.register(helmet);
 await app.register(cors, { origin: true });
 
-app.get('/health', () => ({ status: 'ok', version: '0.1.0' }));
+app.get('/health', () => ({
+  status: 'ok',
+  version: '0.1.0',
+  timestamp: new Date().toISOString(),
+}));
 
 // TODO: register webhooks, dashboard API, cleaner endpoints
 

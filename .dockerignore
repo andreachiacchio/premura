@@ -1,0 +1,43 @@
+# File e cartelle esclusi dal Docker build context.
+# Mantenere aggiornato quando si aggiungono cartelle al repo.
+
+# Node
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+**/coverage
+.turbo
+tmp
+
+# Git e metadata
+.git
+.github
+.gitignore
+.gitattributes
+
+# Env locali — niente segreti nel build context
+.env
+.env.local
+.env.*.local
+
+# Documentazione — il container non ha bisogno di markdown
+*.md
+**/*.md
+
+# IDE / editor
+.vscode
+.idea
+.DS_Store
+
+# Docker stesso (evita ricorsione self-copy)
+Dockerfile
+.dockerignore
+apps/api/Dockerfile
+apps/api/fly.toml
+
+# Demo HTML (non serve al runtime API)
+demo
+
+# Test infra (il container non esegue test)
+vitest.config.ts
+vitest.integration.config.ts
