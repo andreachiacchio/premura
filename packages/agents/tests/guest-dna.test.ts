@@ -6,7 +6,7 @@ vi.mock('@premura/shared', () => ({
 }));
 
 import { runClaude } from '@premura/shared';
-import { generateGuestDna } from '@premura/agents';
+import { generateGuestDna } from '../src/guest-dna.js';
 
 describe('generateGuestDna', () => {
   beforeEach(() => {
