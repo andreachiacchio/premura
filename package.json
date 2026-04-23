@@ -22,7 +22,7 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed.ts",
+    "db:seed": "tsx packages/db/src/seed.ts",
     "db:studio": "drizzle-kit studio"
   },
   "devDependencies": {
