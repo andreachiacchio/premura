@@ -24,9 +24,10 @@ export function Hero() {
         </Heading>
 
         <p className="mt-8 max-w-2xl text-body-lg text-ink-soft">
-          Per host che vogliono recensioni 10 senza fare nulla. Premura studia
-          ogni ospite, scrive messaggi su misura, prepara un pensiero in casa e
-          intercetta i problemi prima che diventino recensioni.
+          Per host che vogliono recensioni da 10 senza rinunciare al proprio
+          tempo. Premura studia ogni ospite, scrive messaggi su misura, prepara
+          un pensiero in casa e intercetta i problemi prima che diventino
+          recensioni.
         </p>
 
         <div className="mt-10 max-w-xl">
