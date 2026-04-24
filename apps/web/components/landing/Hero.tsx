@@ -26,8 +26,8 @@ export function Hero() {
         <p className="mt-8 max-w-2xl text-body-lg text-ink-soft">
           Per host che vogliono recensioni da 10 senza rinunciare al proprio
           tempo. Premura è un agente AI che studia ogni ospite, scrive messaggi
-          su misura, prepara un pensiero in casa e intercetta i problemi prima
-          che diventino recensioni.
+          su misura, prepara un pensiero personalizzato in casa e intercetta i
+          problemi prima che diventino recensioni.
         </p>
 
         <div className="mt-10 max-w-xl">
