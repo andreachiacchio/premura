@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/Button";
 import { cn } from "@/lib/cn";
@@ -186,12 +187,12 @@ export function WaitlistForm({ placement }: WaitlistFormProps) {
       <p className="text-body-sm text-ink-mute">
         Iscrivendoti accetti di ricevere un&apos;email quando apriamo. Niente
         newsletter, niente rumore. Cancelli con un click, o leggi la{" "}
-        <a
-          href="mailto:andrea@premura.it?subject=Premura%20%E2%80%94%20privacy"
+        <Link
+          href="/privacy"
           className="underline underline-offset-2 decoration-line hover:text-ink hover:decoration-ink"
         >
           privacy
-        </a>
+        </Link>
         .
       </p>
     </form>
