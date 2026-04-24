@@ -159,4 +159,36 @@ machines restano idle-stop.
 
 ---
 
-_Ultimo aggiornamento: 22 aprile 2026 — Andrea Chiacchio, fondatore_
+## 7. Rate limit waitlist best-effort (in-memory)
+
+**Problema.** L'endpoint pubblico `POST /api/waitlist` (apps/web) è esposto
+senza autenticazione e può essere bersagliato da bot / script. Il rate
+limiter corrente è una `Map` in-memory per IP (`apps/web/lib/rate-limit.ts`),
+finestra 5 min / max 3 req. Su Vercel serverless ogni istanza ha la propria
+Map, quindi un attaccante distribuito o Vercel che autoscale crea istanze
+nuove bypassa il limite.
+
+**Impatto stimato.** Basso finché la landing è pre-lancio e non indicizzata
+aggressivamente. Il vero limite di abuso è il UNIQUE su `waitlist.email`:
+un bot può comunque saturare la tabella con email disposable generate al
+volo. Non abbiamo captcha né verifica email, quindi il DB potrebbe
+riempirsi di entry rumore che andranno filtrate manualmente prima del
+lancio.
+
+**Mitigazione futura.**
+- **Upstash Ratelimit** (Redis serverless) come rate limiter condiviso
+  cross-istanza. Aggiungerebbe `@upstash/ratelimit` + `@upstash/redis`
+  e una env var. Trigger per introdurlo: prima firma di abuso o primo
+  picco di traffico virale sulla landing (>500 req/h).
+- **Turnstile / hCaptcha** invisibile sul form waitlist, attivato solo
+  se il tasso IP supera una soglia sospetta.
+- **Email double-opt-in** al primo invio: niente conferma → niente entry
+  persistita. Richiede Resend/Postmark setup (rimandato dopo milestone
+  Billing 6.1).
+- **Cleanup periodico** delle entry "source=direct" senza property_count
+  e con email disposable (lista pubblica nota) se accumuliamo rumore.
+
+---
+
+_Ultimo aggiornamento: 24 aprile 2026 — Andrea Chiacchio, fondatore_
+_v2.1: aggiunto §7 rate limit waitlist (milestone 1.3.c)_
