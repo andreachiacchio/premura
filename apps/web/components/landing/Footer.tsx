@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Container } from "@/components/Container";
 
 export function Footer() {
@@ -13,7 +14,16 @@ export function Footer() {
             <span className="font-serif text-h4 text-ink">Premura</span>
             <span className="text-body-sm text-ink-mute">· Fatto a Napoli.</span>
           </div>
-          <p className="text-body-sm text-ink-mute">© 2026 Premura</p>
+          <div className="flex items-center gap-4 text-body-sm text-ink-mute">
+            <Link
+              href="/privacy"
+              className="hover:text-ink transition-colors"
+            >
+              Privacy
+            </Link>
+            <span aria-hidden="true">·</span>
+            <span>© 2026 Premura</span>
+          </div>
         </div>
       </Container>
     </footer>
