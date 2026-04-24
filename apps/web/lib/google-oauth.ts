@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { OAuth2Client } from 'google-auth-library';
+import { OAuth2Client, type Credentials } from 'google-auth-library';
 import { SignJWT, jwtVerify, errors as joseErrors } from 'jose';
 
 // ─────────────────────────────────────────────────────────────
@@ -222,7 +222,7 @@ export async function exchangeCodeForTokens(
 
   // Step 2: scambia code con Google.
   const client = createOAuthClient();
-  let tokens: Awaited<ReturnType<OAuth2Client['getToken']>>['tokens'];
+  let tokens: Credentials;
   try {
     const res = await client.getToken(code);
     tokens = res.tokens;
