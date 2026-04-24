@@ -9,10 +9,11 @@ export const metadata = {
     "Come Premura tratta i tuoi dati. Niente tracking, niente vendita, niente rumore.",
 };
 
-// TODO: sostituire "andrea@premura.it" con l'indirizzo definitivo quando il
-// dominio email è attivo (al momento è un placeholder onesto — la casella
-// non esiste ancora). Aggiornare anche il <a href="mailto:..."> sotto.
-const CONTACT_EMAIL = "andrea@premura.it";
+// TODO: sostituire "andreachiacchio1992@gmail.com" con "andrea@premura.it"
+// quando il dominio email è attivo. Nel frattempo usiamo l'email personale
+// di Andrea (attiva e funzionante) per garantire che i messaggi di
+// cancellazione arrivino davvero.
+const CONTACT_EMAIL = "andreachiacchio1992@gmail.com";
 
 export default function PrivacyPage() {
   return (
