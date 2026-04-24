@@ -314,11 +314,6 @@ function SuccessCard({ propertyCount, duplicate }: SuccessCardProps) {
       <p className="mt-5 text-body-sm text-ink-mute">
         — Andrea
       </p>
-
-      <p className="mt-6 pt-5 border-t border-line-soft text-body-sm text-ink-soft">
-        Se vuoi anticipare: scrivimi su{" "}
-        <span className="font-semibold text-ink">andrea@premura.it</span>.
-      </p>
     </div>
   );
 }
