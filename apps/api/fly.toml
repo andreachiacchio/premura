@@ -9,7 +9,7 @@
 # Session Pooler (5432 IPv4), vedi docs/KNOWN-LIMITS.md §5.
 
 app = "premura-api-staging"
-primary_region = "mxp"
+primary_region = "fra"
 
 [build]
   dockerfile = "Dockerfile"
