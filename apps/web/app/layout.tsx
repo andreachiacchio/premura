@@ -16,9 +16,17 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Premura — il concierge che non dorme mai",
+  title: "Premura — Il concierge per host italiani",
   description:
-    "Premura è l'agente AI concierge per host italiani di affitti brevi. Cura l'ospite prima, durante e dopo il soggiorno — al posto tuo.",
+    "Premura è l'agente AI che si prende cura degli ospiti al posto tuo. Studia, scrive, intercetta i problemi prima che diventino recensioni. Per host di affitti brevi in Italia. In beta privata — entra nella waitlist.",
+  openGraph: {
+    title: "Premura — Il concierge per host italiani",
+    description:
+      "L'agente AI che si prende cura degli ospiti al posto tuo. Per host di affitti brevi in Italia.",
+    type: "website",
+    locale: "it_IT",
+    siteName: "Premura",
+  },
 };
 
 export const viewport: Viewport = {

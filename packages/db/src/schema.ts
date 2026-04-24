@@ -28,4 +28,5 @@ export * from './schema/agent-actions';
 export * from './schema/pending-payouts';
 export * from './schema/reviews';
 export * from './schema/local-partners';
+export * from './schema/waitlist';
 export * from './schema/relations';

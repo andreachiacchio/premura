@@ -80,9 +80,15 @@ importers:
 
   apps/web:
     dependencies:
+      '@premura/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      drizzle-orm:
+        specifier: ^0.38.0
+        version: 0.38.4(@types/react@19.2.14)(postgres@3.4.9)(react@19.2.5)
       next:
         specifier: ^15.1.4
         version: 15.5.15(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -95,6 +101,9 @@ importers:
       tailwind-merge:
         specifier: ^2.6.0
         version: 2.6.1
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.0.0
