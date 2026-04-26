@@ -222,6 +222,13 @@ export type ParserOptions = {
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const TOOL_NAME = 'extract_airbnb_email';
 
+// Timeout per ogni chiamata Anthropic. Protezione vs Claude lento o
+// stallato: se non risponde in 30s, abort + AirbnbParserError →
+// orchestrator marca questa email come fallita e CONTINUA con la
+// prossima. Niente retry automatico (bilancio costi); l'host può
+// rilanciare il sync per ritentare.
+const REQUEST_TIMEOUT_MS = 30_000;
+
 export async function parseAirbnbEmail(
   email: AirbnbEmailInput,
   options: ParserOptions = {},
@@ -240,34 +247,51 @@ export async function parseAirbnbEmail(
   const html = (email.htmlBody || '').slice(0, 12000);
   const userMessage = buildUserMessage({ text, html, date: email.date, subject: email.subject });
 
+  // Timeout 30s via AbortController. Se Claude non risponde in tempo,
+  // l'orchestrator catcherà l'errore, marcherà questa email come fallita
+  // in error_log, e proseguirà con la prossima.
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
   let response;
   try {
-    response = await client.messages.create({
-      model,
-      max_tokens: 1024,
-      system: [
-        {
-          type: 'text',
-          text: SYSTEM_PROMPT,
-          // Prompt caching: identico per ogni email del sync (~70% saving).
-          cache_control: { type: 'ephemeral' },
-        },
-      ],
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Estrae i dati strutturati dall\'email Airbnb',
-          input_schema: TOOL_INPUT_SCHEMA,
-        },
-      ],
-      tool_choice: { type: 'tool', name: TOOL_NAME },
-      messages: [{ role: 'user', content: userMessage }],
-    });
+    response = await client.messages.create(
+      {
+        model,
+        max_tokens: 1024,
+        system: [
+          {
+            type: 'text',
+            text: SYSTEM_PROMPT,
+            // Prompt caching: identico per ogni email del sync (~70% saving).
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
+        tools: [
+          {
+            name: TOOL_NAME,
+            description: "Estrae i dati strutturati dall'email Airbnb",
+            input_schema: TOOL_INPUT_SCHEMA,
+          },
+        ],
+        tool_choice: { type: 'tool', name: TOOL_NAME },
+        messages: [{ role: 'user', content: userMessage }],
+      },
+      { signal: controller.signal },
+    );
   } catch (err) {
+    if (controller.signal.aborted) {
+      throw new AirbnbParserError(
+        `Timeout ${REQUEST_TIMEOUT_MS / 1000}s superato durante chiamata Claude (no retry, l'host può rilanciare il sync)`,
+        err,
+      );
+    }
     if (err instanceof Anthropic.APIError) {
       throw new AirbnbParserError(`Anthropic API error ${err.status}: ${err.message}`, err);
     }
     throw new AirbnbParserError(`Errore inatteso parser: ${(err as Error).message}`, err);
+  } finally {
+    clearTimeout(timeoutHandle);
   }
 
   // Estrai il blocco tool_use.
@@ -328,4 +352,5 @@ export const _internals = {
   TOOL_NAME,
   buildUserMessage,
   DEFAULT_MODEL,
+  REQUEST_TIMEOUT_MS,
 };

@@ -29,6 +29,7 @@ type JobStatus = {
   cancelledCount: number;
   guestProfilesCreated: number;
   guestProfilesUpdated: number;
+  truncated: boolean;
   fatalError: string | null;
 };
 
@@ -205,6 +206,13 @@ export function GmailSyncProgress(): ReactElement {
             </li>
           ) : null}
         </ul>
+        {j.truncated ? (
+          <p className="mt-6 rounded-md border border-line bg-paper-deep p-4 text-body-sm text-ink-soft">
+            Trovate più di 200 email negli ultimi 90 giorni: abbiamo processato le 200 più
+            recenti. Per leggere le rimanenti, rilancia la sincronizzazione fra qualche
+            minuto.
+          </p>
+        ) : null}
         <p className="mt-6 text-body-sm text-ink-mute">
           {profilesTotal === 0 && enrichedOrCreated === 0
             ? null

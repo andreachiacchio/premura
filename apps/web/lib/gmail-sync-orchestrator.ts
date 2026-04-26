@@ -73,8 +73,15 @@ export type SyncResult = {
   cancelledCount: number;
   guestProfilesCreated: number;
   guestProfilesUpdated: number;
+  truncated: boolean;
   fatalError?: string;
 };
+
+// Hard cap di sicurezza: protezione costi vs host con casella molto attiva
+// o sync runaway. Se la query Gmail trova più email di questo limite,
+// processiamo solo le N più recenti e marchiamo job.truncated=true.
+// L'host può rilanciare il sync per processare le rimanenti.
+export const MAX_EMAILS_PER_SYNC = 200;
 
 export async function syncGmailForHost(
   serverClient: ServerClient,
@@ -109,6 +116,7 @@ export async function syncGmailForHost(
   };
 
   let totalEmails = 0;
+  let truncated = false;
   let fatalError: string | undefined;
 
   try {
@@ -125,9 +133,22 @@ export async function syncGmailForHost(
     const gmail = await factory(serverClient, hostId, googleEmail);
 
     // Step 4: query email Airbnb ultimi N giorni.
-    const messageIds = await searchAirbnbEmails(gmail, daysBack, { now });
+    const allMessageIds = await searchAirbnbEmails(gmail, daysBack, { now });
+    // Hard cap: se >200 email, processa solo le 200 PIÙ RECENTI. Gmail
+    // API ritorna gli ID in ordine cronologico inverso (più recente prima),
+    // quindi slice(0, MAX) prende esattamente quelle.
+    const messageIds = allMessageIds.slice(0, MAX_EMAILS_PER_SYNC);
+    truncated = allMessageIds.length > MAX_EMAILS_PER_SYNC;
     totalEmails = messageIds.length;
-    await setTotalEmails(db, job.id, totalEmails);
+    await setTotalEmails(db, job.id, totalEmails, truncated);
+    if (truncated) {
+      // Nota informativa nel log: NON è un errore di una specifica email.
+      await appendErrorLog(db, job.id, {
+        messageId: '_sync_truncated',
+        stage: 'fetch',
+        error: `${allMessageIds.length} email Airbnb trovate negli ultimi ${daysBack}gg, processate solo le ${MAX_EMAILS_PER_SYNC} più recenti per protezione costi. Re-run sync per le rimanenti.`,
+      });
+    }
 
     // Step 5: loop processing.
     const parser = options.emailParser ?? parseAirbnbEmail;
@@ -293,6 +314,7 @@ export async function syncGmailForHost(
     jobId: job.id,
     status: fatalError ? 'failed' : 'completed',
     totalEmails,
+    truncated,
     fatalError,
     ...stats,
   };

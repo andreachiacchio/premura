@@ -232,6 +232,45 @@ A scala (>50 host, >1000 sync/giorno) servirà worker dedicato.
   iniziale (l'host clicca → Premura promette "ti aggiorniamo entro
   un'ora", invece di progress bar live).
 
+### 8.1 — Hard cap 200 email per sync
+
+`MAX_EMAILS_PER_SYNC=200` in
+`apps/web/lib/gmail-sync-orchestrator.ts`. Se `searchAirbnbEmails`
+trova più email, processiamo solo le 200 più recenti (Gmail API
+ritorna in ordine cronologico inverso) e marchiamo
+`gmail_sync_jobs.truncated=true` + nota in `error_log`. L'host può
+rilanciare `POST /api/gmail/sync` per processare le rimanenti.
+
+**Perché 200**: ~3-5s per email × 200 = 10-17 min di sync, ~€3 di
+costo Claude. Soglia ragionevole per pilot con 1-5 strutture. Per
+host >5 strutture (post-M3) il limite andrà alzato o reso
+configurabile per-host.
+
+### 8.2 — No retry sul parsing Claude
+
+Ogni chiamata `client.messages.create` ha un timeout 30s
+(`REQUEST_TIMEOUT_MS` in `airbnb-email-parser.ts`) via
+`AbortController`. Se Claude non risponde in tempo o l'API ritorna
+un errore, il parser solleva `AirbnbParserError` → l'orchestrator
+appenda al `error_log` con stage='parse' e CONTINUA con la prossima
+email. **Nessun retry automatico**: bilancio costi (un retry su
+errore Anthropic 5xx duplicherebbe il costo per email problematiche)
++ semplicità. L'host rilancia il sync per ritentare le email
+fallite — sono identificate via `raw_email_id` nell'error_log.
+
+### 8.3 — Migration 0003 non idempotente su `guest_profiles` non vuota
+
+`ALTER TABLE guest_profiles ADD COLUMN host_id uuid NOT NULL` (in
+migration `0003_early_edwin_jarvis.sql`) **fallisce se la tabella
+contiene righe senza `host_id`**. Sul Supabase dev attuale di Andrea
+la tabella è vuota (nessun agent ha ancora popolato Guest DNA),
+quindi la migration applica clean.
+
+**Pre-requisito per ambienti con dati**: prima di applicare 0003,
+`TRUNCATE guest_profiles RESTART IDENTITY CASCADE;` se ci sono
+righe legacy. La M2a.4 (Guest DNA agent) sarà responsabile di
+ri-popolare la tabella con il nuovo schema host-scoped.
+
 ---
 
 _Ultimo aggiornamento: 26 aprile 2026 — Andrea Chiacchio, fondatore_

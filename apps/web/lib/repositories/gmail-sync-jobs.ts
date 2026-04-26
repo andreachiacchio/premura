@@ -34,6 +34,7 @@ export type SyncJob = {
   guestProfilesUpdated: number;
   errorLog: JobErrorEntry[];
   fatalError: string | null;
+  truncated: boolean;
   startedAt: Date;
   completedAt: Date | null;
 };
@@ -51,15 +52,16 @@ export async function createJob(
   return { id: row.id };
 }
 
-// Aggiorna total_emails una volta sola (dopo la query Gmail).
+// Aggiorna total_emails (e flag truncated) una volta sola dopo la query Gmail.
 export async function setTotalEmails(
   db: Database,
   jobId: string,
   total: number,
+  truncated = false,
 ): Promise<void> {
   await db
     .update(gmailSyncJobs)
-    .set({ totalEmails: total, updatedAt: new Date() })
+    .set({ totalEmails: total, truncated, updatedAt: new Date() })
     .where(eq(gmailSyncJobs.id, jobId));
 }
 
@@ -180,6 +182,7 @@ export async function getJob(db: Database, jobId: string): Promise<SyncJob | nul
     guestProfilesUpdated: row.guestProfilesUpdated,
     errorLog: row.errorLog,
     fatalError: row.fatalError,
+    truncated: row.truncated,
     startedAt: row.startedAt,
     completedAt: row.completedAt,
   };

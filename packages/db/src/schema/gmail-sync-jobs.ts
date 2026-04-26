@@ -6,6 +6,7 @@ import {
   timestamp,
   integer,
   jsonb,
+  boolean,
   index,
   pgEnum,
 } from 'drizzle-orm/pg-core';
@@ -63,6 +64,11 @@ export const gmailSyncJobs = pgTable(
     // Errore fatale che ha terminato il job (es. token scaduto, Anthropic
     // unreachable). Quando popolato, status='failed'.
     fatalError: text('fatal_error'),
+
+    // Hard cap protezione costi: se la query Gmail ritorna > MAX_EMAILS
+    // (200), processiamo solo le N più recenti e marchiamo truncated=true.
+    // L'host può rilanciare il sync per processare le rimanenti.
+    truncated: boolean('truncated').notNull().default(false),
 
     startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
