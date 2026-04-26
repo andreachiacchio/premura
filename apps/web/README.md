@@ -38,6 +38,8 @@ pnpm test                              # vitest (include apps/web/tests)
 | `/api/waitlist` | dynamic | `POST` — INSERT in tabella waitlist |
 | `/api/auth/google/start` | dynamic | `GET ?hostId=<uuid>` — redirect a Google consent |
 | `/api/auth/google/callback` | dynamic | `GET ?code&state` — exchange + upsert + redirect |
+| `/api/gmail/sync` | dynamic | `POST` — avvia sync background, ritorna `202 { jobId }` (M2a.3 Fase 2) |
+| `/api/gmail/sync/status` | dynamic | `GET ?jobId=<uuid>` — stato job per progress bar |
 
 ## Google OAuth (M2a.3 Fase 1) — setup dev locale
 
@@ -157,9 +159,61 @@ apps/web/
 └── package.json
 ```
 
+## M2a.3 Fase 2 — Gmail backfill + parser email Airbnb
+
+### Costi Claude (parser email)
+
+Sonnet 4.6 a $3 input / $15 output per 1M token. Una email Airbnb è
+~3000 token input + ~500 output → ~$0.016 per email = ~€0.015.
+
+| Volume sync | Costo stimato |
+|---|---|
+| 50 email (sync iniziale tipico) | ~€0.75 |
+| 200 email (host molto attivo) | ~€3 |
+
+Prompt caching attivo sul system prompt (~70% saving sui token cached
+read). Per ridurre ulteriormente, override
+`CLAUDE_MODEL_EMAIL_PARSER=claude-haiku-4-5-20251001` (~4× più
+economico, qualità accettabile per estrazione strutturata).
+
+### Architettura sync (Opzione B)
+
+`POST /api/gmail/sync`:
+1. Crea `gmail_sync_jobs` row → ottiene `jobId`.
+2. Lancia `syncGmailForHost(...)` in background (`void` promise +
+   `reuseJobId`).
+3. Risponde **202 `{ jobId }`** immediatamente.
+
+Frontend `<GmailSyncProgress />` (montato in `/connect-gmail/success`):
+- POST iniziale → riceve jobId.
+- Polling `GET /api/gmail/sync/status?jobId=X` ogni 1.5s.
+- Render: progress bar (`processedEmails / totalEmails`) → summary
+  finale con "trovate N prenotazioni, M ospiti registrati", oppure
+  errore + retry su `status='failed'`.
+
+Limitazioni note documentate in `docs/KNOWN-LIMITS.md` §8 (Vercel
+function timeout sul tier Hobby, no auto-refresh access_token).
+
+### Test
+
+```bash
+pnpm test                  # 61 unit test (incluse 7 web tests sul parser)
+pnpm test:integration       # 1 integration testcontainer Postgres
+```
+
+L'integration test (`gmail-sync-orchestrator.integration.test.ts`)
+applica le migration 0000→0003 a un Postgres temporaneo, seed-a 1
+host + 1 property "La Goccia", mocka GmailClient con 3 email finte
+(2 future, 1 passata), e verifica che `bookings` + `guest_profiles`
++ `gmail_sync_jobs` siano popolati correttamente. Skipped graceful se
+Docker non è attivo.
+
 ## Roadmap
 
 - **M2a.3 Fase 1** ✅ OAuth flow + token persistiti cifrati
-- **M2a.3 Fase 2** — worker polling Gmail, filtro Airbnb/Booking, enrich bookings
+- **M2a.3 Fase 2** ✅ Gmail backfill 90gg + parser email Airbnb
+  (Claude Sonnet 4.6) + UI progress bar + summary
+- **M2a.3 Fase 3** — parser email Booking.com (analogo, prompt diverso)
+- **M2a.3 Fase 4** — auto-refresh access_token + dashboard "email lette"
 - **M2a.2** — Auth reale (Supabase Auth), rimuovere `DEV_HOST_ID`
 - **M2a.1** — iCal ingestion (su branch separato)

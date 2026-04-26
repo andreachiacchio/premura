@@ -83,6 +83,30 @@
 - [ ] Parser email Booking + Airbnb
 - [ ] Enrichment `bookings` con dati email
 
+### Milestone 2a.3 — Connetti Gmail (OAuth + parser email)
+**Obiettivo:** l'host collega Gmail; Premura legge automaticamente le
+email Airbnb degli ultimi 90 giorni e popola `bookings` + `guest_profiles`.
+
+- [x] **Fase 1**: OAuth Google end-to-end. Schema `google_tokens`
+  cifrato AES-256-GCM, JWT state CSRF, pagina `/connect-gmail` con
+  copy etico (4 sezioni: cosa leggiamo / cosa non possiamo / come te
+  ne accorgi / cosa ti mostrerà Google), success + error pages.
+  Branch: `feat/google-oauth-m2a3` — 27/27 test verdi.
+- [x] **Fase 2**: Gmail backfill 90gg + parser email Airbnb con Claude
+  Sonnet 4.6. Migration 0003 (bookings esteso, guest_profiles
+  host-scoped, gmail_sync_jobs). Lib: gmail-client, airbnb-email-parser
+  (tool_use forzato + Zod), property-matcher (fuzzy Dice + boost),
+  repositories (idempotenti), gmail-sync-orchestrator (3 stati job +
+  error_log). API `/api/gmail/sync` (POST 202 jobId) +
+  `/api/gmail/sync/status` (polling 1.5s). UI:
+  `<GmailSyncProgress />` su `/connect-gmail/success` con progress bar
+  + summary "Trovate N prenotazioni, M ospiti registrati". 61 unit +
+  1 integration testcontainer.
+- [ ] Fase 3: parser email Booking.com (analogo Fase 2 ma su template
+  Booking; bookings.host_payout_amount mappato da "Importo netto").
+- [ ] Fase 4: refresh automatico access_token, dashboard "email lette",
+  trigger sync periodico.
+
 ### Milestone 2.3 — Dashboard home 3-stati
 - [ ] Home "Sta lavorando per te"
 - [ ] Lista prossimi ospiti con badge stato
