@@ -30,4 +30,5 @@ export * from './schema/reviews';
 export * from './schema/local-partners';
 export * from './schema/waitlist';
 export * from './schema/google-tokens';
+export * from './schema/gmail-sync-jobs';
 export * from './schema/relations';
