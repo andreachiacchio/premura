@@ -54,6 +54,10 @@ export type SyncOptions = {
   ) => Promise<GmailClient>;
   // Override parser per test (skip Claude API).
   emailParser?: (input: Parameters<typeof parseAirbnbEmail>[0]) => Promise<ParsedAirbnbEmail>;
+  // Riusa un jobId già creato dal caller (pattern API route: il route
+  // handler crea il job up-front per restituire l'id al client, poi
+  // lascia all'orchestrator il completamento in background).
+  reuseJobId?: string;
 };
 
 export type SyncResult = {
@@ -86,8 +90,10 @@ export async function syncGmailForHost(
 
   const { db } = serverClient;
 
-  // Step 1: crea job. Niente try/catch: se questo fallisce, solleviamo.
-  const job = await createJob(db, hostId, googleEmail);
+  // Step 1: crea job (o riusa quello passato dal caller).
+  const job = options.reuseJobId
+    ? { id: options.reuseJobId }
+    : await createJob(db, hostId, googleEmail);
 
   // Conteggi locali (denormalizzati per il return finale).
   const stats = {
