@@ -67,7 +67,11 @@ export async function createGmailClient(
     token_type: 'Bearer',
   });
 
-  const api = google.gmail({ version: 'v1', auth: oauth });
+  // Cast a unknown perché googleapis pinna una propria copia di
+  // OAuth2Client che non sempre matcha esattamente la versione esportata
+  // da google-auth-library (mismatch sui metodi interni come `fetch`).
+  // A runtime è lo stesso oggetto.
+  const api = google.gmail({ version: 'v1', auth: oauth } as unknown as Parameters<typeof google.gmail>[0]);
   return { api, hostId, googleEmail };
 }
 
@@ -105,12 +109,13 @@ export async function searchAirbnbEmails(
   const MAX_PAGES = 10;
   const pageSize = options.pageSize ?? 50;
   for (let page = 0; page < MAX_PAGES; page++) {
-    const res = await client.api.users.messages.list({
-      userId: 'me',
-      q: query,
-      maxResults: pageSize,
-      pageToken,
-    });
+    const res: { data: { messages?: Array<{ id?: string | null }>; nextPageToken?: string | null } } =
+      await client.api.users.messages.list({
+        userId: 'me',
+        q: query,
+        maxResults: pageSize,
+        pageToken,
+      });
     const messages = res.data.messages ?? [];
     for (const m of messages) {
       if (m.id) ids.push(m.id);

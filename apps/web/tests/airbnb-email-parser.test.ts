@@ -18,7 +18,7 @@ function mockClient(opts: {
   stopReason?: string;
   failWith?: Error;
   noToolUse?: boolean;
-}) {
+}): NonNullable<Parameters<typeof parseAirbnbEmail>[1]>['client'] {
   return {
     messages: {
       create: vi.fn(async () => {
@@ -42,7 +42,7 @@ function mockClient(opts: {
         };
       }),
     },
-  } as unknown as Parameters<typeof parseAirbnbEmail>[1]['client'];
+  } as unknown as NonNullable<Parameters<typeof parseAirbnbEmail>[1]>['client'];
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -146,10 +146,12 @@ describe('parseAirbnbEmail — confirmation', () => {
     );
 
     const createFn = (
-      client as { messages: { create: ReturnType<typeof vi.fn> } }
+      client as unknown as { messages: { create: ReturnType<typeof vi.fn> } }
     ).messages.create;
     expect(createFn).toHaveBeenCalledOnce();
-    const args = createFn.mock.calls[0][0];
+    const firstCall = createFn.mock.calls[0];
+    if (!firstCall) throw new Error('no calls');
+    const args = firstCall[0];
     expect(args.model).toBe('claude-sonnet-4-6');
     expect(Array.isArray(args.system)).toBe(true);
     expect(args.system[0].cache_control).toEqual({ type: 'ephemeral' });
