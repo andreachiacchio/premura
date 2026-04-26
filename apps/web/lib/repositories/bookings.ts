@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { bookings, type Database } from '@premura/db';
 import type { ParsedAirbnbEmail } from '../airbnb-email-parser';
 

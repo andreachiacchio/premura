@@ -1,12 +1,13 @@
-import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { Container } from '@/components/Container';
 import { Eyebrow } from '@/components/Eyebrow';
 import { Heading } from '@/components/Heading';
+import { GmailSyncProgress } from '@/components/connect-gmail/GmailSyncProgress';
 
 export const metadata = {
   title: 'Gmail collegato — Premura',
-  description: 'Gmail collegato a Premura. Da adesso leggeremo automaticamente le prenotazioni Airbnb e Booking.',
+  description:
+    'Gmail collegato a Premura. Stiamo leggendo le tue prenotazioni Airbnb degli ultimi 90 giorni.',
 };
 
 type SearchParams = {
@@ -52,7 +53,7 @@ export default async function ConnectGmailSuccessPage({
           </Heading>
 
           <p className="mt-6 text-body-lg text-ink-soft">
-            Ora Premura ha accesso alle email di Airbnb e Booking.
+            Stiamo già leggendo le tue prenotazioni degli ultimi 90 giorni.
           </p>
 
           <Card padding="loose" className="mt-10">
@@ -60,9 +61,7 @@ export default async function ConnectGmailSuccessPage({
             <dl className="mt-4 space-y-3 text-body">
               <div className="flex flex-col sm:flex-row sm:gap-4">
                 <dt className="text-ink-mute sm:w-40 shrink-0">Account connesso</dt>
-                <dd className="font-semibold text-ink break-all">
-                  {email || '—'}
-                </dd>
+                <dd className="font-semibold text-ink break-all">{email || '—'}</dd>
               </div>
               <div className="flex flex-col sm:flex-row sm:gap-4">
                 <dt className="text-ink-mute sm:w-40 shrink-0">Connesso il</dt>
@@ -71,17 +70,8 @@ export default async function ConnectGmailSuccessPage({
             </dl>
           </Card>
 
-          <p className="mt-10 text-body text-ink-soft">
-            Da adesso in poi ogni prenotazione verrà rilevata automaticamente.
-            Quando un ospite prenota La Goccia, leggeremo la mail da Airbnb o
-            Booking, studieremo il profilo e ti aggiorneremo nella dashboard.
-          </p>
-
-          <div className="mt-12">
-            <Button as="a" href="/dashboard" variant="primary" size="lg">
-              Torna alla dashboard →
-            </Button>
-          </div>
+          {/* Component client-side: avvia sync subito + polling progress. */}
+          <GmailSyncProgress />
         </div>
       </Container>
     </main>
