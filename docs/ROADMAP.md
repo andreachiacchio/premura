@@ -102,10 +102,23 @@ email Airbnb degli ultimi 90 giorni e popola `bookings` + `guest_profiles`.
   `<GmailSyncProgress />` su `/connect-gmail/success` con progress bar
   + summary "Trovate N prenotazioni, M ospiti registrati". 61 unit +
   1 integration testcontainer.
-- [ ] Fase 3: parser email Booking.com (analogo Fase 2 ma su template
-  Booking; bookings.host_payout_amount mappato da "Importo netto").
+- [ ] **Fase 3** 🔄 (WIP): Booking event ingestor. Strategia diversa
+  dalla Fase 2: zero AI, classifier deterministico via regex sul subject
+  delle email da `noreply@booking.com` (le email sono intenzionalmente
+  data-poor, vedi `docs/KNOWN-LIMITS.md` §9). Le email Booking vengono
+  usate solo come EVENT TRIGGERS (new_booking / cancellation /
+  modification) cross-referenziati con bookings creati via iCal. Schema:
+  nuova tabella `booking_email_events` (audit trail) + 4 counter su
+  `gmail_sync_jobs`. Branch:
+  `feat/booking-event-ingestor-m2a3-fase3`.
 - [ ] Fase 4: refresh automatico access_token, dashboard "email lette",
   trigger sync periodico.
+
+### Milestone 2a.4 — Survey post-booking opt-in (placeholder)
+
+Cattura telefono, allergie e frequenza contatto via survey opt-in
+inviata all'ospite dopo la prenotazione. Compensa il gap dati delle
+email Booking (vedi M2a.3 Fase 3 / KNOWN-LIMITS §9).
 
 ### Milestone 2.3 — Dashboard home 3-stati
 - [ ] Home "Sta lavorando per te"
@@ -342,5 +355,6 @@ Allora passiamo alla Fase 8.
 
 ---
 
-_Ultimo aggiornamento: 22 aprile 2026 — Andrea Chiacchio, fondatore_
+_Ultimo aggiornamento: 27 aprile 2026 — Andrea Chiacchio, fondatore_
+_v2.1: M2a.3 Fase 3 (Booking event ingestor) WIP, M2a.4 placeholder_
 _v2: MVP esteso 6→8 settimane, Fase 3.2 Onboarding Agent, Fase 4.3 Conversation Agent_

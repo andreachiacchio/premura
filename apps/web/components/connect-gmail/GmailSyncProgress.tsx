@@ -29,6 +29,11 @@ type JobStatus = {
   cancelledCount: number;
   guestProfilesCreated: number;
   guestProfilesUpdated: number;
+  // Counter Booking (M2a.3 Fase 3). Nullable per row legacy pre-migration.
+  bookingEmailsScanned: number | null;
+  bookingEmailsMatched: number | null;
+  bookingEmailsUnmatched: number | null;
+  bookingEmailsSkipped: number | null;
   truncated: boolean;
   fatalError: string | null;
 };
@@ -168,6 +173,10 @@ export function GmailSyncProgress(): ReactElement {
     const j = state.job;
     const enrichedOrCreated = j.enrichedCount + j.createdCount;
     const profilesTotal = j.guestProfilesCreated + j.guestProfilesUpdated;
+    const bookingScanned = j.bookingEmailsScanned ?? 0;
+    const bookingMatched = j.bookingEmailsMatched ?? 0;
+    const bookingUnmatched = j.bookingEmailsUnmatched ?? 0;
+    const bookingSkipped = j.bookingEmailsSkipped ?? 0;
     return (
       <Card padding="loose" className="mt-10">
         <Eyebrow variant="terracotta">Sincronizzazione completata</Eyebrow>
@@ -206,6 +215,19 @@ export function GmailSyncProgress(): ReactElement {
             </li>
           ) : null}
         </ul>
+        {bookingScanned > 0 ? (
+          <ul className="mt-4 space-y-2 border-t border-line pt-4 text-body text-ink-soft">
+            <li>
+              <span className="font-semibold text-ink">{bookingScanned}</span> email Booking
+              scansionate
+            </li>
+            <li>
+              <span className="font-semibold text-ink">{bookingMatched}</span> aggiornate,{' '}
+              <span className="font-semibold text-ink">{bookingUnmatched}</span> non matchate,{' '}
+              <span className="font-semibold text-ink">{bookingSkipped}</span> ignorate
+            </li>
+          </ul>
+        ) : null}
         {j.truncated ? (
           <p className="mt-6 rounded-md border border-line bg-paper-deep p-4 text-body-sm text-ink-soft">
             Trovate più di 200 email negli ultimi 90 giorni: abbiamo processato le 200 più

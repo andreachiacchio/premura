@@ -273,5 +273,47 @@ ri-popolare la tabella con il nuovo schema host-scoped.
 
 ---
 
-_Ultimo aggiornamento: 26 aprile 2026 — Andrea Chiacchio, fondatore_
+---
+
+## 9. Booking email content limitation
+
+**Problema.** Le email da `noreply@booking.com` sono intenzionalmente
+data-poor: contengono solo subject + link extranet, nessun dato
+strutturato (no nome ospite, no date, no importo, no telefono). È una
+scelta progettuale di Booking per forzare l'host a usare l'extranet
+proprietario (e quindi non disintermediare).
+
+**Impatto stimato.** Premura usa queste email solo come EVENT TRIGGERS
+(new_booking / cancellation / modification), cross-referenziandole con
+bookings creati via iCal — la fonte primaria di dati per Booking resta
+iCal polling (M2a.1). Il classifier (`apps/web/lib/booking-email-classifier.ts`)
+è regex-puro: zero chiamate Anthropic, costo zero per email Booking.
+
+**Mitigazione.** Phone number capture & altri dati ospite Booking sono
+fuori scope di Fase 3 — verranno raccolti via survey opt-in post-booking
+in **M2a.4** (Survey post-booking opt-in).
+
+---
+
+## 10. Cascade DELETE su `hosts`
+
+**Problema.** Cancellare manualmente una riga in `hosts` triggera CASCADE
+su `properties` (FK `properties.host_id` con `onDelete: 'cascade'`) e di
+conseguenza su `bookings` (FK `bookings.property_id` con
+`onDelete: 'cascade'`). La stessa cascade vale ora per
+`booking_email_events` (FK `host_id` con `onDelete: 'cascade'`,
+introdotta in M2a.3 Fase 3).
+
+**Impatto.** Per il fix dello stato (es. testing) usare invece
+UPDATE/SOFT DELETE. È successo durante M2a.3 Fase 2 (27 apr 2026) e ha
+richiesto re-pop iCal completo.
+
+**Mitigazione.** Niente fix di codice: documentare. Per ambienti shared
+(staging) considerare in futuro `is_active=false` come "soft delete" al
+posto di `DELETE FROM hosts WHERE …`.
+
+---
+
+_Ultimo aggiornamento: 27 aprile 2026 — Andrea Chiacchio, fondatore_
+_v2.3: aggiunti §9 Booking email data-poor + §10 cascade DELETE su hosts (M2a.3 Fase 3)_
 _v2.2: aggiunto §8 sync Gmail sincrono / no auto-rotate (M2a.3 Fase 2)_

@@ -16,6 +16,7 @@ import { pendingPayouts } from './pending-payouts';
 import { agentActions } from './agent-actions';
 import { reviews } from './reviews';
 import { localPartners } from './local-partners';
+import { bookingEmailEvents } from './booking-email-events';
 
 // ─────────────────────────────────────────────────────────────
 // HOST
@@ -159,4 +160,16 @@ export const agentActionsRelations = relations(agentActions, ({ one }) => ({
 
 export const localPartnersRelations = relations(localPartners, ({ one }) => ({
   host: one(hosts, { fields: [localPartners.hostId], references: [hosts.id] }),
+}));
+
+// ─────────────────────────────────────────────────────────────
+// BOOKING EMAIL EVENTS (audit trail, M2a.3 Fase 3)
+// ─────────────────────────────────────────────────────────────
+
+export const bookingEmailEventsRelations = relations(bookingEmailEvents, ({ one }) => ({
+  host: one(hosts, { fields: [bookingEmailEvents.hostId], references: [hosts.id] }),
+  booking: one(bookings, {
+    fields: [bookingEmailEvents.bookingId],
+    references: [bookings.id],
+  }),
 }));

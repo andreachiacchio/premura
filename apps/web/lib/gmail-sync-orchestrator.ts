@@ -3,6 +3,7 @@ import { getTokenByHostAndEmail } from './repositories/google-tokens';
 import {
   createGmailClient,
   searchAirbnbEmails,
+  searchBookingEmails,
   fetchEmailContent,
   GmailClientError,
   type GmailClient,
@@ -19,6 +20,9 @@ import {
   completeJob,
   type SyncIncrement,
 } from './repositories/gmail-sync-jobs';
+import { classifyBookingEmail } from './booking-email-classifier';
+import { ingestBookingEvent } from './booking-event-ingestor';
+import { existsBookingEmailEvent } from './repositories/booking-email-events';
 
 // Orchestrator del sync Gmail (M2a.3 Fase 2).
 //
@@ -73,6 +77,12 @@ export type SyncResult = {
   cancelledCount: number;
   guestProfilesCreated: number;
   guestProfilesUpdated: number;
+  // Counter Booking (M2a.3 Fase 3). Sempre presenti; se il sync non ha
+  // trovato email Booking restano a 0.
+  bookingEmailsScanned: number;
+  bookingEmailsMatched: number;
+  bookingEmailsUnmatched: number;
+  bookingEmailsSkipped: number;
   truncated: boolean;
   fatalError?: string;
 };
@@ -113,6 +123,10 @@ export async function syncGmailForHost(
     cancelledCount: 0,
     guestProfilesCreated: 0,
     guestProfilesUpdated: 0,
+    bookingEmailsScanned: 0,
+    bookingEmailsMatched: 0,
+    bookingEmailsUnmatched: 0,
+    bookingEmailsSkipped: 0,
   };
 
   let totalEmails = 0;
@@ -302,6 +316,61 @@ export async function syncGmailForHost(
         // Conta come processed per la progress bar.
         stats.processedEmails++;
         await persistInc(db, job.id, { processedEmails: 1 });
+      }
+    }
+
+    // ─── Step 6: loop email Booking.com (M2a.3 Fase 3) ───────────
+    // Strategia diversa da Airbnb: zero AI, classifier deterministico via
+    // regex sul subject. Le email Booking sono usate come EVENT TRIGGERS
+    // su bookings creati via iCal — la fonte primaria di dati resta iCal.
+    // Riusa lo stesso GmailClient (un solo OAuth, un solo job).
+    const bookingMessageIds = await searchBookingEmails(gmail, daysBack);
+    for (const messageId of bookingMessageIds) {
+      const bookingInc: SyncIncrement = { bookingEmailsScanned: 1 };
+      stats.bookingEmailsScanned++;
+      try {
+        // Idempotenza: se questa email è già stata processata in un sync
+        // precedente, skip senza toccare DB.
+        if (await existsBookingEmailEvent(db, messageId)) {
+          // Non incrementiamo i counter "matched/skipped/unmatched" perché
+          // non riprocessiamo. Lo scanned riflette il volume Gmail.
+          await persistInc(db, job.id, bookingInc);
+          continue;
+        }
+
+        const email = await fetchEmailContent(gmail, messageId);
+        const classified = classifyBookingEmail(email.subject);
+        const result = await ingestBookingEvent(serverClient, {
+          classified,
+          hostId,
+          emailId: messageId,
+          emailReceivedAt: email.date ?? new Date(),
+        });
+
+        if (result.status === 'updated' || result.status === 'created') {
+          bookingInc.bookingEmailsMatched = 1;
+          stats.bookingEmailsMatched++;
+        } else if (result.status === 'unmatched') {
+          bookingInc.bookingEmailsUnmatched = 1;
+          stats.bookingEmailsUnmatched++;
+        } else if (result.status === 'skipped') {
+          bookingInc.bookingEmailsSkipped = 1;
+          stats.bookingEmailsSkipped++;
+        }
+        // 'error': è bookingEmailsScanned-only, l'errore è già loggato.
+
+        await persistInc(db, job.id, bookingInc);
+      } catch (err) {
+        // Errore singola email Booking NON blocca le altre. Stage='fetch'
+        // come default (l'unico altro punto di errore è ingest, ma quello
+        // dovrebbe essere catturato e ritornare result.status='error').
+        const errMsg = err instanceof Error ? err.message : String(err);
+        await appendErrorLog(db, job.id, {
+          messageId,
+          stage: 'fetch',
+          error: `[booking] ${errMsg}`,
+        });
+        await persistInc(db, job.id, bookingInc);
       }
     }
   } catch (err) {

@@ -76,16 +76,56 @@ export async function createGmailClient(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Search emails Airbnb
+// Search emails (generico + wrapper per ogni piattaforma)
 // ─────────────────────────────────────────────────────────────
 
 const AIRBNB_FROM = 'automated@airbnb.com';
+const BOOKING_FROM = 'noreply@booking.com';
+
+// Hard cap pagine: 500 email = ~10 pagine. Se serve di più è sintomo di
+// sync iniziale enorme e va gestito a livello orchestrator.
+const SEARCH_MAX_PAGES = 10;
+
+// Funzione generica: lista i message ID risultanti da una qualsiasi query
+// Gmail. Paginazione automatica via pageToken.
+//
+// Esposta come building block per i wrapper specifici (Airbnb, Booking).
+// Non espone validazione di daysBack; chi la chiama costruisce la query
+// finale e si occupa dell'input sanitization.
+export async function searchEmailsByQuery(
+  client: GmailClient,
+  query: string,
+  options: { pageSize?: number } = {},
+): Promise<string[]> {
+  const ids: string[] = [];
+  let pageToken: string | undefined = undefined;
+  const pageSize = options.pageSize ?? 50;
+  for (let page = 0; page < SEARCH_MAX_PAGES; page++) {
+    const res: { data: { messages?: Array<{ id?: string | null }>; nextPageToken?: string | null } } =
+      await client.api.users.messages.list({
+        userId: 'me',
+        q: query,
+        maxResults: pageSize,
+        pageToken,
+      });
+    const messages = res.data.messages ?? [];
+    for (const m of messages) {
+      if (m.id) ids.push(m.id);
+    }
+    if (!res.data.nextPageToken) break;
+    pageToken = res.data.nextPageToken;
+  }
+  return ids;
+}
 
 // Lista i message ID delle email Airbnb ricevute negli ultimi `daysBack`
 // giorni. Paginazione automatica via pageToken.
 //
 // Query Gmail "from:automated@airbnb.com after:YYYY-MM-DD". L'operatore
 // after:YYYY-MM-DD è inclusivo della data alle 00:00 UTC.
+//
+// Thin wrapper su searchEmailsByQuery: la signature pubblica resta
+// invariata per non rompere chiamanti esistenti (orchestrator + test).
 export async function searchAirbnbEmails(
   client: GmailClient,
   daysBack: number,
@@ -102,28 +142,25 @@ export async function searchAirbnbEmails(
   const dd = String(after.getUTCDate()).padStart(2, '0');
   const query = `from:${AIRBNB_FROM} after:${yyyy}/${mm}/${dd}`;
 
-  const ids: string[] = [];
-  let pageToken: string | undefined = undefined;
-  // Hard cap di sicurezza: 500 email = ~10 pagine. Se serve di più, è
-  // sintomo di sync iniziale enorme e va gestito a livello orchestrator.
-  const MAX_PAGES = 10;
-  const pageSize = options.pageSize ?? 50;
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const res: { data: { messages?: Array<{ id?: string | null }>; nextPageToken?: string | null } } =
-      await client.api.users.messages.list({
-        userId: 'me',
-        q: query,
-        maxResults: pageSize,
-        pageToken,
-      });
-    const messages = res.data.messages ?? [];
-    for (const m of messages) {
-      if (m.id) ids.push(m.id);
-    }
-    if (!res.data.nextPageToken) break;
-    pageToken = res.data.nextPageToken;
+  return searchEmailsByQuery(client, query, { pageSize: options.pageSize });
+}
+
+// Lista i message ID delle email Booking.com ricevute negli ultimi
+// `daysBack` giorni (M2a.3 Fase 3).
+//
+// Query Gmail "from:noreply@booking.com newer_than:Nd". `newer_than`
+// è la sintassi Gmail per "negli ultimi N giorni" (più semplice di
+// after:YYYY-MM-DD a parità di risultato).
+export async function searchBookingEmails(
+  client: GmailClient,
+  daysBack: number,
+  options: { pageSize?: number } = {},
+): Promise<string[]> {
+  if (!Number.isFinite(daysBack) || daysBack <= 0) {
+    throw new GmailClientError(`daysBack deve essere intero positivo (ricevuto ${daysBack})`);
   }
-  return ids;
+  const query = `from:${BOOKING_FROM} newer_than:${Math.floor(daysBack)}d`;
+  return searchEmailsByQuery(client, query, { pageSize: options.pageSize });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -213,6 +250,7 @@ function extractBodies(
 
 export const _internals = {
   AIRBNB_FROM,
+  BOOKING_FROM,
   extractBodies,
   headerValue,
 };
