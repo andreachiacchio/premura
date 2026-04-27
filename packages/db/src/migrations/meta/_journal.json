@@ -36,6 +36,13 @@
       "when": 1777236742987,
       "tag": "0004_omniscient_nightcrawler",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777298459194,
+      "tag": "0005_bizarre_boomer",
+      "breakpoints": true
     }
   ]
 }

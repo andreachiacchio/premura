@@ -32,6 +32,12 @@ export type SyncJob = {
   cancelledCount: number;
   guestProfilesCreated: number;
   guestProfilesUpdated: number;
+  // Statistiche Booking (M2a.3 Fase 3). Nullable solo per righe legacy
+  // create prima della migration; per i job nuovi sono sempre numerici.
+  bookingEmailsScanned: number | null;
+  bookingEmailsMatched: number | null;
+  bookingEmailsUnmatched: number | null;
+  bookingEmailsSkipped: number | null;
   errorLog: JobErrorEntry[];
   fatalError: string | null;
   truncated: boolean;
@@ -77,6 +83,12 @@ export type SyncIncrement = Partial<{
   cancelledCount: number;
   guestProfilesCreated: number;
   guestProfilesUpdated: number;
+  // Counter Booking (M2a.3 Fase 3) — separati da quelli Airbnb per non
+  // sporcare il summary host-facing.
+  bookingEmailsScanned: number;
+  bookingEmailsMatched: number;
+  bookingEmailsUnmatched: number;
+  bookingEmailsSkipped: number;
 }>;
 
 export async function incrementJob(
@@ -103,6 +115,15 @@ export async function incrementJob(
     set.guest_profiles_created = sql`${gmailSyncJobs.guestProfilesCreated} + ${inc.guestProfilesCreated}`;
   if (inc.guestProfilesUpdated)
     set.guest_profiles_updated = sql`${gmailSyncJobs.guestProfilesUpdated} + ${inc.guestProfilesUpdated}`;
+  // Booking counters: COALESCE per gestire le righe legacy con NULL.
+  if (inc.bookingEmailsScanned)
+    set.booking_emails_scanned = sql`COALESCE(${gmailSyncJobs.bookingEmailsScanned}, 0) + ${inc.bookingEmailsScanned}`;
+  if (inc.bookingEmailsMatched)
+    set.booking_emails_matched = sql`COALESCE(${gmailSyncJobs.bookingEmailsMatched}, 0) + ${inc.bookingEmailsMatched}`;
+  if (inc.bookingEmailsUnmatched)
+    set.booking_emails_unmatched = sql`COALESCE(${gmailSyncJobs.bookingEmailsUnmatched}, 0) + ${inc.bookingEmailsUnmatched}`;
+  if (inc.bookingEmailsSkipped)
+    set.booking_emails_skipped = sql`COALESCE(${gmailSyncJobs.bookingEmailsSkipped}, 0) + ${inc.bookingEmailsSkipped}`;
 
   // Drizzle .set() richiede chiavi camelCase del modello: traduciamo.
   const camel: Record<string, unknown> = {};
@@ -115,6 +136,10 @@ export async function incrementJob(
   if (set.cancelled_count) camel.cancelledCount = set.cancelled_count;
   if (set.guest_profiles_created) camel.guestProfilesCreated = set.guest_profiles_created;
   if (set.guest_profiles_updated) camel.guestProfilesUpdated = set.guest_profiles_updated;
+  if (set.booking_emails_scanned) camel.bookingEmailsScanned = set.booking_emails_scanned;
+  if (set.booking_emails_matched) camel.bookingEmailsMatched = set.booking_emails_matched;
+  if (set.booking_emails_unmatched) camel.bookingEmailsUnmatched = set.booking_emails_unmatched;
+  if (set.booking_emails_skipped) camel.bookingEmailsSkipped = set.booking_emails_skipped;
   camel.updatedAt = new Date();
 
   if (Object.keys(camel).length <= 1) return; // niente da incrementare
@@ -180,6 +205,10 @@ export async function getJob(db: Database, jobId: string): Promise<SyncJob | nul
     cancelledCount: row.cancelledCount,
     guestProfilesCreated: row.guestProfilesCreated,
     guestProfilesUpdated: row.guestProfilesUpdated,
+    bookingEmailsScanned: row.bookingEmailsScanned,
+    bookingEmailsMatched: row.bookingEmailsMatched,
+    bookingEmailsUnmatched: row.bookingEmailsUnmatched,
+    bookingEmailsSkipped: row.bookingEmailsSkipped,
     errorLog: row.errorLog,
     fatalError: row.fatalError,
     truncated: row.truncated,

@@ -19,6 +19,16 @@ export const bookingStatusEnum = pgEnum('booking_status', [
   'cancelled',
 ]);
 
+// Tipo di evento intercettato da un'email Booking.com (M2a.3 Fase 3).
+// Le email Booking sono usate solo come trigger di evento (subject parsing
+// deterministico via regex, no AI). Vedi apps/web/lib/booking-email-classifier.ts.
+export const bookingEmailEventTypeEnum = pgEnum('booking_email_event_type', [
+  'new_booking',
+  'cancellation',
+  'modification',
+  'noise',
+]);
+
 // ─────────────────────────────────────────────────────────────
 // KIT
 // ─────────────────────────────────────────────────────────────

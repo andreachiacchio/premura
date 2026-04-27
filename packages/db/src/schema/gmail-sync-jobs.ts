@@ -57,6 +57,20 @@ export const gmailSyncJobs = pgTable(
     guestProfilesCreated: integer('guest_profiles_created').notNull().default(0),
     guestProfilesUpdated: integer('guest_profiles_updated').notNull().default(0),
 
+    // Statistiche email Booking.com (M2a.3 Fase 3). Nullable + default 0
+    // così le righe esistenti restano valide senza backfill.
+    // - bookingEmailsScanned: totale email Booking trovate da Gmail.
+    // - bookingEmailsMatched: email che hanno aggiornato un booking esistente
+    //   (cross-ref via booking_external_code).
+    // - bookingEmailsUnmatched: email con event valido ma nessun booking
+    //   corrispondente (es. iCal non ancora pollato).
+    // - bookingEmailsSkipped: email rumore (Customer Service, Invoice,
+    //   marketing, modifiche/cancellazioni senza code parsabile).
+    bookingEmailsScanned: integer('booking_emails_scanned').default(0),
+    bookingEmailsMatched: integer('booking_emails_matched').default(0),
+    bookingEmailsUnmatched: integer('booking_emails_unmatched').default(0),
+    bookingEmailsSkipped: integer('booking_emails_skipped').default(0),
+
     // Errori per singola email: { messageId, stage, error } — non blocca
     // il job, le altre email continuano.
     errorLog: jsonb('error_log').$type<JobErrorEntry[]>().notNull().default([]),
