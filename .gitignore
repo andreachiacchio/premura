@@ -12,3 +12,8 @@ coverage/
 .turbo/
 tmp/
 *.tsbuildinfo
+
+# Test fixtures with real PII — never commit
+# Pattern: any file in any fixtures/ folder ending with -private suffix
+**/fixtures/*-private.*
+**/fixtures/*-private/
