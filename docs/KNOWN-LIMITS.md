@@ -190,5 +190,88 @@ lancio.
 
 ---
 
-_Ultimo aggiornamento: 24 aprile 2026 — Andrea Chiacchio, fondatore_
-_v2.1: aggiunto §7 rate limit waitlist (milestone 1.3.c)_
+## 8. Sync Gmail sincrono (no worker, no auto-rotate token)
+
+**Problema.** L'endpoint `POST /api/gmail/sync` (M2a.3 Fase 2)
+processa email in BACKGROUND nello stesso processo Next.js (fire-and-
+forget via `void` promise + `reuseJobId` nell'orchestrator). Niente
+BullMQ, niente Fly worker. Tre limitazioni note:
+
+1. **Vercel function timeout**. Su tier Hobby le function hanno
+   un timeout duro di 60s. Un sync iniziale tipico è ~50 email × 3-5s
+   Claude = 3 minuti, quindi su Vercel Hobby l'orchestrator viene
+   killato a metà. Il job resta `status='running'` con
+   `processedEmails < totalEmails` e nessun `completedAt`. Su Vercel
+   Pro il limite è 300s (settato `maxDuration=300` nella route).
+2. **Refresh token Google non auto-ruotato**. `google-auth-library`
+   refresha l'access_token in memoria via refresh_token, ma non lo
+   persistiamo: se il refresh_token venisse invalidato (revoca utente
+   o pulizia Google), il sync fallisce con messaggio chiaro
+   ("Ricollegare Gmail") senza retry. L'host deve rifare il flow
+   `/connect-gmail`.
+3. **Costo Claude non ottimizzato**. Sonnet 4.6 ~$0.016/email,
+   ~€3/200 email. Prompt caching attivo sul system prompt (~70%
+   saving sui token cached read). Non c'è batching: ogni email è una
+   chiamata API distinta. Vedi sopra "Costi attesi" in
+   `apps/web/README.md`.
+
+**Impatto stimato.** Pilot Andrea: testa localmente con
+`pnpm --filter @premura/web dev` (no timeout). Per i prossimi 5-10
+host early access, lo stesso pattern regge in dev locale o Vercel Pro.
+A scala (>50 host, >1000 sync/giorno) servirà worker dedicato.
+
+**Mitigazione futura.**
+- **M3 worker BullMQ**: orchestrator gira in `apps/api`, route
+  `/api/gmail/sync` enqueue + ritorna jobId, frontend polla
+  invariato. Migrazione progressiva: schema `gmail_sync_jobs` resta
+  identico, cambia solo il "chi" esegue il loop.
+- **Refresh token rotation**: persistere il nuovo access_token al
+  refresh, e ritentare 1 volta su 401 prima di abortire.
+- **Batching Claude**: usare Anthropic Batches API (50% costo) per
+  sync ≥50 email. Trade-off: latenza +~1h, ma accettabile per backfill
+  iniziale (l'host clicca → Premura promette "ti aggiorniamo entro
+  un'ora", invece di progress bar live).
+
+### 8.1 — Hard cap 200 email per sync
+
+`MAX_EMAILS_PER_SYNC=200` in
+`apps/web/lib/gmail-sync-orchestrator.ts`. Se `searchAirbnbEmails`
+trova più email, processiamo solo le 200 più recenti (Gmail API
+ritorna in ordine cronologico inverso) e marchiamo
+`gmail_sync_jobs.truncated=true` + nota in `error_log`. L'host può
+rilanciare `POST /api/gmail/sync` per processare le rimanenti.
+
+**Perché 200**: ~3-5s per email × 200 = 10-17 min di sync, ~€3 di
+costo Claude. Soglia ragionevole per pilot con 1-5 strutture. Per
+host >5 strutture (post-M3) il limite andrà alzato o reso
+configurabile per-host.
+
+### 8.2 — No retry sul parsing Claude
+
+Ogni chiamata `client.messages.create` ha un timeout 30s
+(`REQUEST_TIMEOUT_MS` in `airbnb-email-parser.ts`) via
+`AbortController`. Se Claude non risponde in tempo o l'API ritorna
+un errore, il parser solleva `AirbnbParserError` → l'orchestrator
+appenda al `error_log` con stage='parse' e CONTINUA con la prossima
+email. **Nessun retry automatico**: bilancio costi (un retry su
+errore Anthropic 5xx duplicherebbe il costo per email problematiche)
++ semplicità. L'host rilancia il sync per ritentare le email
+fallite — sono identificate via `raw_email_id` nell'error_log.
+
+### 8.3 — Migration 0003 non idempotente su `guest_profiles` non vuota
+
+`ALTER TABLE guest_profiles ADD COLUMN host_id uuid NOT NULL` (in
+migration `0003_early_edwin_jarvis.sql`) **fallisce se la tabella
+contiene righe senza `host_id`**. Sul Supabase dev attuale di Andrea
+la tabella è vuota (nessun agent ha ancora popolato Guest DNA),
+quindi la migration applica clean.
+
+**Pre-requisito per ambienti con dati**: prima di applicare 0003,
+`TRUNCATE guest_profiles RESTART IDENTITY CASCADE;` se ci sono
+righe legacy. La M2a.4 (Guest DNA agent) sarà responsabile di
+ri-popolare la tabella con il nuovo schema host-scoped.
+
+---
+
+_Ultimo aggiornamento: 26 aprile 2026 — Andrea Chiacchio, fondatore_
+_v2.2: aggiunto §8 sync Gmail sincrono / no auto-rotate (M2a.3 Fase 2)_

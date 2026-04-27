@@ -15,6 +15,27 @@
       "when": 1777024138714,
       "tag": "0001_polite_warhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777051921857,
+      "tag": "0002_fluffy_human_fly",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777234755770,
+      "tag": "0003_early_edwin_jarvis",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777236742987,
+      "tag": "0004_omniscient_nightcrawler",
+      "breakpoints": true
     }
   ]
 }

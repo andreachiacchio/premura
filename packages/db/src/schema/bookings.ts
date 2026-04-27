@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   pgTable,
   uuid,
@@ -14,7 +15,14 @@ import { platformEnum, bookingStatusEnum } from './enums';
 import { properties } from './properties';
 
 // Prenotazione. Entry point di ogni workflow Premura.
-// Ingested via iCal polling (milestone 2.1) o email forwarding (2.2).
+// Ingested via iCal polling (M2a.1) o email parsing Gmail (M2a.3 Fase 2).
+//
+// Convivenza iCal ↔ email: la stessa prenotazione arriva sia via iCal
+// (PII mascherata: guest_full_name = "Reserved") sia via email Airbnb
+// (PII piena). L'email arricchisce la riga creata da iCal usando la
+// chiave (property_id, booking_external_code), preservando i dati iCal
+// quando le email mancano (es. checkin_at iCal viene preservato; il
+// nome "Reserved" viene sovrascritto col nome reale dell'ospite).
 export const bookings = pgTable(
   'bookings',
   {
@@ -25,15 +33,29 @@ export const bookings = pgTable(
 
     platform: platformEnum('platform').notNull(),
     // Riferimento univoco sulla piattaforma origine (iCal UID o booking ID).
-    // La coppia (platform, platformBookingRef) è usata per dedup.
+    // La coppia (platform, platformBookingRef) è usata per dedup iCal.
     platformBookingRef: varchar('platform_booking_ref', { length: 128 }).notNull(),
 
-    // Dati ospite dalla piattaforma (non ancora arricchiti da Guest DNA).
+    // Codice prenotazione user-facing (Airbnb: HM4XDFHECP, Booking: 1234567890).
+    // Estratto dall'email; può essere null se la riga arriva solo via iCal
+    // (Airbnb iCal non lo espone in modo affidabile).
+    bookingExternalCode: varchar('booking_external_code', { length: 64 }),
+
+    // Dati ospite dalla piattaforma.
+    // Da iCal arrivano "Reserved" / null; da email Airbnb arrivano completi.
     guestFullName: varchar('guest_full_name', { length: 255 }).notNull(),
+    guestFirstName: varchar('guest_first_name', { length: 128 }),
     guestCountryCode: varchar('guest_country_code', { length: 2 }),
+    guestLanguage: varchar('guest_language', { length: 8 }),
     guestAgeApprox: integer('guest_age_approx'),
     guestEmail: varchar('guest_email', { length: 255 }),
     guestPhone: varchar('guest_phone', { length: 32 }),
+
+    // Messaggio iniziale dell'ospite. Lo memorizziamo NELLA LINGUA ORIGINALE
+    // (non la traduzione automatica Airbnb) perché serve a Guest DNA per
+    // capire chi è veramente l'ospite.
+    guestMessageOriginal: text('guest_message_original'),
+    guestMessageLang: varchar('guest_message_lang', { length: 8 }),
 
     // Opt-in ospite per contatto via WhatsApp (canale primario).
     // Se null → non ancora chiesto; se false → fallback obbligato su inbox piattaforma.
@@ -48,6 +70,24 @@ export const bookings = pgTable(
     nights: integer('nights').notNull(),
     totalPriceEur: decimal('total_price_eur', { precision: 10, scale: 2 }),
 
+    // Compenso netto host (post-fee Airbnb/Booking). Da email parsing.
+    hostPayoutAmount: decimal('host_payout_amount', { precision: 10, scale: 2 }),
+    hostPayoutCurrency: varchar('host_payout_currency', { length: 3 }),
+
+    // URL listing piattaforma origine (utile in dashboard).
+    listingUrl: text('listing_url'),
+
+    // Tracking sync email: quale Gmail message ID ha arricchito questa
+    // riga, e quando. Usato per idempotenza (skip se già processato).
+    rawEmailId: varchar('raw_email_id', { length: 128 }),
+    lastEmailSyncedAt: timestamp('last_email_synced_at', { withTimezone: true }),
+
+    // Profilo ospite associato (host-scoped guest directory). Nullable
+    // perché bookings creati via iCal con guest_full_name='Reserved' non
+    // hanno ancora un profilo identificabile.
+    // FK a guest_profiles dichiarata nella migration SQL (evita ciclo import).
+    guestProfileId: uuid('guest_profile_id'),
+
     // Nota libera dell'ospite al momento della prenotazione
     guestNote: text('guest_note'),
     status: bookingStatusEnum('status').notNull().default('confirmed'),
@@ -57,10 +97,17 @@ export const bookings = pgTable(
   },
   (t) => [
     index('bookings_property_idx').on(t.propertyId),
-    // Dedup: la stessa booking non può essere ingerita due volte.
+    // Dedup iCal: stessa booking non può essere ingerita due volte.
     uniqueIndex('bookings_platform_ref_uniq').on(t.platform, t.platformBookingRef),
+    // Dedup email: la stessa prenotazione Airbnb (codice HM…) per stessa
+    // property arriva sia da iCal sia da email. Indice partial perché
+    // molte righe iCal-only non hanno il codice esterno.
+    uniqueIndex('bookings_property_external_code_uniq')
+      .on(t.propertyId, t.bookingExternalCode)
+      .where(sql`"booking_external_code" IS NOT NULL`),
     index('bookings_checkin_idx').on(t.checkinAt),
     index('bookings_status_idx').on(t.status),
     index('bookings_created_at_idx').on(t.createdAt),
+    index('bookings_guest_profile_idx').on(t.guestProfileId),
   ],
 );

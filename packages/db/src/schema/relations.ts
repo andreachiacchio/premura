@@ -79,9 +79,12 @@ export const cleanersRelations = relations(cleaners, ({ one, many }) => ({
 
 export const bookingsRelations = relations(bookings, ({ one, many }) => ({
   property: one(properties, { fields: [bookings.propertyId], references: [properties.id] }),
+  // Da M2a.3 Fase 2 il profilo è host-scoped e linkato via FK esplicito
+  // su bookings (1 profilo → N bookings). bookingId su guest_profiles è
+  // legacy nullable, non più chiave logica.
   guestProfile: one(guestProfiles, {
-    fields: [bookings.id],
-    references: [guestProfiles.bookingId],
+    fields: [bookings.guestProfileId],
+    references: [guestProfiles.id],
   }),
   quiz: one(guestQuizzes, { fields: [bookings.id], references: [guestQuizzes.bookingId] }),
   kit: one(kits, { fields: [bookings.id], references: [kits.bookingId] }),
@@ -92,8 +95,15 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
   agentActions: many(agentActions),
 }));
 
-export const guestProfilesRelations = relations(guestProfiles, ({ one }) => ({
-  booking: one(bookings, { fields: [guestProfiles.bookingId], references: [bookings.id] }),
+export const guestProfilesRelations = relations(guestProfiles, ({ one, many }) => ({
+  host: one(hosts, { fields: [guestProfiles.hostId], references: [hosts.id] }),
+  // Booking legacy: bookingId nullable, può essere null se il profilo
+  // viene dal sync email prima del link a una booking specifica.
+  legacyBooking: one(bookings, {
+    fields: [guestProfiles.bookingId],
+    references: [bookings.id],
+  }),
+  bookings: many(bookings),
 }));
 
 export const guestQuizzesRelations = relations(guestQuizzes, ({ one }) => ({

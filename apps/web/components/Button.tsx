@@ -25,9 +25,9 @@ const BASE =
   "inline-flex items-center justify-center gap-2 rounded-full font-semibold whitespace-nowrap transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40 focus-visible:ring-offset-2 focus-visible:ring-offset-ivory disabled:opacity-50 disabled:pointer-events-none";
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-ink text-ivory hover:bg-ink-deep",
+  primary: "bg-ink text-white hover:bg-ink-deep",
   secondary: "bg-paper border border-line text-ink hover:bg-paper-deep",
-  accent: "bg-terracotta text-paper hover:bg-terracotta-2",
+  accent: "bg-terracotta text-white hover:bg-terracotta-2",
   ghost: "bg-transparent text-ink-soft hover:text-ink",
 };
 

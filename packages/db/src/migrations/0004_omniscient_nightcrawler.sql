@@ -1,0 +1,1 @@
+ALTER TABLE "gmail_sync_jobs" ADD COLUMN "truncated" boolean DEFAULT false NOT NULL;
