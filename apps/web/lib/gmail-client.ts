@@ -1,5 +1,4 @@
 import { google, type gmail_v1 } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
 import type { ServerClient } from '@premura/db';
 import { getTokenByHostAndEmail } from './repositories/google-tokens';
 
@@ -7,16 +6,16 @@ import { getTokenByHostAndEmail } from './repositories/google-tokens';
 //
 // Responsabilità:
 //   - createGmailClient: legge google_tokens, decifra refresh_token,
-//     instanzia OAuth2Client + Gmail API client tipizzato.
+//     instanzia google.auth.OAuth2 + Gmail API client tipizzato.
 //   - searchAirbnbEmails: lista message ID inviati da automated@airbnb.com
 //     negli ultimi N giorni (paginazione automatica).
 //   - fetchEmailContent: estrae subject, from, date, htmlBody, textBody
 //     da un singolo messaggio MIME-decoded.
 //
-// Nota refresh token: la libreria google-auth-library refresha
-// automaticamente l'access_token usando il refresh_token quando questo è
-// settato. Per M2a.3 Fase 2 NON persistiamo l'access_token rinnovato
-// (fail-fast se scade tra start e fine sync è M2a.3 Fase 4).
+// Nota refresh token: googleapis refresha automaticamente l'access_token
+// usando il refresh_token quando questo è settato. Per M2a.3 Fase 2 NON
+// persistiamo l'access_token rinnovato (fail-fast se scade tra start e
+// fine sync è M2a.3 Fase 4).
 //
 // Errori: GmailClientError per errori di setup; le chiamate API lasciano
 // passare l'errore originale di googleapis (ricco di status code).
@@ -58,7 +57,12 @@ export async function createGmailClient(
     );
   }
 
-  const oauth = new OAuth2Client({ clientId, clientSecret });
+  // Usiamo google.auth.OAuth2 (esposto da googleapis) invece di
+  // OAuth2Client da google-auth-library per evitare mismatch tra le
+  // due copie della libreria — il check interno di googleapis sull'auth
+  // client fallisce silenziosamente con istanze "esterne" e non aggiunge
+  // l'header Authorization, con conseguente 401 "Login Required".
+  const oauth = new google.auth.OAuth2(clientId, clientSecret);
   oauth.setCredentials({
     access_token: token.accessToken,
     refresh_token: token.refreshToken,
@@ -67,11 +71,7 @@ export async function createGmailClient(
     token_type: 'Bearer',
   });
 
-  // Cast a unknown perché googleapis pinna una propria copia di
-  // OAuth2Client che non sempre matcha esattamente la versione esportata
-  // da google-auth-library (mismatch sui metodi interni come `fetch`).
-  // A runtime è lo stesso oggetto.
-  const api = google.gmail({ version: 'v1', auth: oauth } as unknown as Parameters<typeof google.gmail>[0]);
+  const api = google.gmail({ version: 'v1', auth: oauth });
   return { api, hostId, googleEmail };
 }
 
