@@ -13,8 +13,8 @@
 
 ```bash
 # 1. Clone + install
-git clone https://github.com/yourusername/gifttube.git
-cd gifttube
+git clone https://github.com/yourusername/premura.git
+cd premura
 pnpm install
 
 # 2. Env vars

@@ -1,6 +1,6 @@
 # Prompts per Claude Code
 
-Come usare Claude Code per sviluppare GiftTube in ordine logico. Copia-incolla questi prompt uno alla volta.
+Come usare Claude Code per sviluppare Premura in ordine logico. Copia-incolla questi prompt uno alla volta.
 
 ## Prima sessione — capire il contesto
 
@@ -80,7 +80,7 @@ Focus su subset di item ricorrenti (vini, dolciumi confezionati, tappi).
 ```
 Implementa src/workflows/quiz-flow.ts:
 1. Quando DNA.confidence < 0.7, genera 3-4 domande (via Claude Haiku, personalizzate sul context)
-2. Invia via canale piattaforma (Booking/Airbnb message) con UI generata come short link a quiz.gifttube.app/[token]
+2. Invia via canale piattaforma (Booking/Airbnb message) con UI generata come short link a quiz.premura.app/[token]
 3. Crea src/api/quiz/ con endpoint pubblici per rendere il quiz (no auth, solo token)
 4. Al completamento, ri-triggera generateGuestDna con le risposte aggiunte all'input
 
@@ -90,7 +90,7 @@ Il quiz deve essere mobile-first, 4 swipe max, completabile in <60s.
 ## Step 8 — n8n observability workflow
 
 ```
-Crea n8n-workflows/gifttube-observability.json.
+Crea n8n-workflows/premura-observability.json.
 Workflow che ogni ora:
 1. Query DB per bookings in "stuck" states (es. awaiting_approval da > 2h)
 2. Alert su Slack/Telegram all'admin
