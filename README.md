@@ -133,8 +133,8 @@ premura/
 ## Getting started
 
 ```bash
-git clone <repo-url> gifttube
-cd gifttube
+git clone <repo-url> premura
+cd premura
 pnpm install
 pnpm dev
 ```

@@ -161,6 +161,7 @@ pnpm typecheck        # tsc --noEmit
 
 ## Nota storica
 
-Il progetto si chiamava "GiftTube" con prezzo €4,99/mese. Nome e pricing sono
-cambiati ad aprile 2026. Lo slug tecnico del repo e della cartella è rimasto
-`gifttube` per comodità; il brand pubblico è **Premura** ovunque.
+Il progetto si chiamava GiftTube nel periodo gen-mar 2026. Tutto il codice, il
+repo e il package name sono ora premura. Riferimenti residui a gifttube in
+docs/30-day-validation.md e docs/ROADMAP.md sono volutamente lasciati come
+record storico.
