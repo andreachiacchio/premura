@@ -314,6 +314,35 @@ posto di `DELETE FROM hosts WHERE …`.
 
 ---
 
+## 11. Mistero env var Vercel premura-web
+
+`premura-web` su Vercel (account andreachiacchios-projects, plan Hobby)
+mostra in UI Settings → Environment Variables solo `DATABASE_URL` come
+variabile configurata. Tuttavia, in produzione il deploy funziona
+correttamente con accesso a:
+
+- `ANTHROPIC_API_KEY` (parser AI Airbnb chiama Claude API senza errori)
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (OAuth Gmail completa con
+  successo)
+- `CLAUDE_MODEL_EMAIL_PARSER` (default model selection funziona)
+- `SUPABASE_URL` / `SUPABASE_SECRET_KEY` (anche se `DATABASE_URL` è la
+  connessione primary)
+
+Ipotesi non verificate:
+
+1. Vercel team-level "Shared Environment Variables" linkate al progetto
+   (UI Shared tab era vuoto al check del 27 apr 2026)
+2. Build cache fantasma da deploy passati
+3. Env var settate via Vercel CLI con scope diversi che non appaiono in
+   UI Web
+
+Stato: funziona, non investigare per ora. Da chiarire prima di scalare
+il prodotto a più progetti Vercel o se mai migrerà a Pro plan con team
+multipli.
+
+---
+
 _Ultimo aggiornamento: 27 aprile 2026 — Andrea Chiacchio, fondatore_
+_v2.4: aggiunto §11 mistero env var Vercel premura-web_
 _v2.3: aggiunti §9 Booking email data-poor + §10 cascade DELETE su hosts (M2a.3 Fase 3)_
 _v2.2: aggiunto §8 sync Gmail sincrono / no auto-rotate (M2a.3 Fase 2)_
