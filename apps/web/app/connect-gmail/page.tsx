@@ -92,7 +92,7 @@ export default function ConnectGmailPage() {
             </Button>
           </div>
 
-          {!DEV_HOST_ID ? (
+          {!DEV_HOST_ID && process.env.NODE_ENV === 'development' ? (
             <Card padding="tight" className="mt-8 border-terracotta-soft">
               <p className="text-body-sm text-terracotta-2">
                 <strong>Setup incompleto</strong>: <code>DEV_HOST_ID</code> non
