@@ -71,6 +71,15 @@
 **Obiettivo:** le prenotazioni di Andrea entrano automaticamente nel sistema.
 
 ### Milestone 2.1 — iCal polling
+
+> **DEBITO TECNICO scoperto 28 apr 2026:** worker iCal NON esiste in produzione. Schema `properties.icalSources` esiste solo come seed, nessun codice in `apps/api/` lo legge. Le 16 prenotazioni La Goccia in DB sono entrate via parser email Airbnb (M2a.3 Fase 2), non via iCal.
+>
+> **Cosa serve costruire:** BullMQ scheduler + node-ical fetcher + parser .ics + upsert idempotente in `apps/api/`.
+>
+> **Stima refit:** 6-10 ore. Non bloccante per M2a.4 (le prenotazioni entrano via email parser oggi). Da scopare in PR separata.
+>
+> **Riferimento:** `docs/booking-strategy.md` § 3 Livello base.
+
 - [ ] Parser iCal
 - [ ] Job BullMQ schedulato ogni 15 min
 - [ ] Upsert `bookings` con dedup per UID
@@ -114,11 +123,23 @@ email Airbnb degli ultimi 90 giorni e popola `bookings` + `guest_profiles`.
 - [ ] Fase 4: refresh automatico access_token, dashboard "email lette",
   trigger sync periodico.
 
-### Milestone 2a.4 — Survey post-booking opt-in (placeholder)
+### Milestone 2a.4 — UI Booking incompleto + form manuale dati guest
 
-Cattura telefono, allergie e frequenza contatto via survey opt-in
-inviata all'ospite dopo la prenotazione. Compensa il gap dati delle
-email Booking (vedi M2a.3 Fase 3 / KNOWN-LIMITS §9).
+**Stato:** spec completa scritta 28 apr 2026 (`docs/m2a4-spec.md`), implementazione prossima.
+**Stima:** 3-5 giorni dev.
+**Riferimento strategico:** `docs/booking-strategy.md` § 3 Livello 3.
+
+**Cosa fa:**
+- Schema `bookings.data_source` (5 valori enum) + `host_skipped_completion` + `manual_completion_at`
+- Backfill record esistenti
+- Helper `isRichDataSource()` per logica condizionale workflow agente AI
+- UI dashboard host: badge stato dati + card "Booking incomplete" + modal form 3 campi (nome, telefono, lingua)
+- Backend: POST `/api/bookings/:id/complete-manual` + POST `/api/bookings/:id/skip-completion`
+- Workflow `on-new-booking` cablato + guard `isRichDataSource`
+
+**Definition of Done:** vedere `docs/m2a4-spec.md` § 7.
+
+**Posizionamento:** M2a.4 NON è "survey post-booking" (decisione superata 28 apr 2026). È UI manuale per host senza channel manager, parte della strategia Booking 4 livelli.
 
 ### Milestone 2.3 — Dashboard home 3-stati
 - [ ] Home "Sta lavorando per te"
@@ -126,6 +147,32 @@ email Booking (vedi M2a.3 Fase 3 / KNOWN-LIMITS §9).
 - [ ] Dettaglio ospite base (replica prototipo)
 
 **Test chiusura fase:** Andrea incolla iCal Booking + Airbnb delle sue 3 strutture, vede tutte le prenotazioni future.
+
+---
+
+## Fase 2b — Channel Manager Bridge (post-validation primi host)
+
+Strategia per host che usano già Smoobu / Hostaway / Lodgify: OAuth 1-click → Premura ottiene dati guest completi tramite il channel manager (che a sua volta è Connectivity Partner Booking ufficiale).
+
+### Milestone 2b.1 — Smoobu OAuth bridge
+
+**Priorità:** alta (Smoobu è più diffuso in Italia tra host short-rental).
+**Stima:** TBD (ricerca API Smoobu da fare).
+**Pre-requisito:** V1 in produzione + 5+ host attivi che usano Smoobu (validation che il path è sensato).
+
+### Milestone 2b.2 — Hostaway OAuth bridge
+
+**Priorità:** media (Hostaway più USA-centric).
+**Stima:** TBD.
+
+### Milestone 2b.3 — Lodgify OAuth bridge
+
+**Priorità:** bassa.
+**Stima:** TBD.
+
+**Limite architetturale:** un host può avere UN solo channel manager. Se sceglie Premura come bridge, Smoobu non può più gestire Booking. Conflitto da gestire in onboarding M2b.x.
+
+**Riferimento bibbia:** `docs/booking-strategy.md` § 3 Livello 2.
 
 ---
 
@@ -343,6 +390,30 @@ Allora passiamo alla Fase 8.
 - Premura Plus: assicurazione danni ospite
 - Premura Fornitori: marketplace B2B per host
 - Premura Insights: dataset anonimizzato per OTA/brand
+
+---
+
+## V2 e oltre — Riconsiderare quando contesto cambia
+
+### V2 candidato: Booking Connectivity API direct partnership
+
+Quando Premura avrà host base sufficiente (~50+ properties) e Booking riaprirà registrazioni partner, applicare per Connectivity API ufficiale. Sblocca dati guest pieni come Airbnb.
+
+### V2 candidato: Browser extension per dati Booking
+
+Solo se host beta richiedono esplicitamente più funzionalità Booking di quello che V1 offre.
+
+---
+
+## Fuori scope permanenti
+
+Le seguenti idee sono state discusse, valutate e scartate definitivamente il 28 aprile 2026. Vedere `docs/booking-strategy.md` § 4.4 per motivazioni dettagliate. **Non riaprire la discussione senza cambiamento sostanziale di contesto.**
+
+- Scraping extranet via headless browser (ToS violation + ban risk per host)
+- Second-user login extranet automatizzato (2FA + IP detection + ban risk)
+- Pulse OCR / iOS Shortcuts / reverse-engineering Pulse mobile API
+- QR code su biglietto fisico del kit al check-in (rifiutato per ragione prodotto)
+- Whitelist domain Premura su template Booking message (rifiutato per ragione prodotto)
 
 ---
 
