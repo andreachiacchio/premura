@@ -8,6 +8,19 @@
 
 ---
 
+## Stato fine 29 aprile 2026
+
+- **Pipeline iCal Booking V1**: ATTIVA in staging Fly (`premura-api-staging`), polling automatico ogni 15 min.
+- **Prenotazioni in DB**:
+  - 16 prenotazioni Airbnb (`data_source=airbnb_email_parsed`)
+  - 24 prenotazioni Booking (`data_source=booking_ical_only`)
+  - 1 Booking completata (`data_source=booking_manual_filled`)
+  - 1 Booking skippata (`host_skipped_completion=true`)
+- **Backend M2a.4**: completo (slice 1-4). Manca solo UI dashboard host (slice 5) e auth JWT host (slice 6).
+- **Worker iCal**: scaffolding + upsert reale + cron */15 funzionanti. Idempotenza confermata via re-poll.
+
+---
+
 ## Principi della roadmap
 
 1. **Validare sempre con realtà.** Ogni fase si chiude con un test su dati veri.
@@ -125,7 +138,7 @@ email Airbnb degli ultimi 90 giorni e popola `bookings` + `guest_profiles`.
 
 ### Milestone 2a.4 — UI Booking incompleto + form manuale dati guest
 
-**Stato:** spec completa scritta 28 apr 2026 (`docs/m2a4-spec.md`), implementazione prossima.
+**Stato:** backend completo 29 apr 2026 (slice 1-4). UI e auth ancora TODO.
 **Stima:** 3-5 giorni dev.
 **Riferimento strategico:** `docs/booking-strategy.md` § 3 Livello 3.
 
@@ -140,6 +153,23 @@ email Airbnb degli ultimi 90 giorni e popola `bookings` + `guest_profiles`.
 **Definition of Done:** vedere `docs/m2a4-spec.md` § 7.
 
 **Posizionamento:** M2a.4 NON è "survey post-booking" (decisione superata 28 apr 2026). È UI manuale per host senza channel manager, parte della strategia Booking 4 livelli.
+
+**Slice progress:**
+
+- [x] **Slice 1 (FATTO 29 apr 2026, PR #14)**: schema `bookings.data_source` + `host_skipped_completion` + `manual_completion_at`, indice composito, backfill 16 record La Goccia.
+- [x] **Slice 2 (FATTO 29 apr 2026, PR #15)**: Worker iCal scaffolding (BullMQ + ioredis + node-ical), endpoint `/health/jobs`, graceful shutdown.
+- [x] **Slice 3.1 (FATTO 29 apr 2026, PR #16)**: ical-event-mapper + booking-upsert-repository (ON CONFLICT DO NOTHING + skip RICH preserve) + redactIcalUrl, helper `isRichDataSource` spostato in `packages/shared`.
+- [x] **Slice 3.2 (FATTO 29 apr 2026, PR #17)**: Cron croner pattern `*/15 * * * *`, script CLI `manual-poll`, dynamic import per env caricato prima dei moduli BullMQ.
+- [x] **Slice 4 (FATTO 29 apr 2026, PR #18)**: endpoint POST `/api/bookings/:id/complete-manual` + POST `/api/bookings/:id/skip-completion`, workflow guard `isRichDataSource` in `on-new-booking`. 7 nuovi test (108/108 verde). E2E reale verificato su staging Fly.
+- [ ] **Slice 5 (TODO)**: UI dashboard host
+  - [ ] Badge stato dati (verde RICH / giallo INCOMPLETE / grigio SKIPPED)
+  - [ ] Card "Booking incompleto" sulla home
+  - [ ] Modal form 3 campi (nome ospite, telefono, lingua) con validazione zod
+  - [ ] Bottone "Salta" → `POST /api/bookings/:id/skip-completion`
+  - [ ] Dashboard count "N booking da completare"
+- [ ] **Slice 6 (TODO)**: auth host
+  - [ ] JWT host via Supabase Auth
+  - [ ] Verifica ownership property nei route guard (`/api/bookings/:id/*` solo se property apartiene a host autenticato)
 
 ### Milestone 2.3 — Dashboard home 3-stati
 - [ ] Home "Sta lavorando per te"

@@ -375,19 +375,15 @@ _v2.2: aggiunto §8 sync Gmail sincrono / no auto-rotate (M2a.3 Fase 2)_
 
 ---
 
-## §14 — Worker iCal Premura non esiste ancora (debito tecnico)
+## §14 — Worker iCal Premura (RISOLTO il 29 aprile 2026)
 
-**Status:** debito tecnico scoperto 28 aprile 2026 durante audit codice.
+**Status:** RISOLTO il 29 aprile 2026.
 
-**Cosa manca:** infrastruttura BullMQ + Redis + scheduler + node-ical fetcher + parser .ics + upsert idempotente. Schema properties.icalSources esiste in DB ma nessun codice lo legge in produzione.
+**Nota:** Worker iCal implementato in slice 2 (scaffolding) + 3.1 (upsert reale) + 3.2 (cron scheduler). Pipeline E2E verificata su staging Fly: 24 prenotazioni Booking di La Goccia importate da iCal, idempotenza confermata. Vedi PR #14, #15, #16, #17, #18.
 
 **Cosa funziona oggi (al posto di iCal):** parser email Airbnb (M2a.3 Fase 2) + parser email Booking event ingestor (M2a.3 Fase 3). Le 16 prenotazioni La Goccia in DB sono entrate via email parser, non via iCal.
 
-**Stima refit:** 6-10 ore lavoro.
-
-**Cabling target:** apps/api/ deploy premura-api-staging (Fly.io Frankfurt 2 macchine). Oggi serve solo /health endpoint.
-
-**Priorità:** non bloccante per M2a.4. Da scopare in PR separata in M2a.1 reale.
+**Cabling target:** apps/api/ deploy premura-api-staging (Fly.io Frankfurt 2 macchine). Worker BullMQ + cron */15 attivo in staging.
 
 ---
 
@@ -414,4 +410,30 @@ _v2.2: aggiunto §8 sync Gmail sincrono / no auto-rotate (M2a.3 Fase 2)_
 **Implicazione:** non c'è scappatoia mobile per dati Booking. Pulse OCR / iOS Shortcuts / reverse-engineering Pulse API sono in docs/booking-strategy.md § 4.4 FUORI SCOPE PERMANENTI.
 
 **TODO:** documentare metodologia verifica Pulse in sessione successiva (cosa è stato testato, cosa è stato trovato sui forum, output di tentativi URL scheme booking://...).
+
+---
+
+## §17 — Endpoint skip-completion: body vuoto richiede curl senza Content-Type
+
+**Status:** edge case scoperto 29 aprile 2026 durante test E2E manuale slice 4.
+
+**Verifica:** chiamata `POST /api/bookings/:id/skip-completion` con `Content-Type: application/json` e body vuoto. Fastify ritorna 400 `FST_ERR_CTP_EMPTY_JSON_BODY`.
+
+**Implicazione:** l'endpoint non vuole body, ma il body parser JSON di Fastify rifiuta richieste con header `Content-Type: application/json` senza payload.
+
+**Mitigazione:** UI dashboard host (slice 5) chiamera l'endpoint senza header `Content-Type` oppure con body `{}`. Per test manuali via curl, omettere `-H "Content-Type: application/json"`.
+
+**Alternative future:** rendere il body opzionale lato schema zod (`.optional()`), oppure cambiare il content-type-parser per accettare body vuoto come `{}`.
+
+---
+
+## §18 — Fly Free tier auto-stop machine
+
+**Status:** vincolo del piano Fly Free, non aggirabile senza upgrade.
+
+**Verifica:** 29 aprile 2026 durante test E2E. Le machine `premura-api-staging` si fermano dopo qualche minuto di inattivita.
+
+**Implicazione:** per test e sviluppo serve `fly machine start <id> -a premura-api-staging` a mano prima di chiamare endpoint o aprire `fly ssh console`.
+
+**Mitigazione:** in produzione vera con traffico continuo non sara un problema (le macchine restano sveglie). In alternativa, passare a piano paid Fly per disabilitare auto-stop.
 
