@@ -6,6 +6,7 @@ import cors from '@fastify/cors';
 // inizia subito ad ascoltare la queue 'ical-poll'. Niente lazy load.
 import { icalPollWorker } from './jobs/ical-poll-worker';
 import { icalPollQueue } from './jobs/queues';
+import { startIcalCron } from './jobs/ical-cron';
 
 const app = Fastify({
   logger: {
@@ -41,16 +42,22 @@ app.get('/health/jobs', async () => {
 
 // TODO: register webhooks, dashboard API, cleaner endpoints
 
+// Cron iCal avviato dopo il worker (worker gia' importato top-level) e prima
+// di app.listen, cosi' eventuali tick che partono mentre l'app sta per andare
+// online trovano la pipeline di processing pronta.
+const icalCron = startIcalCron();
+
 const port = Number(process.env.PORT ?? 3000);
 await app.listen({ port, host: '0.0.0.0' });
 app.log.info(`Premura listening on :${port}`);
 app.log.info('ical poll worker started');
 
-// Graceful shutdown: chiudo il worker (drain dei job in-flight + disconnect
-// Redis) PRIMA di Fastify, cosi' eventuali handler che enqueuano job non
-// trovano connessioni gia' chiuse.
+// Graceful shutdown: prima fermo il cron (niente nuovi enqueue), poi il
+// worker (drain dei job in-flight + disconnect Redis), poi Fastify. L'ordine
+// evita che enqueue partiti dal cron trovino connessioni gia' chiuse.
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, 'shutdown requested');
+  icalCron.stop();
   await icalPollWorker.close();
   await app.close();
   process.exit(0);
