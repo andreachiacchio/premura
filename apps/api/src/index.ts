@@ -2,11 +2,13 @@ import 'dotenv/config';
 import Fastify from 'fastify';
 import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
+import { createServerClient } from '@premura/db';
 // Import top-level: l'istanza Worker viene creata nel modulo importato e
 // inizia subito ad ascoltare la queue 'ical-poll'. Niente lazy load.
 import { icalPollWorker } from './jobs/ical-poll-worker';
 import { icalPollQueue } from './jobs/queues';
 import { startIcalCron } from './jobs/ical-cron';
+import { bookingsRoutes } from './api/bookings';
 
 const app = Fastify({
   logger: {
@@ -40,6 +42,14 @@ app.get('/health/jobs', async () => {
   return { queue: 'ical-poll', counts };
 });
 
+// Client Drizzle long-lived per le routes HTTP. Diversamente dal worker
+// iCal (che apre/chiude per job), le routes condividono una sola pool
+// Postgres a vita app. Chiusa nello shutdown gracieful.
+const apiClient = createServerClient();
+
+// Routes M2a.4: completion form Booking + skip. Auth host JWT verra' in slice 6.
+await app.register(bookingsRoutes, { prefix: '/api/bookings', db: apiClient.db });
+
 // TODO: register webhooks, dashboard API, cleaner endpoints
 
 // Cron iCal avviato dopo il worker (worker gia' importato top-level) e prima
@@ -60,6 +70,7 @@ const shutdown = async (signal: string): Promise<void> => {
   icalCron.stop();
   await icalPollWorker.close();
   await app.close();
+  await apiClient.close();
   process.exit(0);
 };
 process.on('SIGTERM', () => void shutdown('SIGTERM'));

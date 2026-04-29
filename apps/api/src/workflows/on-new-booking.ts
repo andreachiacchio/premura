@@ -1,4 +1,6 @@
 import { generateGuestDna, composeKit, writeMessage } from '@premura/agents';
+import { isRichDataSource } from '@premura/shared';
+import pino from 'pino';
 
 /**
  * Main workflow triggered by webhook from Booking.com or Airbnb
@@ -19,12 +21,31 @@ import { generateGuestDna, composeKit, writeMessage } from '@premura/agents';
  * specialized module. It must remain readable top-to-bottom.
  */
 
+const logger = pino({
+  name: 'on-new-booking',
+  level: process.env.LOG_LEVEL ?? 'info',
+});
+
 type OnNewBookingInput = {
   bookingId: string; // UUID in our DB, already persisted
 };
 
 export async function onNewBooking(input: OnNewBookingInput): Promise<void> {
   const booking = await loadBookingFull(input.bookingId);
+
+  // Guard data source: il workflow agente AI parte solo per righe RICH
+  // (Airbnb email parsed, Booking manual filled, Booking via channel
+  // manager). Per righe INCOMPLETE (booking_ical_only, booking_email_only)
+  // o data-poor (airbnb_ical_only, unknown) restiamo silenti in attesa di
+  // arricchimento (form M2a.4 per Booking, parser email per Airbnb).
+  // Vedi docs/m2a4-spec.md sezione 4 e packages/shared/src/booking-data-richness.ts.
+  if (!isRichDataSource(booking.dataSource)) {
+    logger.info(
+      { bookingId: booking.id, dataSource: booking.dataSource },
+      'workflow skipped: data source not rich',
+    );
+    return;
+  }
 
   // 1. OSINT enrichment (best-effort, non-blocking)
   const enrichment = await tryEnrichGuest(booking).catch(() => undefined);
@@ -176,6 +197,9 @@ async function scheduleAt(
 type BookingFull = {
   id: string;
   platform: 'booking' | 'airbnb';
+  // Origine dati prenotazione: solo i valori RICH abilitano questo workflow.
+  // Vedi packages/shared/src/booking-data-richness.ts.
+  dataSource: string;
   guestFullName: string;
   guestCountryCode?: string;
   guestAgeApprox?: number;
