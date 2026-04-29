@@ -43,6 +43,13 @@
       "when": 1777298459194,
       "tag": "0005_bizarre_boomer",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777455998754,
+      "tag": "0006_stormy_mephistopheles",
+      "breakpoints": true
     }
   ]
 }

@@ -92,6 +92,33 @@ export const bookings = pgTable(
     guestNote: text('guest_note'),
     status: bookingStatusEnum('status').notNull().default('confirmed'),
 
+    // Origine dei dati prenotazione: determina se il workflow agente AI parte
+    // (Guest DNA, messaggi pre-arrivo, kit composer) o resta silente per
+    // quella prenotazione.
+    // Enum applicativo, niente Postgres enum per lasciare flessibilita di
+    // evoluzione futura senza migration.
+    // Valori ammessi:
+    // - 'airbnb_email_parsed'         (RICH)        parser email Airbnb ha estratto dati ricchi
+    // - 'booking_manual_filled'       (RICH)        host ha compilato form M2a.4
+    // - 'booking_via_channel_manager' (RICH)        futuro M2b.x (Smoobu/Hostaway OAuth bridge)
+    // - 'booking_ical_only'           (INCOMPLETE)  solo iCal Booking, niente nome/telefono
+    // - 'booking_email_only'          (INCOMPLETE)  solo email Booking event ingestor
+    // - 'unknown'                     fallback default, popolato via backfill
+    // Solo i valori RICH abilitano il workflow agente AI completo.
+    // Vedi docs/booking-strategy.md sezione 3 e docs/m2a4-spec.md sezione 2.1.
+    dataSource: varchar('data_source', { length: 32 }).notNull().default('unknown'),
+
+    // Host ha cliccato "Salta" sulla card Booking incompleto: la prenotazione
+    // viene rimossa dal conteggio top della home dashboard, ma il badge sulla
+    // riga resta visibile nella lista prenotazioni (l'host puo sempre tornare
+    // a compilare il form quando vuole).
+    hostSkippedCompletion: boolean('host_skipped_completion').notNull().default(false),
+
+    // Timestamp del completion form manuale (M2a.4). Usato per metriche
+    // prodotto: percentuale host che compila e latenza dalla notifica al
+    // complete.
+    manualCompletionAt: timestamp('manual_completion_at', { withTimezone: true }),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -109,5 +136,9 @@ export const bookings = pgTable(
     index('bookings_status_idx').on(t.status),
     index('bookings_created_at_idx').on(t.createdAt),
     index('bookings_guest_profile_idx').on(t.guestProfileId),
+    // Query dashboard "tutte le prenotazioni incomplete della property X"
+    // (filtro per data_source + scope per property). Vedi docs/m2a4-spec.md
+    // sezione 2.3.
+    index('bookings_data_source_property_idx').on(t.dataSource, t.propertyId),
   ],
 );
