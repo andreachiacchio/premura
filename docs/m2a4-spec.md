@@ -36,6 +36,7 @@ Valori ammessi (enum applicativo, no Postgres enum per flessibilità futura):
 - 'airbnb_email_parsed' — parser Claude email Airbnb ha estratto dati ricchi (Fase 2)
 - 'booking_ical_only' — solo iCal Booking, niente nome/telefono guest
 - 'booking_email_only' — solo email Booking event ingestor (codice + status), niente dati ricchi
+- 'airbnb_ical_only' — solo iCal Airbnb, in attesa arricchimento email parser. NON triggera la UI form manuale M2a.4: il completamento Airbnb è automatico via parser email Fase 2, quindi la dashboard non deve invitare l'host a compilare a mano queste righe (sarebbero arricchite entro minuti). Resta visibile come "In sincronizzazione" se serve un badge UI.
 - 'booking_manual_filled' — host ha compilato form M2a.4 (questa milestone)
 - 'booking_via_channel_manager' — futuro M2b.x (Smoobu/Hostaway OAuth bridge)
 - 'unknown' — default fallback, da popolare via backfill

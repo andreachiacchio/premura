@@ -1,8 +1,12 @@
 import { Worker, type Job } from 'bullmq';
 import nodeIcal from 'node-ical';
 import pino from 'pino';
+import { createServerClient } from '@premura/db';
 import { getRedisConnection } from './redis-connection';
 import type { IcalPollJobData } from './queues';
+import { mapIcalEventToBookingShell } from './ical-event-mapper';
+import { upsertBookingShell } from './booking-upsert-repository';
+import { redactIcalUrl } from './redact-ical-url';
 
 /**
  * Logger dedicato al worker iCal.
@@ -20,41 +24,115 @@ const logger = pino({
 /**
  * Worker BullMQ che processa job dalla coda 'ical-poll'.
  *
- * Comportamento slice 2 (scaffolding):
- *  - Fetcha l'URL iCal con node-ical (API async)
- *  - Conta gli eventi di tipo VEVENT trovati
- *  - Logga il risultato; NESSUN upsert su DB (arriva in slice 3)
+ * TODO slice 3.2: test E2E della pipeline completa (fetch -> map -> upsert)
+ * con Postgres Testcontainer e URL Booking reale. Slice 3.1 copre solo i
+ * passi pure-function via unit test (redactIcalUrl, mapIcalEventToBookingShell);
+ * upsertBookingShell non e' unit-testato perche' mockare la chain Drizzle
+ * e' fragile e l'integration con DB vero da' segnale piu' utile.
  *
- * Concurrency 2: due job in parallelo per istanza worker. Numero conservativo
- * coerente con host Livello 1 (1-5 properties, max 2-3 sorgenti l'una).
+ * Pipeline (slice 3.1):
+ *  1. Fetch URL via node-ical (async.fromURL)
+ *  2. Per ogni VEVENT chiama mapIcalEventToBookingShell
+ *  3. Per ogni shell valida chiama upsertBookingShell (idempotente)
+ *  4. Aggrega contatori e logga summary
  *
- * Error handling: try/catch + log + rethrow. Il rethrow e' essenziale per
- * far scattare il retry BullMQ secondo le opzioni in queues.ts
- * (attempts 3, backoff exponential 2s).
+ * Source 'channel_manager' viene skippato in slice 3.1: il mapper accetta
+ * solo 'booking' | 'airbnb'. La logica CM iCal arrivera' con M2b.x quando
+ * si decidera' la semantica del data_source per quei feed.
+ *
+ * Concurrency 2: due job in parallelo per istanza worker. Numero
+ * conservativo coerente con host Livello 1 (1-5 properties, max 2-3
+ * sorgenti l'una).
+ *
+ * Lifecycle DB: per ogni job apriamo e chiudiamo un client Drizzle.
+ * Allineato al pattern dello scheduler. Se l'overhead di setup pool a ogni
+ * job diventa significativo (cron frequente, molte property), in slice 3.2
+ * valuteremo un client condiviso a livello di processo worker.
+ *
+ * Error handling:
+ *  - errore di fetch o di setup DB         -> log error + rethrow (BullMQ retry)
+ *  - errore upsert su singola shell        -> log warn + counter, NON rethrow:
+ *                                              un evento corrotto non deve
+ *                                              far perdere progresso sugli altri
+ *  - icalUrl nei log error e' redacted via redactIcalUrl per non leakare il
+ *    token (chiude il TODO lasciato in slice 2)
  */
 export const icalPollWorker = new Worker<IcalPollJobData>(
   'ical-poll',
   async (job: Job<IcalPollJobData>) => {
     const { propertyId, icalUrl, source } = job.data;
+
+    if (source === 'channel_manager') {
+      logger.warn(
+        { propertyId, source },
+        'channel_manager ical skipped (slice 3.1, supportato in M2b.x)',
+      );
+      return;
+    }
+
+    const client = createServerClient();
     try {
       const events = await nodeIcal.async.fromURL(icalUrl);
-      const veventCount = Object.values(events).filter(
-        (event) => event.type === 'VEVENT',
-      ).length;
+      const components = Object.values(events);
+      const fetched = components.length;
+
+      let mapped = 0;
+      let inserted = 0;
+      let skipped = 0;
+      let dateChanged = 0;
+      let errors = 0;
+
+      for (const component of components) {
+        if (component.type !== 'VEVENT') continue;
+        const shell = mapIcalEventToBookingShell(component, propertyId, source);
+        if (!shell) continue;
+        mapped += 1;
+
+        try {
+          const result = await upsertBookingShell(client.db, shell);
+          if (result.inserted) {
+            inserted += 1;
+          } else if (result.skipped) {
+            skipped += 1;
+            if (result.reason === 'date changed - handled in slice 3.2') {
+              dateChanged += 1;
+            }
+          }
+        } catch (err) {
+          errors += 1;
+          logger.warn(
+            {
+              err,
+              propertyId,
+              source,
+              platformBookingRef: shell.platformBookingRef,
+            },
+            'upsert failed for single event, continuing',
+          );
+        }
+      }
+
       logger.info(
-        { propertyId, source, veventCount },
-        `fetched ${veventCount} events from ${source} for property ${propertyId}`,
+        {
+          propertyId,
+          source,
+          fetched,
+          mapped,
+          inserted,
+          skipped,
+          dateChanged,
+          errors,
+        },
+        'ical poll completed',
       );
     } catch (err) {
-      // TODO slice 3: redactIcalUrl(icalUrl) prima di loggare. icalUrl puo'
-      // contenere token sensibile (es. ical.booking.com/v1/export?t=TOKEN).
-      // Helper deve mostrare host + path mascherato, mai query string.
-      // Per slice 2 lasciamo log completo: logghiamo solo in dev.
       logger.error(
-        { err, propertyId, source, icalUrl },
+        { err, propertyId, source, icalUrl: redactIcalUrl(icalUrl) },
         'ical poll failed',
       );
       throw err;
+    } finally {
+      await client.close();
     }
   },
   {
