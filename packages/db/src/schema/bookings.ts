@@ -103,6 +103,10 @@ export const bookings = pgTable(
     // - 'booking_via_channel_manager' (RICH)        futuro M2b.x (Smoobu/Hostaway OAuth bridge)
     // - 'booking_ical_only'           (INCOMPLETE)  solo iCal Booking, niente nome/telefono
     // - 'booking_email_only'          (INCOMPLETE)  solo email Booking event ingestor
+    // - 'airbnb_ical_only'            (data-poor)   solo iCal Airbnb, in attesa
+    //                                                arricchimento email parser; NON
+    //                                                triggera il form manuale M2a.4
+    //                                                (esclusivo Booking)
     // - 'unknown'                     fallback default, popolato via backfill
     // Solo i valori RICH abilitano il workflow agente AI completo.
     // Vedi docs/booking-strategy.md sezione 3 e docs/m2a4-spec.md sezione 2.1.
