@@ -346,3 +346,72 @@ _Ultimo aggiornamento: 27 aprile 2026 — Andrea Chiacchio, fondatore_
 _v2.4: aggiunto §11 mistero env var Vercel premura-web_
 _v2.3: aggiunti §9 Booking email data-poor + §10 cascade DELETE su hosts (M2a.3 Fase 3)_
 _v2.2: aggiunto §8 sync Gmail sincrono / no auto-rotate (M2a.3 Fase 2)_
+
+---
+
+## §12 — Booking Connectivity API chiusa a nuovi entranti
+
+**Status:** porta chiusa per V1, riconsiderare in V2.
+
+**Verifica:** 28 aprile 2026 lettura developers.booking.com + blog Elfsight 2025. Citazione testuale Booking docs: *"At the moment the platform is not accepting new registrations on the partner portal."*
+
+**Implicazione:** Premura V1 non può ricevere dati guest Booking via API ufficiale. Workaround: vedi docs/booking-strategy.md strategia 4 livelli.
+
+**Riapertura possibile quando:**
+- Booking annuncia nuove registrazioni partner
+- Premura ha host base sufficiente per applicare (~50+ properties + audit + mesi onboarding)
+
+---
+
+## §13 — iCal Booking espone solo date occupate anonimizzate
+
+**Status:** limite strutturale Booking, non aggirabile.
+
+**Verifica:** 28 aprile 2026 ore 16:35, test reale curl URL iCal La Goccia. Output: BEGIN:VEVENT / SUMMARY: CLOSED - Not available. Niente nome guest, niente codice prenotazione, niente telefono.
+
+**Implicazione:** iCal Booking serve solo per overbooking detection. Non basta per workflow agente AI completo.
+
+**Workaround:** form manuale dashboard host (M2a.4). Vedi docs/m2a4-spec.md.
+
+---
+
+## §14 — Worker iCal Premura non esiste ancora (debito tecnico)
+
+**Status:** debito tecnico scoperto 28 aprile 2026 durante audit codice.
+
+**Cosa manca:** infrastruttura BullMQ + Redis + scheduler + node-ical fetcher + parser .ics + upsert idempotente. Schema properties.icalSources esiste in DB ma nessun codice lo legge in produzione.
+
+**Cosa funziona oggi (al posto di iCal):** parser email Airbnb (M2a.3 Fase 2) + parser email Booking event ingestor (M2a.3 Fase 3). Le 16 prenotazioni La Goccia in DB sono entrate via email parser, non via iCal.
+
+**Stima refit:** 6-10 ore lavoro.
+
+**Cabling target:** apps/api/ deploy premura-api-staging (Fly.io Frankfurt 2 macchine). Oggi serve solo /health endpoint.
+
+**Priorità:** non bloccante per M2a.4. Da scopare in PR separata in M2a.1 reale.
+
+---
+
+## §15 — Booking Reply-To noreply, alias guest non utilizzabile off-platform
+
+**Status:** vincolo strutturale Booking, non aggirabile.
+
+**Verifica:** Booking partner help center, articolo "Contacting guests": *"Both you and your guests will only see an anonymous alias ending in @guest.booking.com or @partner.booking.com. Only use Booking.com platforms, the Extranet, and Pulse app to communicate with guests securely."*
+
+**Implicazione:** anche se ottenessimo l'email guest, è alias temporaneo + monitoring Booking + ToS violation se mandiamo email da fuori piattaforma.
+
+**Workaround:** WhatsApp diretto (canale Premura primario), via numero raccolto da form M2a.4.
+
+---
+
+## §16 — Pulse iOS senza API pubblica + senza Shortcuts/Share endpoints
+
+**Status:** porta chiusa, più chiusa dell'extranet web.
+
+**Verifica:** Andrea, 28 aprile 2026, offline (metodologia da documentare in sessione successiva).
+
+**Cosa è stato controllato (sintesi offline):** nessuna API pubblica documentata su developers.booking.com per Pulse, niente Apple Shortcuts esposti da Booking app installata, Daily Activity Widget legge dati ma non accessibili programmaticamente da app terze, 2FA aggressivo blocca emulatori e bot.
+
+**Implicazione:** non c'è scappatoia mobile per dati Booking. Pulse OCR / iOS Shortcuts / reverse-engineering Pulse API sono in docs/booking-strategy.md § 4.4 FUORI SCOPE PERMANENTI.
+
+**TODO:** documentare metodologia verifica Pulse in sessione successiva (cosa è stato testato, cosa è stato trovato sui forum, output di tentativi URL scheme booking://...).
+
