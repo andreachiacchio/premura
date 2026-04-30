@@ -10,7 +10,7 @@
 //
 // Vedi docs/m2a4-spec.md sezione 2.4.
 
-const RICH_DATA_SOURCES = [
+export const RICH_DATA_SOURCES = [
   'airbnb_email_parsed',
   'booking_manual_filled',
   'booking_via_channel_manager',
@@ -22,7 +22,32 @@ const RICH_DATA_SOURCES = [
 // Airbnb il completamento arriva automatico via parser email (Fase 2),
 // quindi non vogliamo che la UI dashboard inviti l'host a compilare a mano
 // righe Airbnb-iCal-only: sarebbero arricchite dall'email entro minuti.
-const INCOMPLETE_DATA_SOURCES = ['booking_ical_only', 'booking_email_only'] as const;
+export const INCOMPLETE_DATA_SOURCES = ['booking_ical_only', 'booking_email_only'] as const;
+
+// Lista chiusa di tutti i valori data_source riconosciuti dall'applicazione.
+// Sorgente di verita' per il tipo TypeScript DataSource: lo schema DB tiene
+// volutamente data_source come varchar libero (vedi packages/db/src/schema/
+// bookings.ts riga 99 sgg.) per non bloccare evoluzioni dietro migration,
+// ma a livello di dominio la lista qui e' la fonte autoritativa.
+//
+// 'airbnb_ical_only' = riga iCal Airbnb in attesa di arricchimento email
+// parser. 'unknown' = fallback default.
+export const DATA_SOURCES = [
+  ...RICH_DATA_SOURCES,
+  ...INCOMPLETE_DATA_SOURCES,
+  'airbnb_ical_only',
+  'unknown',
+] as const;
+
+export type DataSource = (typeof DATA_SOURCES)[number];
+
+/**
+ * Type guard: ritorna true se la stringa e' uno dei valori DataSource noti.
+ * Utile alla UI per discriminare badge senza affidarsi al cast 'as'.
+ */
+export function isKnownDataSource(s: string): s is DataSource {
+  return (DATA_SOURCES as readonly string[]).includes(s);
+}
 
 /**
  * Ritorna true quando la prenotazione ha dati ospite sufficienti ad attivare
