@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; redirectTo?: string }>;
 }) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -24,7 +24,7 @@ export default async function LoginPage({
   } = await supabase.auth.getUser();
   if (user) redirect("/dashboard");
 
-  const { error } = await searchParams;
+  const { error, redirectTo } = await searchParams;
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-ivory px-5 pt-16 pb-8">
@@ -38,7 +38,7 @@ export default async function LoginPage({
         </p>
       </header>
 
-      <LoginForm errorCode={error ?? null} />
+      <LoginForm errorCode={error ?? null} redirectTo={redirectTo ?? null} />
 
       <footer className="mt-auto pt-12 text-center text-body-sm text-ink-mute">
         Premura - il concierge che non dorme mai.

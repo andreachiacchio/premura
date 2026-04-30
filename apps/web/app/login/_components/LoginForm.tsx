@@ -32,10 +32,15 @@ function callbackErrorMessage(code: string | null): string | null {
 
 export function LoginForm({
   errorCode,
+  redirectTo,
   signInAction = signInWithMagicLink,
 }: {
   errorCode: string | null;
-  signInAction?: (email: string) => Promise<SignInResult>;
+  redirectTo: string | null;
+  signInAction?: (
+    email: string,
+    redirectTo?: string,
+  ) => Promise<SignInResult>;
 }) {
   const [state, setState] = React.useState<FormState>({ kind: "idle" });
   const [email, setEmail] = React.useState("");
@@ -44,7 +49,7 @@ export function LoginForm({
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setState({ kind: "sending" });
-    const result = await signInAction(email);
+    const result = await signInAction(email, redirectTo ?? undefined);
     if (result.ok) {
       setState({ kind: "sent", email });
     } else {

@@ -25,6 +25,7 @@ export type SignInResult = { ok: true } | { ok: false; error: string };
 
 export async function signInWithMagicLink(
   email: string,
+  redirectTo?: string,
 ): Promise<SignInResult> {
   const parsed = emailSchema.safeParse(email);
   if (!parsed.success) {
@@ -39,11 +40,18 @@ export async function signInWithMagicLink(
     headerList.get("origin") ??
     `https://${headerList.get("host") ?? "premura.it"}`;
 
+  // Pattern Supabase ssr: il param "next" viaggia attraverso emailRedirectTo,
+  // viene preservato letteralmente nel link email e ritorna in /auth/callback.
+  // Stateless, niente cookie temporanei, robusto cross-device.
+  const callbackUrl = redirectTo
+    ? `${origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`
+    : `${origin}/auth/callback`;
+
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithOtp({
     email: parsed.data,
     options: {
-      emailRedirectTo: `${origin}/auth/callback`,
+      emailRedirectTo: callbackUrl,
     },
   });
 
