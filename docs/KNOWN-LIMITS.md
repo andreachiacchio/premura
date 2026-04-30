@@ -480,9 +480,16 @@ Trade-off: tutte le scritture worker bypassano RLS. Se in futuro vogliamo che il
 
 ---
 
-## §22 - Slice 6 fase 6: trigger iCal su nuova property
+## §22 - Slice 6 auth Supabase: debiti tecnici
 
-**Status:** debito aperto durante M2a.4 slice 6 fase 6 (form prima property), 30 aprile 2026.
+**Status:** debiti aperti durante M2a.4 slice 6 (auth Supabase magic link + RLS multi-tenancy), 30 aprile 2026. Branch `claude/auth-supabase-rls`, PR #22.
 
-Trigger iCal polling su nuova property: manuale, host aspetta il prossimo cron 15 min per importare le bookings. Auto-trigger via chiamata diretta a `apps/api` scheduler in slice futuro (`apps/web` -> `apps/api` worker queue, probabilmente HTTP POST a `/api/jobs/poll-property` o enqueue diretto BullMQ tramite Redis condiviso). Fino ad allora il flusso e': host aggiunge property con iCal URL -> aspetta fino a 15 minuti -> dashboard mostra le prenotazioni. Documentato in UI dialog (`Lo trovi su Booking nelle impostazioni della struttura, sezione Calendari sincronizzati`). UX accettabile per il pilot, da rifinire prima dell'apertura host esterni.
+- **Slice 6.5 dedicato (NON ancora aperto): JWT validation lato Fastify.** Chiude il vettore residuo "chiamata diretta `apps/api/src/api/bookings.ts` senza passare da server action". Attualmente il pre-check ownership in server actions (`assertOwnership` via `findOwnership` Drizzle) chiude il buco a livello applicativo apps/web (vedi §20 voce su buco mutazioni gia chiuso applicativamente). Il fix architetturale completo: `apps/api` legge il cookie Supabase, valida il JWT, deriva `host_id` dal token invece di fidarsi del payload del client.
+- **Trigger iCal automatico su nuova property: manuale.** Oggi l'host aggiunge property con iCal URL e aspetta il prossimo cron 15 min per vedere le bookings. Auto-trigger via `apps/web` -> `apps/api` worker queue (HTTP POST `/api/jobs/poll-property` o enqueue diretto BullMQ tramite Redis condiviso) in slice futuro. UX accettabile per il pilot, da rifinire prima dell'apertura host esterni.
+- **SMTP custom email magic link.** Default Supabase usa `noreply@mail.app.supabase.io`, non brandizzato. Setup Resend (o simile) in slice 6.5 dedicato a email branding. Vincolo Supabase rate limit free tier: ~30 email/h, sufficiente per il pilot.
+- **Google OAuth: rimandato.** Magic link only in slice 6. OAuth Google sara aggiunto in slice futuro quando avremo abbastanza host per giustificare il setup OAuth consent screen.
+- **RLS policies non testate end-to-end.** Test runtime in `packages/db` che verifichi `rowsecurity=true` su ogni tabella per-host gia tracciato in §21. Test integration con Supabase locale o test container in slice futuro dedicato. Mitigazione attuale: review manuale del file SQL `0007_enable_rls.sql` + smoke test su staging.
+- **Drift schema zod tra apps/web e apps/api per createPropertyAction.** `createPropertyPayloadSchema` in `apps/web/app/dashboard/actions.ts` ridefinisce le regole di validazione anche per la creazione property. Refactor a `packages/shared/property-validation.ts` gia proposto per booking in §20, esteso a property in slice futuro. Stesso debito strutturale gia tracciato.
+- **Onboarding form prima property: 3 campi base.** Nome, citta, iCal URL. `addressLine`, `postalCode`, `kitBudgetEur`, `agentNotes` vanno completati in settings page (slice futuro). UX accettabile per pilot, da rifinire prima dell'apertura host esterni.
+- **Dialog state per-riga in BookingRow ancora locale (debito gia in §20).** Non rifattorizzato in slice 6, rimane per quando un host avra ~100 incomplete simultanee. Refactor a stato lifted in `BookingsList` quando il volume lo richiedera.
 
