@@ -239,6 +239,34 @@ export async function findByHostId(args: {
   }));
 }
 
+// Slice 6 fase 6.5: pre-check ownership per le server actions di
+// mutazione (complete-manual, skip-completion). Le actions
+// inoltrano bookingId all'API Fastify, che attualmente non valida
+// l'ownership; il fix architetturale completo (JWT validation
+// Fastify) e' tracciato come slice 6.5 dedicato. Qui chiudiamo il
+// buco a livello applicativo apps/web.
+//
+// Ritorna { hostId } se la booking esiste e e' associata a una
+// property tracciata. null se la booking non esiste.
+//
+// Il caller confronta hostId restituito con la sessione corrente:
+// se diverso o null, deve trattarli identico (stessa risposta
+// "non trovata") per non rivelare l'esistenza di booking altrui.
+export async function findOwnership(args: {
+  db: Database;
+  bookingId: string;
+}): Promise<{ hostId: string } | null> {
+  const { db, bookingId } = args;
+  const rows = await db
+    .select({ hostId: properties.hostId })
+    .from(bookings)
+    .innerJoin(properties, eq(properties.id, bookings.propertyId))
+    .where(eq(bookings.id, bookingId))
+    .limit(1);
+  if (rows.length === 0) return null;
+  return { hostId: rows[0]!.hostId };
+}
+
 function parseIsoDate(yyyymmdd: string): Date {
   // YYYY-MM-DD → UTC midnight (timezone-safe per check-in date logica).
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(yyyymmdd);

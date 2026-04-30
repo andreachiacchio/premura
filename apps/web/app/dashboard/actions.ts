@@ -8,6 +8,7 @@ import {
 } from "@/lib/api";
 import { getCurrentHostId } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { findOwnership } from "@/lib/repositories/bookings";
 import { createProperty } from "@/lib/repositories/properties";
 
 // Server actions per la dashboard host (M2a.4 slice 5 sezione E).
@@ -20,8 +21,27 @@ import { createProperty } from "@/lib/repositories/properties";
 // dell'API Fastify (apps/api/src/api/bookings.ts). Schema duplicato
 // rispetto al server: vedi docs/KNOWN-LIMITS.md sezione 20 per il debito
 // tecnico (refactor proposto: estrarre in packages/shared).
+//
+// Slice 6 fase 6.5: pre-check ownership via findOwnership prima di
+// inoltrare all'API. Difesa applicativa contro modifica booking
+// altrui. Fix architetturale (JWT validation Fastify) in slice 6.5
+// dedicato.
 
 const idSchema = z.string().uuid();
+
+// Errore generico volutamente identico per "booking non esiste" e
+// "booking di altro host": evita di rivelare l'esistenza di booking
+// altrui via 404 vs 403 differenziati.
+const NOT_FOUND_MESSAGE = "Booking non trovata";
+
+async function assertOwnership(bookingId: string): Promise<void> {
+  const currentHostId = await getCurrentHostId();
+  const { db } = await getDb();
+  const ownership = await findOwnership({ db, bookingId });
+  if (!ownership || ownership.hostId !== currentHostId) {
+    throw new Error(NOT_FOUND_MESSAGE);
+  }
+}
 
 const completePayloadSchema = z.object({
   guestFullName: z.string().trim().min(2),
@@ -40,12 +60,14 @@ export async function completeBookingAction(formData: FormData): Promise<void> {
     numGuests: rawNum === null || rawNum === "" ? undefined : rawNum,
   });
 
+  await assertOwnership(bookingId);
   await completeBookingManual(bookingId, payload);
   revalidatePath("/dashboard");
 }
 
 export async function skipBookingAction(bookingId: string): Promise<void> {
   const id = idSchema.parse(bookingId);
+  await assertOwnership(id);
   await skipBookingCompletion(id);
   revalidatePath("/dashboard");
 }
