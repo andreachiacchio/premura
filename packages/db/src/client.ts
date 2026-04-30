@@ -10,10 +10,10 @@
 //                             aprire connessioni Postgres direttamente).
 //
 // Configurazione via env vars (niente chiavi hardcoded):
-//   DATABASE_URL              connection string Postgres (server only)
-//   SUPABASE_URL              endpoint REST Supabase
-//   SUPABASE_SECRET_KEY       service role, solo server
-//   SUPABASE_PUBLISHABLE_KEY  anon, esponibile al browser
+//   DATABASE_URL                connection string Postgres (server only)
+//   SUPABASE_URL                endpoint REST Supabase
+//   SUPABASE_SERVICE_ROLE_KEY   service role, solo server (bypass RLS)
+//   SUPABASE_PUBLISHABLE_KEY    anon, esponibile al browser
 
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
@@ -34,7 +34,7 @@ export type Database = ReturnType<typeof drizzle<typeof schema>>;
 export type ServerClient = {
   db: Database;
   // Client Supabase con service role key. Usato per auth admin, storage,
-  // realtime. Null se SUPABASE_URL o SUPABASE_SECRET_KEY non sono
+  // realtime. Null se SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY non sono
   // configurate (utile in ambienti locali senza Supabase, es. CI test).
   admin: SupabaseClient | null;
   // Chiude la pool Postgres sottostante. Chiamare su shutdown del server.
@@ -45,7 +45,7 @@ export type ServerClient = {
 export type ServerClientConfig = {
   connectionString?: string;
   supabaseUrl?: string;
-  supabaseSecretKey?: string;
+  supabaseServiceRoleKey?: string;
   // Override opzioni postgres (es. max connessioni pool, prepared statements).
   postgresOptions?: Parameters<typeof postgres>[1];
 };
@@ -87,10 +87,11 @@ export function createServerClient(config: ServerClientConfig = {}): ServerClien
   const db = drizzle(queryClient, { schema });
 
   const supabaseUrl = config.supabaseUrl ?? process.env.SUPABASE_URL;
-  const secretKey = config.supabaseSecretKey ?? process.env.SUPABASE_SECRET_KEY;
+  const serviceRoleKey =
+    config.supabaseServiceRoleKey ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
   const admin =
-    supabaseUrl && secretKey
-      ? createSupabaseClient(supabaseUrl, secretKey, {
+    supabaseUrl && serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
           auth: { persistSession: false, autoRefreshToken: false },
         })
       : null;

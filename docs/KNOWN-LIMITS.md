@@ -325,7 +325,7 @@ correttamente con accesso a:
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (OAuth Gmail completa con
   successo)
 - `CLAUDE_MODEL_EMAIL_PARSER` (default model selection funziona)
-- `SUPABASE_URL` / `SUPABASE_SECRET_KEY` (anche se `DATABASE_URL` è la
+- `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` (anche se `DATABASE_URL` è la
   connessione primary)
 
 Ipotesi non verificate:
