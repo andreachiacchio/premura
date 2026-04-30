@@ -1,6 +1,7 @@
-import { and, eq } from 'drizzle-orm';
-import { bookings, type Database } from '@premura/db';
+import { and, desc, eq, ne } from 'drizzle-orm';
+import { bookings, properties, type Database } from '@premura/db';
 import type { ParsedAirbnbEmail } from '../airbnb-email-parser';
+import type { BookingForDashboard, DataSource } from '../types';
 
 // Repository bookings: upsert da email Airbnb (M2a.3 Fase 2).
 //
@@ -168,6 +169,66 @@ export async function cancelBooking(args: {
     .set({ status: 'cancelled', updatedAt: new Date() })
     .where(eq(bookings.id, row.id));
   return { bookingId: row.id, alreadyCancelled: false };
+}
+
+// Lettura per la dashboard host (M2a.4 slice 5).
+// Join su properties per recuperare il nome struttura (mostrato nella riga
+// prenotazione). Filtro per host via properties.host_id; il propertyId
+// opzionale serve quando in futuro mostreremo viste per singola struttura.
+//
+// Esclude le cancellate (status='cancelled'): lo slice 5 e' data hygiene
+// sulle prenotazioni vive, le cancellate sono rumore. Schema bookings non
+// espone cancelled_at, quindi filtriamo via status enum.
+// Niente filtro soft-delete: schema bookings/properties non espone
+// deleted_at.
+//
+// Order by check-in desc: prossime prima, archivio dopo.
+export async function findByHostId(args: {
+  db: Database;
+  hostId: string;
+  propertyId?: string;
+}): Promise<BookingForDashboard[]> {
+  const { db, hostId, propertyId } = args;
+
+  const filter = and(
+    eq(properties.hostId, hostId),
+    ne(bookings.status, 'cancelled'),
+    propertyId ? eq(bookings.propertyId, propertyId) : undefined,
+  );
+
+  const rows = await db
+    .select({
+      id: bookings.id,
+      propertyId: bookings.propertyId,
+      propertyName: properties.name,
+      dataSource: bookings.dataSource,
+      hostSkippedCompletion: bookings.hostSkippedCompletion,
+      guestFullName: bookings.guestFullName,
+      guestFirstName: bookings.guestFirstName,
+      guestPhone: bookings.guestPhone,
+      guestLanguage: bookings.guestLanguage,
+      guestCountryCode: bookings.guestCountryCode,
+      numGuests: bookings.numGuests,
+      checkinAt: bookings.checkinAt,
+      checkoutAt: bookings.checkoutAt,
+    })
+    .from(bookings)
+    .innerJoin(properties, eq(properties.id, bookings.propertyId))
+    .where(filter)
+    .orderBy(desc(bookings.checkinAt));
+
+  // Cast del data_source: la sorgente di verita' applicativa per la lista
+  // valori e' DATA_SOURCES in packages/shared/src/booking-data-richness.ts,
+  // ma il DB lo tiene varchar libero per non bloccare evoluzioni dietro
+  // migration (vedi schema bookings riga 99 sgg.). Quindi il tipo che
+  // arriva da drizzle e' string e qui forziamo la narrowing.
+  // Valori non riconosciuti restano string a runtime e degradano sul badge
+  // 'neutral' lato UI senza crash; un type guard runtime non e' necessario
+  // perche' la dashboard tollera il fallback.
+  return rows.map((r) => ({
+    ...r,
+    dataSource: r.dataSource as DataSource,
+  }));
 }
 
 function parseIsoDate(yyyymmdd: string): Date {
