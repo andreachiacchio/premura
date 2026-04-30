@@ -7,6 +7,7 @@ import { IncompleteAlert } from "./_components/IncompleteAlert";
 import { BookingsList } from "./_components/BookingsList";
 import { EmptyState } from "./_components/EmptyState";
 import { completeBookingAction, skipBookingAction } from "./actions";
+import { notFound } from "next/navigation";
 
 // Server component: render server-side, fetch via repository drizzle
 // diretto (vedi commit precedente per la decisione architetturale).
@@ -16,6 +17,17 @@ import { completeBookingAction, skipBookingAction } from "./actions";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  // Public-facing 404 in production senza opt-in esplicito. Slice 5 non
+  // ha auth vera (vedi lib/auth.ts e KNOWN-LIMITS sezione 20): chiunque
+  // hit /dashboard vedrebbe le prenotazioni di La Goccia. Per smoke test
+  // su staging Vercel accendo ALLOW_DEV_HOST=1 a mano.
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.ALLOW_DEV_HOST !== "1"
+  ) {
+    notFound();
+  }
+
   const hostId = getCurrentHostId();
   const { db } = await getDb();
   const bookings = await findByHostId({ db, hostId });
