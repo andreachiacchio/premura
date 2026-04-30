@@ -437,3 +437,13 @@ _v2.2: aggiunto §8 sync Gmail sincrono / no auto-rotate (M2a.3 Fase 2)_
 
 **Mitigazione:** in produzione vera con traffico continuo non sara un problema (le macchine restano sveglie). In alternativa, passare a piano paid Fly per disabilitare auto-stop.
 
+---
+
+## §19 — Preflight slice 5: debiti tecnici UI
+
+**Status:** debiti aperti durante il preflight di M2a.4 slice 5 (dashboard host UI), 30 aprile 2026.
+
+- **`tw-animate-css` da installare per le animazioni del Dialog.** Le classi `data-[state=open]:animate-in fade-in-0 zoom-in-95` usate in `apps/web/components/ui/dialog.tsx` sono no-op senza un plugin compatibile Tailwind v4 (l'originale `tailwindcss-animate` e` rimasto a v3). Aggiungerlo quando si rifinisce la UX del dialog di completamento prenotazione.
+- **Bump `vitest` 2 -> 3 in slice futuro.** Attualmente bloccato a `^2.1.8` con `vite@5.4.21`; per questo motivo `@vitejs/plugin-react` e` stato downgradato da `^6` a `^4.7.0` (peer compat). L'upgrade a vitest 3 sblocca vite 6/7 e plugin-react 5/6.
+- **`lucide-react` pinnato esatto a `1.14.0`.** Il major v1 e` uscito il 29 aprile 2026, troppo fresco per affidarsi al bump automatico via caret. Da rilassare a `^1.x` dopo qualche settimana di soak.
+
