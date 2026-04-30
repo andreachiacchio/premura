@@ -32,7 +32,7 @@ export default async function DashboardPage() {
     notFound();
   }
 
-  const hostId = getCurrentHostId();
+  const hostId = await getCurrentHostId();
   const { db } = await getDb();
   const bookings = await findByHostId({ db, hostId });
 
