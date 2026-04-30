@@ -6,6 +6,9 @@ import {
   completeBookingManual,
   skipBookingCompletion,
 } from "@/lib/api";
+import { getCurrentHostId } from "@/lib/auth";
+import { getDb } from "@/lib/db";
+import { createProperty } from "@/lib/repositories/properties";
 
 // Server actions per la dashboard host (M2a.4 slice 5 sezione E).
 //
@@ -44,5 +47,47 @@ export async function completeBookingAction(formData: FormData): Promise<void> {
 export async function skipBookingAction(bookingId: string): Promise<void> {
   const id = idSchema.parse(bookingId);
   await skipBookingCompletion(id);
+  revalidatePath("/dashboard");
+}
+
+// Slice 6 fase 6: creazione prima property dall'EmptyOnboardingState.
+// host_id deriva dalla sessione Supabase (getCurrentHostId), niente
+// trust del client. Schema zod allineato a quello di AddPropertyDialog,
+// stesso debito di duplicazione gia' tracciato in KNOWN-LIMITS sezione 20
+// (refactor proposto: schema condiviso in packages/shared).
+const createPropertyPayloadSchema = z.object({
+  name: z.string().trim().min(2).max(255),
+  city: z.string().trim().min(2).max(128),
+  icalBookingUrl: z
+    .string()
+    .trim()
+    .refine(
+      (v) => v === "" || z.string().url().safeParse(v).success,
+      { message: "URL non valido" },
+    )
+    .optional(),
+});
+
+export async function createPropertyAction(formData: FormData): Promise<void> {
+  const hostId = await getCurrentHostId();
+  const rawIcal = formData.get("icalBookingUrl");
+  const payload = createPropertyPayloadSchema.parse({
+    name: formData.get("name"),
+    city: formData.get("city"),
+    icalBookingUrl: rawIcal === null ? undefined : rawIcal,
+  });
+
+  const { db } = await getDb();
+  await createProperty({
+    db,
+    hostId,
+    name: payload.name,
+    city: payload.city,
+    icalBookingUrl:
+      payload.icalBookingUrl && payload.icalBookingUrl.length > 0
+        ? payload.icalBookingUrl
+        : undefined,
+  });
+
   revalidatePath("/dashboard");
 }

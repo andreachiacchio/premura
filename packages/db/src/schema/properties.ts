@@ -23,7 +23,10 @@ export const properties = pgTable(
       .references(() => hosts.id, { onDelete: 'cascade' }),
 
     name: varchar('name', { length: 255 }).notNull(),
-    addressLine: text('address_line').notNull(),
+    // Nullable: onboarding incrementale dell'host. Vedi migration
+    // 0008 e KNOWN-LIMITS sezione 22 per il rationale (stringa vuota
+    // in NOT NULL e' anti-pattern, complica query analitiche).
+    addressLine: text('address_line'),
     city: varchar('city', { length: 128 }).notNull(),
     postalCode: varchar('postal_code', { length: 16 }),
     countryCode: varchar('country_code', { length: 2 }).notNull().default('IT'),

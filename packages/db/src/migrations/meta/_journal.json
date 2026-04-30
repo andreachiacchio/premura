@@ -57,6 +57,13 @@
       "when": 1777547675680,
       "tag": "0007_enable_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777554483754,
+      "tag": "0008_property_address_optional",
+      "breakpoints": true
     }
   ]
 }

@@ -477,3 +477,11 @@ Trade-off: tutte le scritture worker bypassano RLS. Se in futuro vogliamo che il
 
 **TODO:** test runtime CI che query `pg_class` per verificare `rowsecurity=true` su ogni tabella per-host elencata, e che confronti la lista di policy attese (4 per tabella per-host standard) contro quelle effettive in `pg_policies`. Difensa minima contro il "dimenticare RLS su tabella nuova". Slice futuro.
 
+---
+
+## §22 - Slice 6 fase 6: trigger iCal su nuova property
+
+**Status:** debito aperto durante M2a.4 slice 6 fase 6 (form prima property), 30 aprile 2026.
+
+Trigger iCal polling su nuova property: manuale, host aspetta il prossimo cron 15 min per importare le bookings. Auto-trigger via chiamata diretta a `apps/api` scheduler in slice futuro (`apps/web` -> `apps/api` worker queue, probabilmente HTTP POST a `/api/jobs/poll-property` o enqueue diretto BullMQ tramite Redis condiviso). Fino ad allora il flusso e': host aggiunge property con iCal URL -> aspetta fino a 15 minuti -> dashboard mostra le prenotazioni. Documentato in UI dialog (`Lo trovi su Booking nelle impostazioni della struttura, sezione Calendari sincronizzati`). UX accettabile per il pilot, da rifinire prima dell'apertura host esterni.
+
