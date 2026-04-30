@@ -458,3 +458,22 @@ _v2.2: aggiunto §8 sync Gmail sincrono / no auto-rotate (M2a.3 Fase 2)_
 - **Drizzle bypass-RLS in `apps/web/lib/db.ts`.** Il singleton `getDb()` apre una pool postgres su `DATABASE_URL` e bypassa RLS. In slice 6 affianchera un secondo helper `getSupabaseServerClient()` cookies-aware che onora la sessione utente. Decisione architetturale aperta: tenere entrambi (drizzle per query server-side bypass-RLS deliberato, Supabase per query RLS-aware) o migrare tutto a Supabase.
 - **Filtro temporale -2gg in `findByHostId`.** Scelta semplice per slice 5, non c'e' ancora una vista 'archivio' per consultare prenotazioni passate. La query esclude tutto cio' che ha `checkin_at < (now - 2 giorni)`. Se l'host ne ha bisogno, slice futuro aggiunge un toggle 'Mostra archivio' sulla dashboard o una rotta `/dashboard/archivio` dedicata.
 
+---
+
+## §21 - RLS attivo + getDb bypass by design
+
+**Status:** introdotto in M2a.4 slice 6 fase 2 (migration `0007_enable_rls.sql`). Tutte le tabelle per-host del workspace hanno RLS abilitato e policy `TO authenticated USING (... = auth.uid())`.
+
+RLS attivo su tutte le tabelle per-host. `getDb()` in `apps/web/lib/db.ts` continua a usare `DATABASE_URL` (ruolo `postgres`, bypass RLS by design) per coerenza con worker iCal, parser Airbnb, Gmail sync orchestrator. Le letture user-scoped della dashboard passano comunque per `findByHostId()` che filtra esplicitamente per `host_id` derivato dalla sessione, quindi RLS non sarebbe strettamente necessario per la dashboard - ma e' la difesa di seconda linea per qualsiasi query futura che dimenticasse il filtro applicativo, e per accessi diretti via client Supabase RLS-aware in slice futuri.
+
+Trade-off: tutte le scritture worker bypassano RLS. Se in futuro vogliamo che il worker iCal NON possa scrivere bookings su properties di host che non hanno autorizzato il polling, serve un meccanismo diverso (audit table, application-level check, JWT di servizio scoped). Per ora il worker si fida del payload del job.
+
+**Trade-off SQL puro vs `pgPolicy`:** drizzle-orm 0.36+ supporta `pgPolicy()` e `enableRLS()` direttamente nello schema TS, con drizzle-kit che genera SQL coerente e snapshot completo. La fase 2 ha scelto SQL puro: le policy 2-livelli con subquery (Pattern C) diventano `sql` template literal poco leggibili dentro pgPolicy(); RLS evolve raramente (1-2 modifiche per slice maggiore); il rischio di dimenticare RLS su una tabella nuova si mitiga con un test CI futuro (vedi TODO sotto). pgPolicy in drizzle 0.38 e' relativamente recente, e i pattern Supabase RLS non sono ancora standardizzati nella community drizzle. Refactor a pgPolicy possibile in slice futuro se l'overhead manuale supera la chiarezza.
+
+**Drift drizzle-kit:** lo schema TS in `packages/db/src/schema/*.ts` non modella le policy. Conseguenze pratiche del flusso `generate` + `migrate`:
+- *Aggiungere una nuova tabella per-host*: drizzle-kit genera solo `CREATE TABLE`, niente RLS/policy. Vanno aggiunte a mano nella migration o in una migration successiva. Rischio di dimenticarlo.
+- *Modificare una policy esistente*: drizzle-kit non aiuta. Migration manuale `DROP POLICY ... CREATE POLICY ...` (ALTER POLICY non permette di cambiare USING/WITH CHECK).
+- Il flusso `pull` (introspect) rileggerebbe il DB e popolerebbe i file TS con `pgPolicy(...)`, retro-allineando lo schema. Non lo facciamo abitualmente, ma e' la via d'uscita se vogliamo migrare a pgPolicy in futuro.
+
+**TODO:** test runtime CI che query `pg_class` per verificare `rowsecurity=true` su ogni tabella per-host elencata, e che confronti la lista di policy attese (4 per tabella per-host standard) contro quelle effettive in `pg_policies`. Difensa minima contro il "dimenticare RLS su tabella nuova". Slice futuro.
+
