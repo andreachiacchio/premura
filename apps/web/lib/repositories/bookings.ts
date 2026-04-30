@@ -1,4 +1,4 @@
-import { and, desc, eq, ne } from 'drizzle-orm';
+import { and, desc, eq, gte, ne } from 'drizzle-orm';
 import { bookings, properties, type Database } from '@premura/db';
 import type { ParsedAirbnbEmail } from '../airbnb-email-parser';
 import type { BookingForDashboard, DataSource } from '../types';
@@ -182,6 +182,11 @@ export async function cancelBooking(args: {
 // Niente filtro soft-delete: schema bookings/properties non espone
 // deleted_at.
 //
+// Filtro temporale: solo prenotazioni con check-in da oggi - 2gg in
+// avanti. Le passate sono archivio, fuori dal flusso operativo della
+// dashboard. Soglia di 2 giorni copre ospiti ancora in casa con
+// check-in di ieri o l'altro ieri.
+//
 // Order by check-in desc: prossime prima, archivio dopo.
 export async function findByHostId(args: {
   db: Database;
@@ -190,9 +195,12 @@ export async function findByHostId(args: {
 }): Promise<BookingForDashboard[]> {
   const { db, hostId, propertyId } = args;
 
+  const cutoff = computeOperativeCutoff();
+
   const filter = and(
     eq(properties.hostId, hostId),
     ne(bookings.status, 'cancelled'),
+    gte(bookings.checkinAt, cutoff),
     propertyId ? eq(bookings.propertyId, propertyId) : undefined,
   );
 
@@ -239,4 +247,14 @@ function parseIsoDate(yyyymmdd: string): Date {
   return new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d)));
 }
 
-export const _internals = { parseIsoDate };
+// Soglia "prenotazione operativa": (now - 2 giorni) a mezzanotte locale.
+// Il -2 copre ospiti ancora in casa con check-in di ieri o l'altro ieri.
+// Iniettabile via parametro per i test (default new Date()).
+function computeOperativeCutoff(now: Date = new Date()): Date {
+  const c = new Date(now);
+  c.setDate(c.getDate() - 2);
+  c.setHours(0, 0, 0, 0);
+  return c;
+}
+
+export const _internals = { parseIsoDate, computeOperativeCutoff };

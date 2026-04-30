@@ -233,3 +233,40 @@ describe('parseIsoDate', () => {
     expect(() => _internals.parseIsoDate('23/09/2025')).toThrow(/formato/);
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// findByHostId — cutoff temporale -2gg
+// ─────────────────────────────────────────────────────────────
+//
+// Verifica indiretta dell'esclusione dell'archivio: testiamo l'helper
+// computeOperativeCutoff usato dal WHERE in findByHostId. Una volta
+// aperto un Postgres testcontainer (vedi gmail-sync-orchestrator) si
+// potrà testare l'esclusione end-to-end con righe inserite e contate.
+
+describe('findByHostId — computeOperativeCutoff', () => {
+  it('cutoff = now - 2 giorni a mezzanotte locale', () => {
+    const now = new Date(2026, 3, 30, 15, 30, 45, 123); // 30 aprile 2026 15:30:45.123
+    const cutoff = _internals.computeOperativeCutoff(now);
+    expect(cutoff.getFullYear()).toBe(2026);
+    expect(cutoff.getMonth()).toBe(3); // aprile (0-indexed)
+    expect(cutoff.getDate()).toBe(28);
+    expect(cutoff.getHours()).toBe(0);
+    expect(cutoff.getMinutes()).toBe(0);
+    expect(cutoff.getSeconds()).toBe(0);
+    expect(cutoff.getMilliseconds()).toBe(0);
+  });
+
+  it('cutoff attraversa il mese precedente', () => {
+    const now = new Date(2026, 4, 1, 10, 0, 0); // 1 maggio 2026
+    const cutoff = _internals.computeOperativeCutoff(now);
+    expect(cutoff.getMonth()).toBe(3); // aprile
+    expect(cutoff.getDate()).toBe(29);
+  });
+
+  it('non muta il Date passato come argomento', () => {
+    const now = new Date(2026, 3, 30, 15, 30);
+    const before = now.getTime();
+    _internals.computeOperativeCutoff(now);
+    expect(now.getTime()).toBe(before);
+  });
+});

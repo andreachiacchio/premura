@@ -13,6 +13,10 @@ import { notFound } from "next/navigation";
 // diretto (vedi commit precedente per la decisione architetturale).
 // Niente cache di Next: ogni pageload riflette lo stato reale del DB,
 // importante per i flussi mutate-and-revalidate del dialog.
+//
+// La lista mostra solo prenotazioni operative (check-in da oggi - 2gg
+// in avanti, filtro temporale in findByHostId). Le passate sono
+// archivio: non c'e' ancora una vista dedicata in slice 5.
 
 export const dynamic = "force-dynamic";
 
