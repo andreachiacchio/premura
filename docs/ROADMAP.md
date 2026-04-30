@@ -170,7 +170,7 @@ email Airbnb degli ultimi 90 giorni e popola `bookings` + `guest_profiles`.
   - [ ] Fase 5: middleware protezione `/dashboard/*`
   - [ ] Fase 6: empty onboarding state + form prima property
   - [ ] Fase 6.5: pre-check ownership in server actions (mitigazione buco mutazioni)
-  - [ ] Fase 7: rimozione `DEV_HOST_ID`, `ALLOW_DEV_HOST`, guard 404
+  - [x] Fase 7: rimozione `DEV_HOST_ID`, `ALLOW_DEV_HOST`, guard 404 (refactor `connect-gmail` + `/api/gmail/sync` a `getCurrentHostId()`/sessione Supabase, middleware esteso a `/connect-gmail`)
   - [ ] Fase 8: test componenti + middleware
   - [ ] Fase 9: KNOWN-LIMITS finale + body PR #22
   - JWT validation lato Fastify rimandata a slice 6.5 dedicato

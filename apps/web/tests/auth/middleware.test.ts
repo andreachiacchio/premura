@@ -84,4 +84,15 @@ describe("middleware", () => {
     const res = await middleware(makeRequest("https://premura.it/"));
     expect(res.headers.get("location")).toBeNull();
   });
+
+  it("user null + path /connect-gmail -> redirect /login con redirectTo", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null } });
+    const res = await middleware(
+      makeRequest("https://premura.it/connect-gmail"),
+    );
+    expect(res.status).toBe(307);
+    const location = res.headers.get("location");
+    expect(location).toContain("/login");
+    expect(location).toContain("redirectTo=%2Fconnect-gmail");
+  });
 });

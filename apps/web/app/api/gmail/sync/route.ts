@@ -4,6 +4,7 @@ import { createServerClient, googleTokens, type ServerClient } from '@premura/db
 import { getTokenByHostAndEmail } from '@/lib/repositories/google-tokens';
 import { createJob } from '@/lib/repositories/gmail-sync-jobs';
 import { syncGmailForHost } from '@/lib/gmail-sync-orchestrator';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 
 // POST /api/gmail/sync
 //
@@ -18,7 +19,7 @@ import { syncGmailForHost } from '@/lib/gmail-sync-orchestrator';
 // `next dev` (no timeout). M3 migrerà a worker dedicato.
 // Documentato in docs/KNOWN-LIMITS.md §8.
 //
-// Body: vuoto. L'host viene letto da DEV_HOST_ID env (no auth ancora).
+// Body: vuoto. hostId derivato dalla sessione Supabase (slice 6 fase 7).
 // L'email Gmail target è la prima riga google_tokens per quell'host
 // (un host = un Gmail per ora).
 
@@ -35,13 +36,17 @@ function getClient(): Promise<ServerClient> {
 }
 
 export async function POST(): Promise<NextResponse> {
-  const hostId = process.env.DEV_HOST_ID;
-  if (!hostId) {
-    return NextResponse.json(
-      { error: 'DEV_HOST_ID non configurato (M2a.2 introdurrà auth reale)' },
-      { status: 500 },
-    );
+  // Slice 6 fase 7: hostId dalla sessione Supabase. Il middleware non
+  // intercetta /api/* (lascia passare le route handler che decidono
+  // l'auth interna), quindi qui facciamo il check authoritativo.
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Non autenticato' }, { status: 401 });
   }
+  const hostId = user.id;
 
   const serverClient = await getClient();
   const { db } = serverClient;

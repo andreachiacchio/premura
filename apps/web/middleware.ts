@@ -16,7 +16,13 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   } = await supabase.auth.getUser();
 
   const { pathname, search } = request.nextUrl;
-  if (pathname.startsWith("/dashboard") && !user) {
+  // Rotte protette: dashboard host + flusso connect-gmail (richiede
+  // hostId derivato da sessione, slice 6 fase 7). /api/* resta fuori,
+  // i route handler fanno auth interna e ritornano 401 (vedi
+  // /api/gmail/sync/route.ts).
+  const isProtected =
+    pathname.startsWith("/dashboard") || pathname.startsWith("/connect-gmail");
+  if (isProtected && !user) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.search = "";

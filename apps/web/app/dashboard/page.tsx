@@ -13,7 +13,6 @@ import {
   createPropertyAction,
   skipBookingAction,
 } from "./actions";
-import { notFound } from "next/navigation";
 
 // Server component: render server-side, fetch via repository drizzle
 // diretto (vedi commit precedente per la decisione architetturale).
@@ -23,21 +22,14 @@ import { notFound } from "next/navigation";
 // La lista mostra solo prenotazioni operative (check-in da oggi - 2gg
 // in avanti, filtro temporale in findByHostId). Le passate sono
 // archivio: non c'e' ancora una vista dedicata in slice 5.
+//
+// Protezione: middleware Supabase fase 5 redirect /login se non
+// autenticato. getCurrentHostId() throw difensivo se la sessione
+// risultasse assente nonostante il middleware (race a pulizia cookie).
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  // Public-facing 404 in production senza opt-in esplicito. Slice 5 non
-  // ha auth vera (vedi lib/auth.ts e KNOWN-LIMITS sezione 20): chiunque
-  // hit /dashboard vedrebbe le prenotazioni di La Goccia. Per smoke test
-  // su staging Vercel accendo ALLOW_DEV_HOST=1 a mano.
-  if (
-    process.env.NODE_ENV === "production" &&
-    process.env.ALLOW_DEV_HOST !== "1"
-  ) {
-    notFound();
-  }
-
   const hostId = await getCurrentHostId();
   const { db } = await getDb();
 
