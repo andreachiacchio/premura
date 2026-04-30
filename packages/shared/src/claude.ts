@@ -1,8 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+// Lazy init dell'SDK: evita il side-effect top-level `new Anthropic({...})`
+// che in env browser-like (jsdom dei test client) blocca il runner SDK
+// per evitare leak credenziali. La factory e' idempotente, l'istanza
+// viene creata alla prima chiamata e cachata per i successivi call site.
+let _client: Anthropic | null = null;
+
+export function getAnthropic(): Anthropic {
+  if (!_client) {
+    _client = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
+  }
+  return _client;
+}
 
 export type ClaudeModel = 'opus' | 'fast';
 
@@ -42,7 +53,7 @@ export async function runClaude(options: RunOptions): Promise<RunResult> {
   const { system, messages, model = 'opus', maxTokens = 2048, tools, temperature } = options;
   const modelId = MODEL_MAP[model];
 
-  const response = await client.messages.create({
+  const response = await getAnthropic().messages.create({
     model: modelId,
     max_tokens: maxTokens,
     system,
