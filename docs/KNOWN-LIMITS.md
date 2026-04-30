@@ -447,3 +447,13 @@ _v2.2: aggiunto §8 sync Gmail sincrono / no auto-rotate (M2a.3 Fase 2)_
 - **Bump `vitest` 2 -> 3 in slice futuro.** Attualmente bloccato a `^2.1.8` con `vite@5.4.21`; per questo motivo `@vitejs/plugin-react` e` stato downgradato da `^6` a `^4.7.0` (peer compat). L'upgrade a vitest 3 sblocca vite 6/7 e plugin-react 5/6.
 - **`lucide-react` pinnato esatto a `1.14.0`.** Il major v1 e` uscito il 29 aprile 2026, troppo fresco per affidarsi al bump automatico via caret. Da rilassare a `^1.x` dopo qualche settimana di soak.
 
+---
+
+## §20 - Slice 5 dashboard UI: debiti tecnici
+
+**Status:** debiti aperti durante l'implementazione di M2a.4 slice 5 sezioni C+D, 30 aprile 2026.
+
+- **Dialog state locale per riga in BookingRow.** Ogni riga monta una propria istanza di CompleteBookingDialog con useState locale. Per pilot La Goccia (max 23 incomplete) trascurabile - i Radix Portal sono data-state=closed e i figli non rendono. Da rifattorizzare a stato lifted in BookingsList (client component) quando un host raggiungera ~100 incomplete simultanee.
+- **Zod schema duplicato tra apps/web e apps/api.** CompleteBookingDialog ridefinisce le regole di validazione gia presenti in `apps/api/src/api/bookings.ts:31`, con tre divergenze UX intenzionali (nome `min(2)` lato client, `guestLanguage` required, `numGuests max(20)`). Il server resta autoritativo. Quando il server aggiunge un campo, il client non se ne accorge in compile-time. Refactor proposto: estrarre lo schema base in `packages/shared/booking-validation.ts` e arricchirlo con messaggi localizzati nei due consumer.
+- **Drizzle bypass-RLS in `apps/web/lib/db.ts`.** Il singleton `getDb()` apre una pool postgres su `DATABASE_URL` e bypassa RLS. In slice 6 affianchera un secondo helper `getSupabaseServerClient()` cookies-aware che onora la sessione utente. Decisione architetturale aperta: tenere entrambi (drizzle per query server-side bypass-RLS deliberato, Supabase per query RLS-aware) o migrare tutto a Supabase.
+
