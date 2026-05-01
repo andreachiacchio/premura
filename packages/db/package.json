@@ -5,6 +5,9 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "scripts": {
+    "seed:goccia": "tsx src/scripts/seed-goccia-user.ts"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.48.0",
     "drizzle-orm": "^0.38.0",

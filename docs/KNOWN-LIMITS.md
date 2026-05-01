@@ -325,7 +325,7 @@ correttamente con accesso a:
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (OAuth Gmail completa con
   successo)
 - `CLAUDE_MODEL_EMAIL_PARSER` (default model selection funziona)
-- `SUPABASE_URL` / `SUPABASE_SECRET_KEY` (anche se `DATABASE_URL` è la
+- `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` (anche se `DATABASE_URL` è la
   connessione primary)
 
 Ipotesi non verificate:
@@ -456,5 +456,40 @@ _v2.2: aggiunto §8 sync Gmail sincrono / no auto-rotate (M2a.3 Fase 2)_
 - **Dialog state locale per riga in BookingRow.** Ogni riga monta una propria istanza di CompleteBookingDialog con useState locale. Per pilot La Goccia (max 23 incomplete) trascurabile - i Radix Portal sono data-state=closed e i figli non rendono. Da rifattorizzare a stato lifted in BookingsList (client component) quando un host raggiungera ~100 incomplete simultanee.
 - **Zod schema duplicato tra apps/web e apps/api.** CompleteBookingDialog ridefinisce le regole di validazione gia presenti in `apps/api/src/api/bookings.ts:31`, con tre divergenze UX intenzionali (nome `min(2)` lato client, `guestLanguage` required, `numGuests max(20)`). Il server resta autoritativo. Quando il server aggiunge un campo, il client non se ne accorge in compile-time. Refactor proposto: estrarre lo schema base in `packages/shared/booking-validation.ts` e arricchirlo con messaggi localizzati nei due consumer.
 - **Drizzle bypass-RLS in `apps/web/lib/db.ts`.** Il singleton `getDb()` apre una pool postgres su `DATABASE_URL` e bypassa RLS. In slice 6 affianchera un secondo helper `getSupabaseServerClient()` cookies-aware che onora la sessione utente. Decisione architetturale aperta: tenere entrambi (drizzle per query server-side bypass-RLS deliberato, Supabase per query RLS-aware) o migrare tutto a Supabase.
+- **Buco mutazioni server-action -> API Fastify (chiuso applicativo, fix architetturale completo in slice 6.5 dedicato).** Le server actions `completeBookingAction` e `skipBookingAction` inoltrano `bookingId` via HTTP all'API Fastify (`apps/api/src/api/bookings.ts`) che attualmente non valida l'ownership. Slice 6 fase 6.5 ha aggiunto un pre-check ownership via Drizzle (`findOwnership` in `apps/web/lib/repositories/bookings.ts`) prima della chiamata HTTP: chiude il buco a livello apps/web. Un attacker che vuole modificare booking altrui dovrebbe bypassare anche il pre-check (es. chiamando direttamente apps/api Fastify endpoint senza passare da server action). Slice 6.5 dedicato chiudera anche quel vettore con JWT validation lato Fastify, derivando l'host dal cookie Supabase invece di fidarsi del payload del client.
 - **Filtro temporale -2gg in `findByHostId`.** Scelta semplice per slice 5, non c'e' ancora una vista 'archivio' per consultare prenotazioni passate. La query esclude tutto cio' che ha `checkin_at < (now - 2 giorni)`. Se l'host ne ha bisogno, slice futuro aggiunge un toggle 'Mostra archivio' sulla dashboard o una rotta `/dashboard/archivio` dedicata.
+
+---
+
+## §21 - RLS attivo + getDb bypass by design
+
+**Status:** introdotto in M2a.4 slice 6 fase 2 (migration `0007_enable_rls.sql`). Tutte le tabelle per-host del workspace hanno RLS abilitato e policy `TO authenticated USING (... = auth.uid())`.
+
+RLS attivo su tutte le tabelle per-host. `getDb()` in `apps/web/lib/db.ts` continua a usare `DATABASE_URL` (ruolo `postgres`, bypass RLS by design) per coerenza con worker iCal, parser Airbnb, Gmail sync orchestrator. Le letture user-scoped della dashboard passano comunque per `findByHostId()` che filtra esplicitamente per `host_id` derivato dalla sessione, quindi RLS non sarebbe strettamente necessario per la dashboard - ma e' la difesa di seconda linea per qualsiasi query futura che dimenticasse il filtro applicativo, e per accessi diretti via client Supabase RLS-aware in slice futuri.
+
+Trade-off: tutte le scritture worker bypassano RLS. Se in futuro vogliamo che il worker iCal NON possa scrivere bookings su properties di host che non hanno autorizzato il polling, serve un meccanismo diverso (audit table, application-level check, JWT di servizio scoped). Per ora il worker si fida del payload del job.
+
+**Trade-off SQL puro vs `pgPolicy`:** drizzle-orm 0.36+ supporta `pgPolicy()` e `enableRLS()` direttamente nello schema TS, con drizzle-kit che genera SQL coerente e snapshot completo. La fase 2 ha scelto SQL puro: le policy 2-livelli con subquery (Pattern C) diventano `sql` template literal poco leggibili dentro pgPolicy(); RLS evolve raramente (1-2 modifiche per slice maggiore); il rischio di dimenticare RLS su una tabella nuova si mitiga con un test CI futuro (vedi TODO sotto). pgPolicy in drizzle 0.38 e' relativamente recente, e i pattern Supabase RLS non sono ancora standardizzati nella community drizzle. Refactor a pgPolicy possibile in slice futuro se l'overhead manuale supera la chiarezza.
+
+**Drift drizzle-kit:** lo schema TS in `packages/db/src/schema/*.ts` non modella le policy. Conseguenze pratiche del flusso `generate` + `migrate`:
+- *Aggiungere una nuova tabella per-host*: drizzle-kit genera solo `CREATE TABLE`, niente RLS/policy. Vanno aggiunte a mano nella migration o in una migration successiva. Rischio di dimenticarlo.
+- *Modificare una policy esistente*: drizzle-kit non aiuta. Migration manuale `DROP POLICY ... CREATE POLICY ...` (ALTER POLICY non permette di cambiare USING/WITH CHECK).
+- Il flusso `pull` (introspect) rileggerebbe il DB e popolerebbe i file TS con `pgPolicy(...)`, retro-allineando lo schema. Non lo facciamo abitualmente, ma e' la via d'uscita se vogliamo migrare a pgPolicy in futuro.
+
+**TODO:** test runtime CI che query `pg_class` per verificare `rowsecurity=true` su ogni tabella per-host elencata, e che confronti la lista di policy attese (4 per tabella per-host standard) contro quelle effettive in `pg_policies`. Difensa minima contro il "dimenticare RLS su tabella nuova". Slice futuro.
+
+---
+
+## §22 - Slice 6 auth Supabase: debiti tecnici
+
+**Status:** debiti aperti durante M2a.4 slice 6 (auth Supabase magic link + RLS multi-tenancy), 30 aprile 2026. Branch `claude/auth-supabase-rls`, PR #22.
+
+- **Slice 6.5 dedicato (NON ancora aperto): JWT validation lato Fastify.** Chiude il vettore residuo "chiamata diretta `apps/api/src/api/bookings.ts` senza passare da server action". Attualmente il pre-check ownership in server actions (`assertOwnership` via `findOwnership` Drizzle) chiude il buco a livello applicativo apps/web (vedi §20 voce su buco mutazioni gia chiuso applicativamente). Il fix architetturale completo: `apps/api` legge il cookie Supabase, valida il JWT, deriva `host_id` dal token invece di fidarsi del payload del client.
+- **Trigger iCal automatico su nuova property: manuale.** Oggi l'host aggiunge property con iCal URL e aspetta il prossimo cron 15 min per vedere le bookings. Auto-trigger via `apps/web` -> `apps/api` worker queue (HTTP POST `/api/jobs/poll-property` o enqueue diretto BullMQ tramite Redis condiviso) in slice futuro. UX accettabile per il pilot, da rifinire prima dell'apertura host esterni.
+- **SMTP custom email magic link.** Default Supabase usa `noreply@mail.app.supabase.io`, non brandizzato. Setup Resend (o simile) in slice 6.5 dedicato a email branding. Vincolo Supabase rate limit free tier: ~30 email/h, sufficiente per il pilot.
+- **Google OAuth: rimandato.** Magic link only in slice 6. OAuth Google sara aggiunto in slice futuro quando avremo abbastanza host per giustificare il setup OAuth consent screen.
+- **RLS policies non testate end-to-end.** Test runtime in `packages/db` che verifichi `rowsecurity=true` su ogni tabella per-host gia tracciato in §21. Test integration con Supabase locale o test container in slice futuro dedicato. Mitigazione attuale: review manuale del file SQL `0007_enable_rls.sql` + smoke test su staging.
+- **Drift schema zod tra apps/web e apps/api per createPropertyAction.** `createPropertyPayloadSchema` in `apps/web/app/dashboard/actions.ts` ridefinisce le regole di validazione anche per la creazione property. Refactor a `packages/shared/property-validation.ts` gia proposto per booking in §20, esteso a property in slice futuro. Stesso debito strutturale gia tracciato.
+- **Onboarding form prima property: 3 campi base.** Nome, citta, iCal URL. `addressLine`, `postalCode`, `kitBudgetEur`, `agentNotes` vanno completati in settings page (slice futuro). UX accettabile per pilot, da rifinire prima dell'apertura host esterni.
+- **Dialog state per-riga in BookingRow ancora locale (debito gia in §20).** Non rifattorizzato in slice 6, rimane per quando un host avra ~100 incomplete simultanee. Refactor a stato lifted in `BookingsList` quando il volume lo richiedera.
 

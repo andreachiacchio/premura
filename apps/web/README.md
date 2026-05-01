@@ -60,9 +60,10 @@ GOOGLE_CLIENT_SECRET=<client_secret>
 # Genera con: openssl rand -base64 32
 TOKEN_ENCRYPTION_KEY=<32-byte-base64>
 
-# UUID dell'host di test (Andrea) — leggibile da seed.ts in packages/db
-# Temporaneo finché non c'è auth reale (M2a.2).
-DEV_HOST_ID=<uuid>
+# Da slice 6 in poi: l'host_id deriva dalla sessione Supabase Auth
+# (auth.users.id == host_id diretto). DEV_HOST_ID legacy rimosso.
+# Per testare /connect-gmail in dev locale, fai prima il login magic
+# link su /login.
 ```
 
 ### 2) Apply migration
@@ -93,7 +94,7 @@ Clic su "Ho capito, collega Gmail" → consent screen Google → autorizza →
 redirect automatico a `/connect-gmail/success?email=...&connectedAt=...`.
 
 Verifica la riga in Supabase → `google_tokens` → deve comparire un record con
-`host_id = <DEV_HOST_ID>`, `google_email = <tua-gmail>`, token cifrati (base64),
+`host_id = <auth.users.id della sessione>`, `google_email = <tua-gmail>`, token cifrati (base64),
 `expires_at` ~1h nel futuro.
 
 ### 5) Test unit
@@ -215,5 +216,5 @@ Docker non è attivo.
   (Claude Sonnet 4.6) + UI progress bar + summary
 - **M2a.3 Fase 3** — parser email Booking.com (analogo, prompt diverso)
 - **M2a.3 Fase 4** — auto-refresh access_token + dashboard "email lette"
-- **M2a.2** — Auth reale (Supabase Auth), rimuovere `DEV_HOST_ID`
+- **M2a.4 slice 6** ✅ Auth reale (Supabase Auth magic link), rimosso `DEV_HOST_ID`
 - **M2a.1** — iCal ingestion (su branch separato)

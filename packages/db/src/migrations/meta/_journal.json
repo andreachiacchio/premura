@@ -50,6 +50,20 @@
       "when": 1777455998754,
       "tag": "0006_stormy_mephistopheles",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777547675680,
+      "tag": "0007_enable_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777554483754,
+      "tag": "0008_property_address_optional",
+      "breakpoints": true
     }
   ]
 }

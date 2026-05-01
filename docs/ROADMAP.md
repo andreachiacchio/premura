@@ -16,7 +16,7 @@
   - 24 prenotazioni Booking (`data_source=booking_ical_only`)
   - 1 Booking completata (`data_source=booking_manual_filled`)
   - 1 Booking skippata (`host_skipped_completion=true`)
-- **Backend M2a.4**: completo (slice 1-4). Manca solo UI dashboard host (slice 5) e auth JWT host (slice 6).
+- **Backend M2a.4**: completo (slice 1-4). UI dashboard host completa (slice 5 PR #20+#21). Auth Supabase + RLS in corso (slice 6 fase 3/9, PR #22 draft).
 - **Worker iCal**: scaffolding + upsert reale + cron */15 funzionanti. Idempotenza confermata via re-poll.
 
 ---
@@ -161,15 +161,19 @@ email Airbnb degli ultimi 90 giorni e popola `bookings` + `guest_profiles`.
 - [x] **Slice 3.1 (FATTO 29 apr 2026, PR #16)**: ical-event-mapper + booking-upsert-repository (ON CONFLICT DO NOTHING + skip RICH preserve) + redactIcalUrl, helper `isRichDataSource` spostato in `packages/shared`.
 - [x] **Slice 3.2 (FATTO 29 apr 2026, PR #17)**: Cron croner pattern `*/15 * * * *`, script CLI `manual-poll`, dynamic import per env caricato prima dei moduli BullMQ.
 - [x] **Slice 4 (FATTO 29 apr 2026, PR #18)**: endpoint POST `/api/bookings/:id/complete-manual` + POST `/api/bookings/:id/skip-completion`, workflow guard `isRichDataSource` in `on-new-booking`. 7 nuovi test (108/108 verde). E2E reale verificato su staging Fly.
-- [ ] **Slice 5 (TODO)**: UI dashboard host
-  - [ ] Badge stato dati (verde RICH / giallo INCOMPLETE / grigio SKIPPED)
-  - [ ] Card "Booking incompleto" sulla home
-  - [ ] Modal form 3 campi (nome ospite, telefono, lingua) con validazione zod
-  - [ ] Bottone "Salta" → `POST /api/bookings/:id/skip-completion`
-  - [ ] Dashboard count "N booking da completare"
-- [ ] **Slice 6 (TODO)**: auth host
-  - [ ] JWT host via Supabase Auth
-  - [ ] Verifica ownership property nei route guard (`/api/bookings/:id/*` solo se property apartiene a host autenticato)
+- [x] **Slice 5 (FATTO 30 apr 2026, PR #20 + polish PR #21)**: UI dashboard host live su `premura.it/dashboard` (guard 404 + ALLOW_DEV_HOST=1 fino a slice 6). Token design Premura, shadcn ui custom, RHF + zod, server actions, 18 test componenti. Polish: filtro temporale `checkin >= oggi-2gg`, header "Prossimi ospiti".
+- [ ] **Slice 6 (IN CORSO — fase 3/9, branch `claude/auth-supabase-rls`, PR #22 draft)**: auth Supabase magic link + RLS multi-tenancy
+  - [x] Fase 1: helper auth Supabase server-side (`supabase-server.ts`, rewrite `auth.ts` async)
+  - [x] Fase 2: migration `0007_enable_rls.sql` (21 ENABLE RLS + 79 CREATE POLICY scoped `auth.uid()`)
+  - [x] Fase 3: script `seed-goccia-user.ts` + `MIGRATION-SLICE6.md` deploy procedure
+  - [ ] Fase 4: pagine `/login`, `/auth/callback`, `/auth/signout`
+  - [ ] Fase 5: middleware protezione `/dashboard/*`
+  - [ ] Fase 6: empty onboarding state + form prima property
+  - [ ] Fase 6.5: pre-check ownership in server actions (mitigazione buco mutazioni)
+  - [x] Fase 7: rimozione `DEV_HOST_ID`, `ALLOW_DEV_HOST`, guard 404 (refactor `connect-gmail` + `/api/gmail/sync` a `getCurrentHostId()`/sessione Supabase, middleware esteso a `/connect-gmail`)
+  - [ ] Fase 8: test componenti + middleware
+  - [ ] Fase 9: KNOWN-LIMITS finale + body PR #22
+  - JWT validation lato Fastify rimandata a slice 6.5 dedicato
 
 ### Milestone 2.3 — Dashboard home 3-stati
 - [ ] Home "Sta lavorando per te"

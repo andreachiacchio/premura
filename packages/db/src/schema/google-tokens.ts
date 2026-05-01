@@ -22,9 +22,9 @@ import {
 //     re-consenso degli host.
 //
 // host_id: FK logica a hosts.id, ma qui SENZA foreign key constraint
-// perché la tabella auth reale (M2a.2) non è ancora pronta e durante
-// il dev usiamo un DEV_HOST_ID fisso. In M2a.2 aggiungeremo il FK
-// via migration successiva.
+// per ragioni storiche (la tabella e' nata prima di hosts). Da slice 6
+// l'host_id deriva da auth.users.id (Supabase Auth = host_id diretto).
+// FK constraint formale rimandata a slice futuro.
 //
 // Unicità: (host_id, google_email) — un host può collegare più account
 // Gmail (es. email personale + email dedicata alla property), ma non può

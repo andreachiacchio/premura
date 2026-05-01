@@ -1,8 +1,8 @@
 import { Button } from '@/components/Button';
-import { Card } from '@/components/Card';
 import { Container } from '@/components/Container';
 import { Eyebrow } from '@/components/Eyebrow';
 import { Heading } from '@/components/Heading';
+import { getCurrentHostId } from '@/lib/auth';
 
 export const metadata = {
   title: 'Connetti Gmail — Premura',
@@ -10,19 +10,16 @@ export const metadata = {
     'Autorizza Premura a leggere solo le email da Airbnb e Booking. Trasparenza totale, revoca con un click.',
 };
 
-// Dynamic: DEV_HOST_ID è letto da env a runtime (env privata, non NEXT_PUBLIC_),
-// quindi la pagina non può essere prerenderata a build time altrimenti il
-// valore sarebbe cachato a stringa vuota.
+// Dynamic: legge la sessione Supabase a runtime per costruire startHref
+// con l'hostId corretto.
 export const dynamic = 'force-dynamic';
 
-// Server Component. Legge DEV_HOST_ID lato server — temporaneo finché
-// non c'è auth reale (M2a.2). Non viene esposto al browser.
-const DEV_HOST_ID = process.env.DEV_HOST_ID ?? '';
-
-export default function ConnectGmailPage() {
-  const startHref = DEV_HOST_ID
-    ? `/api/auth/google/start?hostId=${encodeURIComponent(DEV_HOST_ID)}`
-    : '/api/auth/google/start';
+export default async function ConnectGmailPage() {
+  // Slice 6 fase 7: hostId derivato dalla sessione Supabase. Il middleware
+  // protegge la rotta e fa redirect /login se non autenticato; il throw
+  // di getCurrentHostId e' difensivo.
+  const hostId = await getCurrentHostId();
+  const startHref = `/api/auth/google/start?hostId=${encodeURIComponent(hostId)}`;
 
   return (
     <main className="py-16 md:py-24 min-h-dvh">
@@ -91,17 +88,6 @@ export default function ConnectGmailPage() {
               Ho capito, collega Gmail
             </Button>
           </div>
-
-          {!DEV_HOST_ID && process.env.NODE_ENV === 'development' ? (
-            <Card padding="tight" className="mt-8 border-terracotta-soft">
-              <p className="text-body-sm text-terracotta-2">
-                <strong>Setup incompleto</strong>: <code>DEV_HOST_ID</code> non
-                configurato in <code>.env.local</code>. Il bottone primary
-                restituirà 400 finché non imposti l&apos;UUID dell&apos;host di
-                test.
-              </p>
-            </Card>
-          ) : null}
         </div>
       </Container>
     </main>

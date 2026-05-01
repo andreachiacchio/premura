@@ -1,41 +1,32 @@
-// Helper auth disaccoppiato.
-//
-// In slice 5 ritorna un host id hardcoded da env DEV_HOST_ID. La pagina
-// /dashboard e le server actions importano sempre da qui per non doversi
-// ricordare di rifattorizzare i call site quando arrivera Supabase Auth.
-//
-// TODO slice 6: sostituire l'implementazione con supabase.auth.getUser()
-// lato server (cookies da next/headers). La firma resta identica.
-// Vedi docs/m2a4-spec.md sezione 5.
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
-const DEV_HOST_ENV = "DEV_HOST_ID";
-const ALLOW_DEV_ENV = "ALLOW_DEV_HOST";
+// Helper auth: ritorna l'host id dell'utente Supabase corrente.
+//
+// Slice 6: auth.users.id == host_id direttamente (no tabella ponte hosts).
+// La query e' fatta via createSupabaseServerClient che legge la sessione
+// dai cookie (cookie-aware via @supabase/ssr).
+//
+// Throw se non autenticato: il middleware redirect a /login prima che
+// chiunque arrivi qui, ma il throw e' un'ulteriore difesa per evitare
+// di leggere accidentalmente undefined/null come host_id valido.
+//
+// Da chiamare solo lato server. La firma e' Promise<string> perche'
+// supabase.auth.getUser() e' async (verifica il JWT contro Supabase).
 
-/**
- * Ritorna l'host id dell'utente corrente.
- *
- * Implementazione provvisoria slice 5: legge process.env.DEV_HOST_ID.
- * In production lancia errore a meno che ALLOW_DEV_HOST=1 sia esplicitamente
- * impostato (escape hatch per smoke test su staging).
- *
- * Da chiamare solo lato server (server component, server action, route
- * handler). Lanciarla in un client component fallirebbe perche le env non
- * prefissate NEXT_PUBLIC_ non sono leggibili dal browser, ma il throw qui
- * sotto la rende comunque sicura.
- */
-export function getCurrentHostId(): string {
-  const isProd = process.env.NODE_ENV === "production";
-  if (isProd && process.env[ALLOW_DEV_ENV] !== "1") {
+export async function getCurrentHostId(): Promise<string> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+  if (error) {
+    throw new Error(`[auth] supabase.auth.getUser failed: ${error.message}`);
+  }
+  if (!user) {
     throw new Error(
-      "[auth] getCurrentHostId chiamato in production senza ALLOW_DEV_HOST=1. " +
-        "Slice 6 sostituira questo helper con supabase.auth.getUser().",
+      "[auth] nessun utente autenticato. Il middleware dovrebbe aver " +
+        "redirezionato a /login prima di arrivare qui.",
     );
   }
-  const hostId = process.env[DEV_HOST_ENV];
-  if (!hostId) {
-    throw new Error(
-      `[auth] env var ${DEV_HOST_ENV} mancante. Imposta in .env.local con il tuo host_id Supabase.`,
-    );
-  }
-  return hostId;
+  return user.id;
 }
