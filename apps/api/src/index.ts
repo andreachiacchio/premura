@@ -55,7 +55,7 @@ await app.register(bookingsRoutes, { prefix: '/api/bookings', db: apiClient.db }
 // Business esistente Andrea). Il plugin registra un content-type parser
 // custom per esporre rawBody (necessario per HMAC) — l'encapsulation
 // Fastify lo isola dal resto dell'app.
-await app.register(whatsappWebhookRoutes);
+await app.register(whatsappWebhookRoutes, { db: apiClient.db });
 
 // TODO: register dashboard API, cleaner endpoints
 

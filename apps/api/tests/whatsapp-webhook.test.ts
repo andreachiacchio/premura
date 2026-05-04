@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import type { Database } from '@premura/db';
 import Fastify from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { whatsappWebhookRoutes } from '../src/api/webhooks/whatsapp';
@@ -16,9 +17,35 @@ function signBody(body: string, secret = APP_SECRET): string {
   return `sha256=${digest}`;
 }
 
+// DB mock minimale: tutti i test in questo file esercitano il path
+// signature verify + challenge handshake, non la persistenza vera. La
+// persistenza ha test dedicati in whatsapp-persist.test.ts (mock Drizzle
+// piu' ricco). Qui basta che il plugin si registri senza esplodere.
+function makeNoopDb(): Database {
+  const noop = {
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve([]),
+          orderBy: () => ({ limit: () => Promise.resolve([]) }),
+        }),
+      }),
+    }),
+    insert: () => ({
+      values: () => ({
+        returning: () => Promise.resolve([{ id: 'noop-id' }]),
+      }),
+    }),
+    update: () => ({
+      set: () => ({ where: () => Promise.resolve() }),
+    }),
+  };
+  return noop as unknown as Database;
+}
+
 async function buildApp(): Promise<ReturnType<typeof Fastify>> {
   const app = Fastify({ logger: false });
-  await app.register(whatsappWebhookRoutes);
+  await app.register(whatsappWebhookRoutes, { db: makeNoopDb() });
   return app;
 }
 
@@ -110,7 +137,7 @@ describe('POST /webhooks/whatsapp - event delivery con signature verify', () => 
     delete process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
   });
 
-  it('signature valida -> 200 con { received: true }', async () => {
+  it('signature valida + payload senza messages -> 200 con persisted=0', async () => {
     const app = await buildApp();
     const payload = JSON.stringify({
       object: 'whatsapp_business_account',
@@ -126,7 +153,7 @@ describe('POST /webhooks/whatsapp - event delivery con signature verify', () => 
       payload,
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ received: true });
+    expect(res.json()).toEqual({ received: true, persisted: 0 });
   });
 
   it('signature mancante -> 401', async () => {

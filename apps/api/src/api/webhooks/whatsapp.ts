@@ -1,5 +1,8 @@
+import type { Database } from '@premura/db';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { extractInboundMessages, whatsappWebhookPayloadSchema } from './whatsapp-payload';
+import { persistInboundMessage } from './whatsapp-persist';
 import { verifyMetaSignature } from './whatsapp-signature';
 
 // Webhook WhatsApp Cloud API per messaggi inbound (slice 7a.1, opzione I).
@@ -30,7 +33,15 @@ const challengeQuerySchema = z.object({
   'hub.challenge': z.string().optional(),
 });
 
-export const whatsappWebhookRoutes: FastifyPluginAsync = async (app) => {
+export type WhatsappWebhookPluginOptions = {
+  db: Database;
+};
+
+export const whatsappWebhookRoutes: FastifyPluginAsync<WhatsappWebhookPluginOptions> = async (
+  app,
+  opts,
+) => {
+  const { db } = opts;
   // Override JSON parser SOLO per questo plugin: salva rawBody su req per
   // il calcolo HMAC, poi parsa come JSON normale. Encapsulato dal register.
   app.addContentTypeParser(
@@ -97,13 +108,47 @@ export const whatsappWebhookRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(401).send({ error: 'invalid_signature' });
     }
 
-    // Signature OK. Per ora ack 200 + log "received". Persistenza dei
-    // messaggi in DB arriva nei commit successivi di slice 7a.1.
-    const body = req.body as Record<string, unknown> | undefined;
+    // Signature OK. Parse + persist.
+    const parsed = whatsappWebhookPayloadSchema.safeParse(req.body);
+    if (!parsed.success) {
+      // Payload non riconosciuto. Ack 200 (Meta non riprova su 4xx
+      // se webhook gia' verificato; vogliamo idempotenza) e log warn.
+      req.log.warn({ issues: parsed.error.issues.slice(0, 3) }, 'whatsapp payload schema mismatch');
+      return reply.code(200).send({ received: true, persisted: 0 });
+    }
+
+    const flatMessages = extractInboundMessages(parsed.data);
+    if (flatMessages.length === 0) {
+      // Probabilmente status update (delivered/read) o webhook system.
+      // Niente da persistere, ack 200.
+      return reply.code(200).send({ received: true, persisted: 0 });
+    }
+
+    let inserted = 0;
+    let duplicates = 0;
+    let orphans = 0;
+    for (const flat of flatMessages) {
+      try {
+        const result = await persistInboundMessage(db, flat);
+        if (result.status === 'inserted') inserted++;
+        else if (result.status === 'duplicate_skipped') duplicates++;
+        else if (result.status === 'orphan_inserted') orphans++;
+      } catch (err) {
+        // Log e continua: un messaggio fallito non deve bloccare gli altri
+        // del batch. Meta riprovera' l'intero batch se torniamo 5xx, ma
+        // qui preferiamo 200 + log perche' un retry duplicherebbe gli
+        // altri messaggi gia' persistiti.
+        req.log.error(
+          { err, messageId: flat.message.id },
+          'whatsapp persist failed for one message',
+        );
+      }
+    }
+
     req.log.info(
-      { object: body?.object, entryCount: Array.isArray(body?.entry) ? body.entry.length : 0 },
-      'whatsapp webhook event received (signature OK, persistence pending)',
+      { inserted, duplicates, orphans, total: flatMessages.length },
+      'whatsapp webhook batch persisted',
     );
-    return reply.code(200).send({ received: true });
+    return reply.code(200).send({ received: true, persisted: inserted });
   });
 };
