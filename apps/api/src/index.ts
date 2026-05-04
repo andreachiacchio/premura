@@ -9,6 +9,7 @@ import { icalPollWorker } from './jobs/ical-poll-worker';
 import { icalPollQueue } from './jobs/queues';
 import { startIcalCron } from './jobs/ical-cron';
 import { bookingsRoutes } from './api/bookings';
+import { whatsappWebhookRoutes } from './api/webhooks/whatsapp';
 
 const app = Fastify({
   logger: {
@@ -50,7 +51,13 @@ const apiClient = createServerClient();
 // Routes M2a.4: completion form Booking + skip. Auth host JWT verra' in slice 6.
 await app.register(bookingsRoutes, { prefix: '/api/bookings', db: apiClient.db });
 
-// TODO: register webhooks, dashboard API, cleaner endpoints
+// Slice 7a.1: webhook WhatsApp Cloud API (opzione I, bootstrap su numero
+// Business esistente Andrea). Il plugin registra un content-type parser
+// custom per esporre rawBody (necessario per HMAC) — l'encapsulation
+// Fastify lo isola dal resto dell'app.
+await app.register(whatsappWebhookRoutes);
+
+// TODO: register dashboard API, cleaner endpoints
 
 // Cron iCal avviato dopo il worker (worker gia' importato top-level) e prima
 // di app.listen, cosi' eventuali tick che partono mentre l'app sta per andare
