@@ -1,33 +1,42 @@
-import {
-  pgTable,
-  uuid,
-  text,
-  timestamp,
-  index,
-} from 'drizzle-orm/pg-core';
-import { pendingDraftStatusEnum } from './enums';
-import { messages } from './messages';
+import { index, jsonb, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { bookings } from './bookings';
+import { pendingDraftStatusEnum } from './enums';
 import { hosts } from './hosts';
+import { messages } from './messages';
 
-// Draft di risposta generato dal Conversation Agent e in attesa di
-// approvazione dell'host (modalità 🟡 Draft della matrice delega).
+// Draft di risposta o azione proposta in attesa di approvazione host
+// (modalità 🟡 Draft della matrice delega).
 //
-// Flusso:
-//   1. Ospite scrive → Conversation Agent decide mode=draft
-//   2. Row qui viene creata con status=pending + push notification all'host
-//   3. Host in app vede "Approva risposta" (1 tap) o modifica o rigetta
-//   4. Su approve → final_response_sent viene scritto e inviato via canale
-//   5. Scaduto (expires_at) senza decisione → status=expired, agente escalate
+// Tre "kind" supportati:
+//   - 'message_reply': legacy slice 6, draft generico associato a
+//     un message_id (deprecato a favore di reply_draft).
+//   - 'deflection_wa_invite' (slice 7a.3): Premura ha generato un nudge
+//     da inviare in-platform per spostare conversazione su WhatsApp.
+//     message_id null.
+//   - 'reply_draft' (slice 11): Conversation Agent ha generato risposta
+//     concreta a un messaggio inbound. reply_to_message_id richiesto,
+//     metadata include classification + confidence.
+//
+// Flusso (entrambi):
+//   1. Trigger (messaggio inbound | new booking)
+//   2. Row creata con status=pending + push notification all'host
+//   3. Host in app vede card + bottone azione (1 tap)
+//   4. Su approve / send → final_response_sent + status=approved
+//   5. Scaduto (expires_at) senza decisione → status=expired
 export const pendingDrafts = pgTable(
   'pending_drafts',
   {
     id: uuid('id').primaryKey().defaultRandom(),
 
-    // Messaggio inbound che ha triggerato il draft
-    messageId: uuid('message_id')
-      .notNull()
-      .references(() => messages.id, { onDelete: 'cascade' }),
+    // Tipo di draft. Determina la UI host e la pipeline di
+    // approvazione/invio. Default 'message_reply' per backward-compat
+    // con i draft pre-7a.3.
+    kind: varchar('kind', { length: 64 }).notNull().default('message_reply'),
+
+    // Messaggio inbound che ha triggerato il draft. NULLABLE da slice
+    // 7a.3 perche' i draft 'deflection_wa_invite' non rispondono a un
+    // messaggio (sono nudge proattivi).
+    messageId: uuid('message_id').references(() => messages.id, { onDelete: 'cascade' }),
     bookingId: uuid('booking_id')
       .notNull()
       .references(() => bookings.id, { onDelete: 'cascade' }),
@@ -41,6 +50,21 @@ export const pendingDrafts = pgTable(
     reasoning: text('reasoning'),
     // Azione concreta suggerita (es. "confermare late check-out di 1h")
     suggestedAction: text('suggested_action'),
+
+    // Metadata libero. Esempi:
+    //   deflection_wa_invite -> { target_channel, source_booking_id,
+    //                              wa_number }
+    //   reply_draft          -> { confidence, classification,
+    //                              suggested_action, voice_profile_version,
+    //                              dna_snapshot, property_knowledge_used }
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}),
+
+    // Slice 11: messaggio inbound che ha triggerato un reply_draft.
+    // Indipendente dal messageId legacy (kind='message_reply').
+    // FK su messages, set null on delete.
+    replyToMessageId: uuid('reply_to_message_id').references(() => messages.id, {
+      onDelete: 'set null',
+    }),
 
     status: pendingDraftStatusEnum('status').notNull().default('pending'),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
@@ -59,5 +83,7 @@ export const pendingDrafts = pgTable(
     index('pending_drafts_message_idx').on(t.messageId),
     index('pending_drafts_status_idx').on(t.status),
     index('pending_drafts_expires_at_idx').on(t.expiresAt),
+    index('pending_drafts_kind_idx').on(t.kind),
+    index('pending_drafts_reply_to_message_idx').on(t.replyToMessageId),
   ],
 );

@@ -1,5 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { createSupabaseMiddlewareClient } from "@/lib/supabase-middleware";
+import { createSupabaseMiddlewareClient } from '@/lib/supabase-middleware';
+import { type NextRequest, NextResponse } from 'next/server';
 
 // Middleware Next.js: refresh sessione Supabase + protezione rotte
 // privilegiate. Pattern @supabase/ssr ufficiale per Next 15.
@@ -16,17 +16,18 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   } = await supabase.auth.getUser();
 
   const { pathname, search } = request.nextUrl;
-  // Rotte protette: dashboard host + flusso connect-gmail (richiede
-  // hostId derivato da sessione, slice 6 fase 7). /api/* resta fuori,
-  // i route handler fanno auth interna e ritornano 401 (vedi
-  // /api/gmail/sync/route.ts).
+  // Rotte protette: dashboard host + flusso connect-gmail + onboarding
+  // (slice 9 prep). /api/* resta fuori, i route handler fanno auth
+  // interna e ritornano 401.
   const isProtected =
-    pathname.startsWith("/dashboard") || pathname.startsWith("/connect-gmail");
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/connect-gmail') ||
+    pathname.startsWith('/onboarding');
   if (isProtected && !user) {
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/login";
-    redirectUrl.search = "";
-    redirectUrl.searchParams.set("redirectTo", `${pathname}${search}`);
+    redirectUrl.pathname = '/login';
+    redirectUrl.search = '';
+    redirectUrl.searchParams.set('redirectTo', `${pathname}${search}`);
     return NextResponse.redirect(redirectUrl);
   }
 
@@ -38,7 +39,5 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 // sessione serve anche li' (es. /auth/callback deve avere cookie
 // freschi prima di exchangeCodeForSession).
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };

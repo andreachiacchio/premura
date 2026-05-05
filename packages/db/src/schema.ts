@@ -15,7 +15,7 @@ export * from './schema/hosts';
 export * from './schema/host-voice-profiles';
 export * from './schema/autopilot-rules';
 export * from './schema/properties';
-export * from './schema/property-knowledge-base';
+export * from './schema/property-knowledge';
 export * from './schema/cleaners';
 export * from './schema/bookings';
 export * from './schema/guest-profiles';

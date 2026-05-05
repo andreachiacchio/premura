@@ -1,22 +1,22 @@
 import { relations } from 'drizzle-orm';
-import { hosts } from './hosts';
-import { hostVoiceProfiles } from './host-voice-profiles';
+import { agentActions } from './agent-actions';
 import { autopilotRules } from './autopilot-rules';
-import { properties } from './properties';
-import { propertyKnowledgeBase } from './property-knowledge-base';
-import { cleaners } from './cleaners';
+import { bookingEmailEvents } from './booking-email-events';
 import { bookings } from './bookings';
+import { cleaners } from './cleaners';
+import { conversations } from './conversations';
 import { guestProfiles } from './guest-profiles';
 import { guestQuizzes } from './guest-quizzes';
+import { hostVoiceProfiles } from './host-voice-profiles';
+import { hosts } from './hosts';
 import { kits } from './kits';
-import { conversations } from './conversations';
+import { localPartners } from './local-partners';
 import { messages } from './messages';
 import { pendingDrafts } from './pending-drafts';
 import { pendingPayouts } from './pending-payouts';
-import { agentActions } from './agent-actions';
+import { properties } from './properties';
+import { propertyKnowledge } from './property-knowledge';
 import { reviews } from './reviews';
-import { localPartners } from './local-partners';
-import { bookingEmailEvents } from './booking-email-events';
 
 // ─────────────────────────────────────────────────────────────
 // HOST
@@ -51,15 +51,15 @@ export const propertiesRelations = relations(properties, ({ one, many }) => ({
   host: one(hosts, { fields: [properties.hostId], references: [hosts.id] }),
   cleaner: one(cleaners, { fields: [properties.cleanerId], references: [cleaners.id] }),
   bookings: many(bookings),
-  knowledgeBase: one(propertyKnowledgeBase, {
+  knowledge: one(propertyKnowledge, {
     fields: [properties.id],
-    references: [propertyKnowledgeBase.propertyId],
+    references: [propertyKnowledge.propertyId],
   }),
 }));
 
-export const propertyKnowledgeBaseRelations = relations(propertyKnowledgeBase, ({ one }) => ({
+export const propertyKnowledgeRelations = relations(propertyKnowledge, ({ one }) => ({
   property: one(properties, {
-    fields: [propertyKnowledgeBase.propertyId],
+    fields: [propertyKnowledge.propertyId],
     references: [properties.id],
   }),
 }));

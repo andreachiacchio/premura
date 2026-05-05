@@ -238,6 +238,98 @@ Strategia per host che usano già Smoobu / Hostaway / Lodgify: OAuth 1-click →
 
 ---
 
+## Slice 6.5 — Debts cleanup (5 maggio 2026)
+
+**Stato:** mergiato in main (PR #28).
+
+- [x] **6.5.2** JWT validation Fastify (`apps/api/src/plugins/jwt-auth.ts` + `attachJwtAuth`). Decora `req.user`. Esclude `/health*`, `/webhooks/*`. Env `SUPABASE_JWT_SECRET`.
+- [x] **6.5.3** Trigger iCal one-shot su nuova property (`POST /api/properties/:id/ical-poll-now` JWT-protected + hook in `createPropertyAction`). Riduce latenza first-poll da 15min a ~2s.
+- [ ] **6.5.1** SMTP Resend per email magic link brandizzata. **In attesa credenziali Andrea** (vedi `docs/SLICE-6-5-DEBTS.md`).
+
+---
+
+## Slice 7a — Pipeline 1 fonte messaggi inbound (5 maggio 2026)
+
+**Stato:** 7a.2 + 7a.3 mergiate in main. 7a.1 (PR #25) in draft, in attesa credenziali Meta per smoke test produzione.
+
+- [x] **7a.2** Gmail message-event parser Booking (trigger-only) + Airbnb (content via Sonnet 4.6). Repository `messages` + `conversations` riusabile cross-channel. Hook in `gmail-sync-orchestrator`. Coverage misurata documentata in `docs/KNOWN-LIMITS.md` §1.
+- [x] **7a.3** Deflection draft host-approved. Migration 0009 (`pending_drafts.kind` + `metadata` + `message_id` nullable). Lib + UI card + tracking outbound. Misurabile via `metadata.deflection_attempt`.
+- [ ] **7a.1** WhatsApp Cloud API webhook. Signature verify + persistenza DB + structured logging. PR #25 draft. Setup doc completa: `docs/META-WEBHOOK-SETUP.md`. **In attesa credenziali Meta da Andrea.**
+
+---
+
+## Slice 8 — Pipeline 2 + 3: Guest DNA + Audit Agent (5 maggio 2026)
+
+**Stato:** 8.1 + 8.2 mergiate in main.
+
+- [x] **8.1** Guest DNA extractor da messaggi inbound. Migration 0010 (`guest_profiles.message_insights` JSONB + 3 campi nuovi). Sonnet 4.6 con tool_use, vocabolario chiuso 20 topics. Merge incrementale (moving avg, FIFO). Trigger fire-and-forget da `insertInboundMessage`. Cost stimato ~€0.001/msg.
+- [x] **8.2** Agent action logger. Migration 0011 (`agent_actions.guest_profile_id` + `message_id` + `human_override`). Decorator `logAgentAction` con `calcCostUsd` (Sonnet/Haiku/Opus) + PII redaction shallow + truncation. Cabling su DNA extractor.
+- [ ] **8.1.1** Cabling parser AI Airbnb message (slice 7a.2) e Airbnb confirmation (M2a.3) al logger 8.2 (richiede modifica parser per restituire `usage`).
+- [ ] **8.3** Dashboard view `agent_actions` (read-only, top 50, filtro per agent + sort cost).
+
+---
+
+## Slice 9 prep — Onboarding scaffolding multi-host (5 maggio 2026)
+
+**Stato:** scaffolding mergiato.
+
+- [x] Migration 0012 `hosts.onboarding_step` varchar (welcome | property | gmail | whatsapp | completed). Backfill: utenti pre-esistenti marcati `completed`.
+- [x] Lib `apps/web/lib/onboarding.ts`: `getOnboardingState`, `setOnboardingStep`, `completeOnboarding`, `urlForStep`, `nextStep`.
+- [x] Pagine `/onboarding/{welcome,property,gmail,whatsapp}` + `_components/OnboardingShell` con stepper visivo. Mobile-first palette Premura.
+- [x] Server actions: `submitWelcomeAction`, `submitFirstPropertyAction`, `advanceFromGmailAction`, `completeOnboardingAction`, `skipToNextStepAction`.
+- [x] Middleware: `/onboarding` aggiunto alle rotte protette.
+- [x] Dashboard redirect: se `onboarding_completed=false` → `/onboarding/{step}` (resume capability).
+- [ ] Test E2E Playwright full flow signup → onboarding → dashboard (richiede setup E2E, slice 9.1).
+- [ ] Step gmail richiama il flow `/connect-gmail` esistente (M2a.3 fase 1) ma non riceve callback diretto: l'host deve cliccare "Ho gia' connesso, vai avanti" manualmente. Refactor con redirect param `?from=onboarding-gmail` in slice 9.1.
+- [ ] Step whatsapp e' placeholder informativo (Meta WA Business non ancora self-service per host #2+).
+
+---
+
+## Slice 8.4 — Host voice profiler automatico (5 maggio 2026)
+
+**Stato:** mergiato in main.
+
+- [x] Migration 0013 (host_voice_profiles +9 colonne Modo 2 auto-extraction).
+- [x] `packages/agents/voice-profiler.ts` — Sonnet 4.6 + tool_use + Zod, MESSAGE_TOPICS chiuso.
+- [x] `packages/agents/voice-profile-merger.ts` — weighted MA decay 0.95, voiceConfidence logaritmica plateau ~50.
+- [x] `apps/web/lib/voice-profile-pipeline.ts` — orchestratore fire-and-forget, BATCH_SIZE 5.
+- [x] Hook in `markDeflectionSent` (slice 7a.3).
+- [ ] Cabling esteso a parser AI Airbnb message + Conversation Agent inbound (slice 8.4.1, richiede worker BullMQ async per webhook WA).
+- [ ] **No UI host** (anti-pattern: Premura impara in background, l'host non vede ne' modifica).
+
+---
+
+## Slice 10a — Visual identity foundation (5 maggio 2026)
+
+**Stato:** mergiato in main.
+
+- [x] Design tokens estratti dal prototipo `demo/premura-prototype.html` in `apps/web/app/globals.css` (palette ivory/ink/terracotta/gold, typography Fraunces/Inter, radii, shadow tinted ink, easing).
+- [x] Componenti shadcn (`button`, `badge`, `card`, `dialog`, `form`, `input`, `label`) con stile Premura (preesistenti slice 6, allineati).
+- [x] Login + auth callback gia' allineati slice 6.
+- [x] Onboarding pages refactorate slice 9 prep -> slice 10a: serif headlines, palette tokens, microcopy umano italiano in prima persona Premura ("Mi presento", "Penso io a tutto il resto", "Ti scrivo via email").
+- [x] Dashboard **NON toccata**: rimane stile slice 6 fino a slice 10b (sessione futura quando Pipeline 1 ha dati prod).
+
+---
+
+## Slice 12 — Property knowledge ingestion (5 maggio 2026)
+
+**Stato:** mergiato in main.
+
+(Vedi PR slice 12 per dettagli implementazione.)
+
+---
+
+## Debt 6.5.1 — SMTP Resend ready-to-deploy (5 maggio 2026)
+
+**Stato:** codice + doc pronti, **in attesa credenziali Andrea**.
+
+- [x] `apps/web/lib/email-resend.ts` — client wrapper Resend SDK (mock-friendly).
+- [x] Template magic link brandizzato (HTML + plaintext, italiano).
+- [x] `docs/SLICE-6-5-DEBTS.md` §6.5.1 procedura completa: signup Resend, DNS Vercel SPF + DKIM, verifica dominio, generazione API key, configurazione Supabase Auth SMTP.
+- [ ] Andrea: signup Resend + DNS records Vercel + provide `RESEND_API_KEY` su Fly secrets.
+
+---
+
 ## Fase 4 — WhatsApp + Conversation Agent (settimana 4-5)
 
 **Obiettivo:** messaggistica bidirezionale funzionante.

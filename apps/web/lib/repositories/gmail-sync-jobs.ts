@@ -1,5 +1,5 @@
+import { type Database, type JobErrorEntry, gmailSyncJobs } from '@premura/db';
 import { eq, sql } from 'drizzle-orm';
-import { gmailSyncJobs, type Database, type JobErrorEntry } from '@premura/db';
 
 // Repository per gmail_sync_jobs: progress bar + audit per il sync.
 // Tutte le mutazioni sono atomiche (un solo UPDATE per chiamata).
@@ -73,6 +73,13 @@ export async function setTotalEmails(
 
 // Increment atomico di processed_emails + statistiche dopo ogni email.
 // Usato dall'orchestrator nel loop principale.
+//
+// NOTE — i counter messages* (slice 7a.2) sono accettati nel type per
+// permettere all'orchestrator di passarli, ma incrementJob li ignora
+// silenziosamente: niente colonne in `gmail_sync_jobs` per loro. Sono
+// in-memory only nello stats locale dell'orchestrator e ritornati nel
+// SyncResult. Aggiungere colonne se servisse persistenza/UI (slice
+// 7a.5 dashboard).
 export type SyncIncrement = Partial<{
   processedEmails: number;
   enrichedCount: number;
@@ -89,13 +96,17 @@ export type SyncIncrement = Partial<{
   bookingEmailsMatched: number;
   bookingEmailsUnmatched: number;
   bookingEmailsSkipped: number;
+  // Counter messages (slice 7a.2) — in-memory only.
+  messagesScanned: number;
+  messagesPersistedBooking: number;
+  messagesPersistedAirbnb: number;
+  messagesOrphans: number;
+  messagesDuplicates: number;
+  messagesSkippedNotMessage: number;
+  messagesErrors: number;
 }>;
 
-export async function incrementJob(
-  db: Database,
-  jobId: string,
-  inc: SyncIncrement,
-): Promise<void> {
+export async function incrementJob(db: Database, jobId: string, inc: SyncIncrement): Promise<void> {
   const set: Record<string, ReturnType<typeof sql>> = { updated_at: sql`NOW()` };
   if (inc.processedEmails)
     set.processed_emails = sql`${gmailSyncJobs.processedEmails} + ${inc.processedEmails}`;
@@ -103,8 +114,7 @@ export async function incrementJob(
     set.enriched_count = sql`${gmailSyncJobs.enrichedCount} + ${inc.enrichedCount}`;
   if (inc.createdCount)
     set.created_count = sql`${gmailSyncJobs.createdCount} + ${inc.createdCount}`;
-  if (inc.skippedPast)
-    set.skipped_past = sql`${gmailSyncJobs.skippedPast} + ${inc.skippedPast}`;
+  if (inc.skippedPast) set.skipped_past = sql`${gmailSyncJobs.skippedPast} + ${inc.skippedPast}`;
   if (inc.skippedNoMatch)
     set.skipped_no_match = sql`${gmailSyncJobs.skippedNoMatch} + ${inc.skippedNoMatch}`;
   if (inc.skippedNotConfirmation)
@@ -144,10 +154,7 @@ export async function incrementJob(
 
   if (Object.keys(camel).length <= 1) return; // niente da incrementare
 
-  await db
-    .update(gmailSyncJobs)
-    .set(camel)
-    .where(eq(gmailSyncJobs.id, jobId));
+  await db.update(gmailSyncJobs).set(camel).where(eq(gmailSyncJobs.id, jobId));
 }
 
 // Append a un'entry di error_log (non blocca il job).
@@ -184,11 +191,7 @@ export async function completeJob(
 }
 
 export async function getJob(db: Database, jobId: string): Promise<SyncJob | null> {
-  const [row] = await db
-    .select()
-    .from(gmailSyncJobs)
-    .where(eq(gmailSyncJobs.id, jobId))
-    .limit(1);
+  const [row] = await db.select().from(gmailSyncJobs).where(eq(gmailSyncJobs.id, jobId)).limit(1);
   if (!row) return null;
   return {
     id: row.id,

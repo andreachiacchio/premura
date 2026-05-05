@@ -5,7 +5,7 @@
 
 ---
 
-## 1. Buco Airbnb inbox
+## 1. Buco Airbnb inbox + asimmetria Booking content
 
 **Problema.** L'API ufficiale di Airbnb è chiusa a chi non è channel manager
 certificato. Messaggi inbound arrivano solo via email forwarding (parser
@@ -20,13 +20,61 @@ Fallback automatico: escalation all'host, che risponde dal proprio account
 Airbnb sul Mac/telefono. Nei fatti, per questi ospiti l'agente lavora in
 modalità "draft permanente" invece che auto.
 
+### Update 5 mag 2026 (slice 7a.2 — Gmail message-event parser)
+
+Coverage MISURATA su pattern subject reali (corpus simulato basato su
+docs/booking-strategy.md §1.3 + KNOWN-LIMITS.md §9):
+
+**Booking message email — segnale, NON contenuto.**
+- Subject regex matcha 4 pattern (italiano + inglese, "Hai un nuovo
+  messaggio da", "Hai ricevuto un messaggio da", "You have a new message
+  from", "New message from"). Coverage classifier: 95%+ dei pattern
+  attesi (15 unit test verdi).
+- Body extraction: 3 strategie best-effort (blockquote HTML, text body
+  con header "Messaggio:", snippet Gmail fallback). ~20-30% delle email
+  contiene preview parziale 200-800 char; ~70-80% e' segnale-solo
+  ("Apri Extranet per leggerlo"). Conformata `booking-strategy.md` §1.3.
+- Reply-To = `noreply@booking.com`: bidirezionalita' email impossibile
+  (`booking-strategy.md` §1.4). Persistenza con
+  `metadata.signal_only=true` quando trigger-only,
+  `metadata.truncated=true` quando preview parziale, body placeholder
+  etichettato.
+
+**Airbnb message email — content rich.**
+- Subject regex matcha 8 pattern (italiano + inglese, "Nuovo messaggio
+  da", "Hai un nuovo messaggio da", "X ti ha inviato/scritto", "New
+  message from", "You have a new message from", "X sent you a message").
+  Coverage classifier: 95%+ dei pattern attesi (15 unit test verdi).
+- Body extraction via parser AI Sonnet 4.6 (apps/web/lib/airbnb-message-
+  parser.ts). Estrae body completo nella lingua originale, lingua ISO
+  639-1, thread_id, booking_external_code, property_name. Cost stimato
+  ~$0.012/email parsata.
+- Bidirezionalita' email: alias `reply-msg-...@airbnb.com` da verificare
+  empiricamente (spike H rimandato a slice 7b).
+
+**Coverage end-to-end attesa per messages inbound (post-deploy slice 7a):**
+- Booking inbox via Gmail: 95% trigger awareness, 20-30% content
+  utile per Conversation Agent.
+- Airbnb inbox via Gmail: 80-90% content utile (parser AI affidabile).
+- WhatsApp via Cloud API: 100% di chi ha optato-in (slice 7a.1).
+- Quota WA cresce con deflection (slice 7a.3): da 10% (Andrea oggi) a
+  30-50% atteso a 6 mesi.
+
+**Implicazione strategica:** **senza C+I (deflection + WhatsApp), ~80% del
+traffico messaggi Booking di Andrea resta off-Premura nel content reale.**
+B-Booking copre il segnale, non il contenuto. L'unico canale rich-content
+per Booking in V1 e' la deflection a WhatsApp. Confermata
+raccomandazione `SLICE7-RESEARCH-MESSAGE-SOURCES.md` §F-pilot
+(I + B + C, D differito a host #2+).
+
 **Mitigazione futura.**
 - Verifica empirica se la reply alla notifica email Airbnb finisce nel
-  thread (test rapido in Fase 5).
+  thread (spike H, slice 7b).
 - Rinforzare opt-in WhatsApp dal quiz pre-arrivo ("per ricevere la foto del
   kit la mattina del check-in").
 - Partnership Booking Partner API come precedente (se/quando approvata),
   e monitorare se Airbnb apre API inbox in futuro.
+- Browser extension G (V2) come canale alternativo Booking content.
 
 ---
 

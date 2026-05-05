@@ -16,7 +16,7 @@
 // Ordine FK gestito dal cascade dello schema:
 //   hosts cascade → properties, cleaners, autopilot_rules,
 //                    host_voice_profiles, pending_drafts, agent_actions
-//   properties cascade → bookings, property_knowledge_base
+//   properties cascade → bookings, property_knowledge
 //   bookings cascade → guest_profiles, guest_quizzes, kits,
 //                       conversations, messages, reviews
 //
