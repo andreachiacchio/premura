@@ -71,6 +71,13 @@
       "when": 1778000000000,
       "tag": "0009_pending_drafts_kind_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778100000000,
+      "tag": "0010_guest_profiles_message_insights",
+      "breakpoints": true
     }
   ]
 }

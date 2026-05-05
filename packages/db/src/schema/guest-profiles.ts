@@ -1,17 +1,17 @@
 import {
+  decimal,
+  index,
+  integer,
+  jsonb,
   pgTable,
-  uuid,
-  varchar,
   text,
   timestamp,
-  jsonb,
-  decimal,
-  integer,
-  index,
   uniqueIndex,
+  uuid,
+  varchar,
 } from 'drizzle-orm/pg-core';
-import { hosts } from './hosts';
 import { bookings } from './bookings';
+import { hosts } from './hosts';
 
 // Profilo ospite — directory degli ospiti conosciuti dall'host.
 // Una riga per (host_id, full_name) coniato dalla email Airbnb.
@@ -76,6 +76,12 @@ export const guestProfiles = pgTable(
     agentModel: varchar('agent_model', { length: 64 }),
     agentCostUsd: decimal('agent_cost_usd', { precision: 8, scale: 6 }),
 
+    // Slice 8.1: Pipeline 2 — insights estratti da messaggi inbound.
+    messageInsights: jsonb('message_insights').$type<MessageInsights>().notNull().default({}),
+    firstMessageAt: timestamp('first_message_at', { withTimezone: true }),
+    lastMessageAt: timestamp('last_message_at', { withTimezone: true }),
+    messageCount: integer('message_count').notNull().default(0),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -83,6 +89,7 @@ export const guestProfiles = pgTable(
     index('guest_profiles_host_idx').on(t.hostId),
     index('guest_profiles_booking_idx').on(t.bookingId),
     index('guest_profiles_archetype_idx').on(t.archetype),
+    index('guest_profiles_last_message_at_idx').on(t.lastMessageAt),
     // Un nome è univoco nel directory dell'host. Se domani un altro host
     // ha un guest "Stephen Smith" diverso, è una riga separata.
     uniqueIndex('guest_profiles_host_name_uniq').on(t.hostId, t.fullName),
@@ -107,4 +114,30 @@ export type DnaRisk = {
   title: string;
   level: 'low' | 'medium' | 'high';
   mitigation: string;
+};
+
+// Slice 8.1 — Pipeline 2: insights aggregati dai messaggi ospite.
+// Aggiornati incrementalmente ad ogni nuovo messaggio inbound.
+export type MessageInsights = {
+  // Lingua predominante dei messaggi ospite (ISO 639-1).
+  preferredLanguage?: string;
+  // Stile comunicativo aggregato.
+  communicationStyle?: {
+    score: number; // 1 = molto formale, 5 = molto casual
+    label: 'formal' | 'casual' | 'mixed';
+  };
+  // Argomenti menzionati. Vocabolario chiuso (vedi MESSAGE_TOPICS in
+  // packages/agents/src/dna-extractor.ts), array unique, max 20.
+  topicsMentioned?: string[];
+  // Almeno un messaggio recente conteneva segnali di urgenza.
+  urgencySignals?: boolean;
+  // Sentiment aggregato [-1, 1] moving average pesata sui messaggi
+  // processati (peso piu' alto ai recenti).
+  sentimentAvg?: number;
+  // Numero di messaggi processati (== guest_profiles.message_count).
+  // Replicato per debugging.
+  processedMessages?: number;
+  // Set di message_id (uuid) gia' processati. Usato per idempotenza
+  // pre-insert: se il message_id e' qui, skip extraction.
+  processedMessageIds?: string[];
 };

@@ -114,6 +114,22 @@ export async function insertInboundMessage(
     throw new Error('[messages-repo] message insert returned no row');
   }
 
+  // Slice 8.1: trigger Pipeline 2 (Guest DNA extractor). Fire-and-forget,
+  // niente await: una failure dell'extraction non deve bloccare la
+  // persistenza del messaggio. Skip per orphan (no booking) e per body
+  // signal-only (gestito dentro triggerDnaExtraction).
+  if (input.bookingId && insertedMsg.id) {
+    const { triggerDnaExtraction } = await import('../dna-extraction-pipeline');
+    triggerDnaExtraction(db, {
+      messageId: insertedMsg.id,
+      bookingId: input.bookingId,
+      body: input.body,
+      sentAt: input.sentAt,
+    }).catch((err) => {
+      console.warn('[messages-repo] DNA extraction trigger failed', err);
+    });
+  }
+
   return {
     messageId: insertedMsg.id,
     conversationId,
