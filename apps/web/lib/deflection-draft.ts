@@ -246,5 +246,20 @@ export async function markDeflectionSent(
     })
     .returning({ id: messages.id });
 
+  // Slice 8.4: trigger Pipeline 4 (Host voice profiler). Fire-and-forget,
+  // niente await: una failure dell'estrazione non deve bloccare la
+  // marcatura della deflection. Skip per body short / placeholder
+  // gestito dentro triggerVoiceProfileUpdate.
+  if (insertedMsg?.id) {
+    const { triggerVoiceProfileUpdate } = await import('./voice-profile-pipeline');
+    triggerVoiceProfileUpdate(db, {
+      hostId: draft.hostId,
+      messageId: insertedMsg.id,
+      body: draft.draftResponse,
+    }).catch((err) => {
+      console.warn('[deflection] voice profile update failed', err);
+    });
+  }
+
   return { status: 'marked', messageId: insertedMsg?.id };
 }
