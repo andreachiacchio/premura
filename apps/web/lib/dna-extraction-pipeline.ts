@@ -4,6 +4,7 @@ import {
   shouldSkipExtraction,
 } from '@premura/agents';
 import type { Database } from '@premura/db';
+import { logAgentAction } from './agent-action-logger';
 import {
   applyInsightToProfile,
   fetchRecentMessageContext,
@@ -28,6 +29,9 @@ export type TriggerDnaExtractionInput = {
   sentAt: Date;
   // Test injection: override extractor (skip Anthropic).
   extractor?: (input: { body: string; context?: string[] }) => Promise<SingleMessageInsight>;
+  // Slice 8.2: hostId per loggare l'azione in agent_actions. Optional
+  // per back-compat con caller esistenti (se assente, skip logging).
+  hostId?: string;
 };
 
 export type DnaExtractionResult = {
@@ -61,8 +65,40 @@ export async function triggerDnaExtraction(
 
   const extractor = input.extractor ?? extractMessageInsights;
   let insight: SingleMessageInsight;
+
+  // Slice 8.2: log su agent_actions se hostId fornito. Wrappa l'extractor
+  // misurando latency + costo. Re-throw e' gestito dal try/catch sotto.
+  const runExtraction = async (): Promise<SingleMessageInsight> =>
+    extractor({ body: input.body, context });
+
   try {
-    insight = await extractor({ body: input.body, context });
+    if (input.hostId) {
+      const logged = await logAgentAction(db, {
+        hostId: input.hostId,
+        agent: 'guest_dna',
+        actionType: 'extract_message_insights',
+        bookingId: input.bookingId,
+        messageId: input.messageId,
+        inputSummary: {
+          body_length: input.body.length,
+          context_count: context.length,
+        },
+        fn: async () => {
+          const result = await runExtraction();
+          return {
+            output: result as unknown as Record<string, unknown>,
+            model: process.env.CLAUDE_MODEL_EMAIL_PARSER ?? 'claude-sonnet-4-6',
+            // Usage tokens non disponibili senza modificare extractor; per
+            // ora null (cost calcolato a 0). In slice futuro si potra'
+            // restituire usage da extractMessageInsights.
+            usage: undefined,
+          };
+        },
+      });
+      insight = logged.output as unknown as SingleMessageInsight;
+    } else {
+      insight = await runExtraction();
+    }
   } catch (err) {
     return {
       status: 'extractor_error',

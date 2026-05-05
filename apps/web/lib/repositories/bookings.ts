@@ -1,5 +1,5 @@
+import { type Database, bookings, properties } from '@premura/db';
 import { and, desc, eq, gte, ne } from 'drizzle-orm';
-import { bookings, properties, type Database } from '@premura/db';
 import type { ParsedAirbnbEmail } from '../airbnb-email-parser';
 import type { BookingForDashboard, DataSource } from '../types';
 
@@ -265,6 +265,22 @@ export async function findOwnership(args: {
     .limit(1);
   if (rows.length === 0) return null;
   return { hostId: rows[0]!.hostId };
+}
+
+// Slice 8.2 helper: ritorna host_id della booking via JOIN properties.
+// Variant di findOwnership che ritorna direttamente la stringa o null
+// (no wrapper object) — usato dai logger fire-and-forget.
+export async function findHostIdForBooking(
+  db: Database,
+  bookingId: string,
+): Promise<string | null> {
+  const rows = await db
+    .select({ hostId: properties.hostId })
+    .from(bookings)
+    .innerJoin(properties, eq(properties.id, bookings.propertyId))
+    .where(eq(bookings.id, bookingId))
+    .limit(1);
+  return rows[0]?.hostId ?? null;
 }
 
 function parseIsoDate(yyyymmdd: string): Date {
