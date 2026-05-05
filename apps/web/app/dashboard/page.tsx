@@ -1,18 +1,16 @@
-import { findByHostId } from "@/lib/repositories/bookings";
-import { findByHostId as findPropertiesByHostId } from "@/lib/repositories/properties";
-import { getCurrentHostId } from "@/lib/auth";
-import { getDb } from "@/lib/db";
-import { isIncompleteDataSource } from "@/lib/types";
-import { DashboardHeader } from "./_components/DashboardHeader";
-import { IncompleteAlert } from "./_components/IncompleteAlert";
-import { BookingsList } from "./_components/BookingsList";
-import { EmptyState } from "./_components/EmptyState";
-import { EmptyOnboardingState } from "./_components/EmptyOnboardingState";
-import {
-  completeBookingAction,
-  createPropertyAction,
-  skipBookingAction,
-} from "./actions";
+import { getCurrentHostId } from '@/lib/auth';
+import { getDb } from '@/lib/db';
+import { getOnboardingState, urlForStep } from '@/lib/onboarding';
+import { findByHostId } from '@/lib/repositories/bookings';
+import { findByHostId as findPropertiesByHostId } from '@/lib/repositories/properties';
+import { isIncompleteDataSource } from '@/lib/types';
+import { redirect } from 'next/navigation';
+import { BookingsList } from './_components/BookingsList';
+import { DashboardHeader } from './_components/DashboardHeader';
+import { EmptyOnboardingState } from './_components/EmptyOnboardingState';
+import { EmptyState } from './_components/EmptyState';
+import { IncompleteAlert } from './_components/IncompleteAlert';
+import { completeBookingAction, createPropertyAction, skipBookingAction } from './actions';
 
 // Server component: render server-side, fetch via repository drizzle
 // diretto (vedi commit precedente per la decisione architetturale).
@@ -27,15 +25,23 @@ import {
 // autenticato. getCurrentHostId() throw difensivo se la sessione
 // risultasse assente nonostante il middleware (race a pulizia cookie).
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
   const hostId = await getCurrentHostId();
   const { db } = await getDb();
 
-  // Onboarding short-circuit: host appena loggato senza alcuna property.
-  // Mostriamo solo lo state di benvenuto, niente lista bookings (che
-  // sarebbe vuota comunque, salviamo una query).
+  // Slice 9 prep: redirect al flusso onboarding stepper se l'host non
+  // ha completato l'onboarding. Pre-empt il fallback EmptyOnboardingState
+  // (che e' stato un MVP minimal pre-stepper).
+  const onboarding = await getOnboardingState(db, hostId);
+  if (!onboarding.completed) {
+    redirect(urlForStep(onboarding.step));
+  }
+
+  // Fallback storico: host completato onboarding ma senza property
+  // (caso edge — non dovrebbe succedere col nuovo flusso). Manteniamo
+  // EmptyOnboardingState per backward-compat con utenti pre-slice 9.
   const hostProperties = await findPropertiesByHostId({ db, hostId });
   if (hostProperties.length === 0) {
     return (
