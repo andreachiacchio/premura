@@ -1,12 +1,4 @@
-import {
-  pgTable,
-  uuid,
-  varchar,
-  timestamp,
-  boolean,
-  decimal,
-  index,
-} from 'drizzle-orm/pg-core';
+import { boolean, decimal, index, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 
 // Host = utente pagante di Premura.
 // 1 host → N properties, N cleaners, 1 voice profile, N autopilot rules.
@@ -37,6 +29,9 @@ export const hosts = pgTable(
     // Onboarding: true quando host ha completato il flow conversazionale con Agent 5
     onboardingCompleted: boolean('onboarding_completed').notNull().default(false),
     onboardingCompletedAt: timestamp('onboarding_completed_at', { withTimezone: true }),
+    // Slice 9 prep: step corrente del flusso onboarding per resume.
+    // Valori: 'welcome' | 'property' | 'gmail' | 'whatsapp' | 'completed'.
+    onboardingStep: varchar('onboarding_step', { length: 32 }).notNull().default('welcome'),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
