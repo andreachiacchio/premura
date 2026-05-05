@@ -282,6 +282,18 @@ describe('extractInboundMessages', () => {
   });
 });
 
+describe('maskPhone (logging GDPR-safe)', () => {
+  it.each([
+    ['393331234567', '39********67'],
+    ['39351451', '39****51'],
+    ['1234', '***'],
+    ['', '***'],
+  ])('mask %s -> %s', async (input, expected) => {
+    const { maskPhone } = await import('../src/api/webhooks/whatsapp');
+    expect(maskPhone(input)).toBe(expected);
+  });
+});
+
 describe('renderMessageBody', () => {
   it('text -> body originale, no mediaType', () => {
     const out = renderMessageBody({

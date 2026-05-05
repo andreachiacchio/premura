@@ -51,16 +51,16 @@ async function buildApp(): Promise<ReturnType<typeof Fastify>> {
 
 describe('GET /webhooks/whatsapp - challenge handshake', () => {
   beforeEach(() => {
-    process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN = VERIFY_TOKEN;
-    process.env.WHATSAPP_APP_SECRET = APP_SECRET;
+    process.env.META_VERIFY_TOKEN = VERIFY_TOKEN;
+    process.env.META_APP_SECRET = APP_SECRET;
   });
   afterEach(() => {
     // Biome consiglia "= undefined" come unsafe fix, ma su process.env
     // setterebbe la stringa "undefined" (truthy). Servono delete reali.
     // biome-ignore lint/performance/noDelete: process.env semantica
-    delete process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+    delete process.env.META_VERIFY_TOKEN;
     // biome-ignore lint/performance/noDelete: process.env semantica
-    delete process.env.WHATSAPP_APP_SECRET;
+    delete process.env.META_APP_SECRET;
   });
 
   it('mode=subscribe + token corretto + challenge -> 200 con challenge in plain text', async () => {
@@ -107,9 +107,9 @@ describe('GET /webhooks/whatsapp - challenge handshake', () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it('env var WHATSAPP_WEBHOOK_VERIFY_TOKEN mancante -> 500', async () => {
+  it('env var META_VERIFY_TOKEN mancante -> 500', async () => {
     // biome-ignore lint/performance/noDelete: process.env semantica
-    delete process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+    delete process.env.META_VERIFY_TOKEN;
     const app = await buildApp();
     const res = await app.inject({
       method: 'GET',
@@ -127,14 +127,14 @@ describe('GET /webhooks/whatsapp - challenge handshake', () => {
 
 describe('POST /webhooks/whatsapp - event delivery con signature verify', () => {
   beforeEach(() => {
-    process.env.WHATSAPP_APP_SECRET = APP_SECRET;
-    process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN = VERIFY_TOKEN;
+    process.env.META_APP_SECRET = APP_SECRET;
+    process.env.META_VERIFY_TOKEN = VERIFY_TOKEN;
   });
   afterEach(() => {
     // biome-ignore lint/performance/noDelete: process.env semantica
-    delete process.env.WHATSAPP_APP_SECRET;
+    delete process.env.META_APP_SECRET;
     // biome-ignore lint/performance/noDelete: process.env semantica
-    delete process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+    delete process.env.META_VERIFY_TOKEN;
   });
 
   it('signature valida + payload senza messages -> 200 con persisted=0', async () => {
@@ -200,9 +200,9 @@ describe('POST /webhooks/whatsapp - event delivery con signature verify', () => 
     expect(res.statusCode).toBe(401);
   });
 
-  it('env var WHATSAPP_APP_SECRET mancante -> 500', async () => {
+  it('env var META_APP_SECRET mancante -> 500', async () => {
     // biome-ignore lint/performance/noDelete: process.env semantica
-    delete process.env.WHATSAPP_APP_SECRET;
+    delete process.env.META_APP_SECRET;
     const app = await buildApp();
     const payload = JSON.stringify({ object: 'whatsapp_business_account', entry: [] });
     const res = await app.inject({
