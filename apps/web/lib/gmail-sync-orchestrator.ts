@@ -1,28 +1,29 @@
 import type { ServerClient } from '@premura/db';
-import { getTokenByHostAndEmail } from './repositories/google-tokens';
-import {
-  createGmailClient,
-  searchAirbnbEmails,
-  searchBookingEmails,
-  fetchEmailContent,
-  GmailClientError,
-  type GmailClient,
-} from './gmail-client';
-import { parseAirbnbEmail, AirbnbParserError, type ParsedAirbnbEmail } from './airbnb-email-parser';
-import { matchProperty } from './property-matcher';
-import { upsertGuestProfile } from './repositories/guest-profiles';
-import { upsertBookingFromEmail, cancelBooking } from './repositories/bookings';
-import {
-  createJob,
-  setTotalEmails,
-  incrementJob,
-  appendErrorLog,
-  completeJob,
-  type SyncIncrement,
-} from './repositories/gmail-sync-jobs';
+import { AirbnbParserError, type ParsedAirbnbEmail, parseAirbnbEmail } from './airbnb-email-parser';
 import { classifyBookingEmail } from './booking-email-classifier';
 import { ingestBookingEvent } from './booking-event-ingestor';
+import {
+  type GmailClient,
+  GmailClientError,
+  createGmailClient,
+  fetchEmailContent,
+  searchAirbnbEmails,
+  searchBookingEmails,
+} from './gmail-client';
+import { ingestAirbnbMessage, ingestBookingMessage } from './gmail-message-ingestor';
+import { matchProperty } from './property-matcher';
 import { existsBookingEmailEvent } from './repositories/booking-email-events';
+import { cancelBooking, upsertBookingFromEmail } from './repositories/bookings';
+import {
+  type SyncIncrement,
+  appendErrorLog,
+  completeJob,
+  createJob,
+  incrementJob,
+  setTotalEmails,
+} from './repositories/gmail-sync-jobs';
+import { getTokenByHostAndEmail } from './repositories/google-tokens';
+import { upsertGuestProfile } from './repositories/guest-profiles';
 
 // Orchestrator del sync Gmail (M2a.3 Fase 2).
 //
@@ -58,6 +59,8 @@ export type SyncOptions = {
   ) => Promise<GmailClient>;
   // Override parser per test (skip Claude API).
   emailParser?: (input: Parameters<typeof parseAirbnbEmail>[0]) => Promise<ParsedAirbnbEmail>;
+  // Override Airbnb message parser per test slice 7a.2 (skip Claude API).
+  airbnbMessageParser?: Parameters<typeof ingestAirbnbMessage>[1]['parser'];
   // Riusa un jobId già creato dal caller (pattern API route: il route
   // handler crea il job up-front per restituire l'id al client, poi
   // lascia all'orchestrator il completamento in background).
@@ -83,6 +86,16 @@ export type SyncResult = {
   bookingEmailsMatched: number;
   bookingEmailsUnmatched: number;
   bookingEmailsSkipped: number;
+  // Counter messages inbound da Gmail (slice 7a.2). Branch separato:
+  // un'email puo' essere "event" (already counted above) o "message"
+  // (counted here). I subject pattern sono mutually exclusive.
+  messagesScanned: number;
+  messagesPersistedBooking: number;
+  messagesPersistedAirbnb: number;
+  messagesOrphans: number;
+  messagesDuplicates: number;
+  messagesSkippedNotMessage: number;
+  messagesErrors: number;
   truncated: boolean;
   fatalError?: string;
 };
@@ -127,6 +140,13 @@ export async function syncGmailForHost(
     bookingEmailsMatched: 0,
     bookingEmailsUnmatched: 0,
     bookingEmailsSkipped: 0,
+    messagesScanned: 0,
+    messagesPersistedBooking: 0,
+    messagesPersistedAirbnb: 0,
+    messagesOrphans: 0,
+    messagesDuplicates: 0,
+    messagesSkippedNotMessage: 0,
+    messagesErrors: 0,
   };
 
   let totalEmails = 0;
@@ -166,10 +186,47 @@ export async function syncGmailForHost(
 
     // Step 5: loop processing.
     const parser = options.emailParser ?? parseAirbnbEmail;
+    const airbnbMessageParser = options.airbnbMessageParser;
     for (const messageId of messageIds) {
       const inc: SyncIncrement = { processedEmails: 1 };
       try {
         const email = await fetchEmailContent(gmail, messageId);
+
+        // Slice 7a.2 — pre-step: e' una notifica di tipo "messaggio
+        // ospite"? Se si, branch dedicato (parser AI body extraction +
+        // persistenza in messages/conversations) e skip parser
+        // confirmation. I subject pattern message vs confirmation/
+        // cancellation/modification sono mutually exclusive su Airbnb.
+        const airbnbMsgClass = (await import('./airbnb-message-classifier')).classifyAirbnbMessage(
+          email.subject,
+        );
+        if (airbnbMsgClass.type === 'message') {
+          stats.messagesScanned++;
+          inc.messagesScanned = 1;
+          const result = await ingestAirbnbMessage(db, {
+            hostId,
+            emailId: messageId,
+            emailReceivedAt: email.date ?? new Date(),
+            subject: email.subject,
+            htmlBody: email.htmlBody,
+            textBody: email.textBody,
+            parser: airbnbMessageParser,
+          });
+          if (result.status === 'inserted') {
+            stats.messagesPersistedAirbnb++;
+            inc.messagesPersistedAirbnb = 1;
+          } else if (result.status === 'orphan_inserted') {
+            stats.messagesOrphans++;
+            inc.messagesOrphans = 1;
+          } else if (result.status === 'duplicate_skipped') {
+            stats.messagesDuplicates++;
+            inc.messagesDuplicates = 1;
+          }
+          stats.processedEmails++;
+          await persistInc(db, job.id, inc);
+          continue;
+        }
+
         const parsed = await parser({
           htmlBody: email.htmlBody,
           textBody: email.textBody,
@@ -257,10 +314,11 @@ export async function syncGmailForHost(
           const confirmationLike =
             parsed.email_type === 'confirmation'
               ? parsed
-              : ({
+              : {
                   email_type: 'confirmation' as const,
                   guest_full_name: parsed.guest_full_name!,
-                  guest_first_name: parsed.guest_first_name ?? parsed.guest_full_name!.split(' ')[0]!,
+                  guest_first_name:
+                    parsed.guest_first_name ?? parsed.guest_full_name!.split(' ')[0]!,
                   guest_country_code: null,
                   guest_language: null,
                   guest_count: parsed.guest_count!,
@@ -274,7 +332,7 @@ export async function syncGmailForHost(
                   booking_external_code: parsed.booking_external_code!,
                   property_name: parsed.property_name,
                   airbnb_listing_url: parsed.airbnb_listing_url,
-                });
+                };
 
           // Upsert guest_profile.
           const profile = await upsertGuestProfile(db, hostId, confirmationLike);
@@ -339,6 +397,41 @@ export async function syncGmailForHost(
         }
 
         const email = await fetchEmailContent(gmail, messageId);
+
+        // Slice 7a.2 — pre-step: e' una notifica di tipo "messaggio
+        // ospite"? Le email Booking message hanno subject pattern
+        // mutually exclusive rispetto a quelle event (new_booking /
+        // cancellation / modification). Se matcha message, persisti
+        // in messages/conversations e skip l'event ingestor.
+        const bookingMsgClass = (
+          await import('./booking-message-classifier')
+        ).classifyBookingMessage(email.subject);
+        if (bookingMsgClass.type === 'message') {
+          stats.messagesScanned++;
+          bookingInc.messagesScanned = 1;
+          const msgResult = await ingestBookingMessage(db, {
+            hostId,
+            emailId: messageId,
+            emailReceivedAt: email.date ?? new Date(),
+            subject: email.subject,
+            htmlBody: email.htmlBody,
+            textBody: email.textBody,
+            snippet: email.snippet,
+          });
+          if (msgResult.status === 'inserted') {
+            stats.messagesPersistedBooking++;
+            bookingInc.messagesPersistedBooking = 1;
+          } else if (msgResult.status === 'orphan_inserted') {
+            stats.messagesOrphans++;
+            bookingInc.messagesOrphans = 1;
+          } else if (msgResult.status === 'duplicate_skipped') {
+            stats.messagesDuplicates++;
+            bookingInc.messagesDuplicates = 1;
+          }
+          await persistInc(db, job.id, bookingInc);
+          continue;
+        }
+
         const classified = classifyBookingEmail(email.subject);
         const result = await ingestBookingEvent(serverClient, {
           classified,
@@ -398,7 +491,9 @@ async function persistInc(
   await incrementJob(db, jobId, inc);
 }
 
-function inferStage(err: unknown): 'fetch' | 'parse' | 'match' | 'upsert_profile' | 'upsert_booking' {
+function inferStage(
+  err: unknown,
+): 'fetch' | 'parse' | 'match' | 'upsert_profile' | 'upsert_booking' {
   if (err instanceof GmailClientError) return 'fetch';
   if (err instanceof AirbnbParserError) return 'parse';
   // Default: errori DB nel finale del flow → upsert_booking è il caso più
