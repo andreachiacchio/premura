@@ -64,6 +64,13 @@
       "when": 1777554483754,
       "tag": "0008_property_address_optional",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1778000000000,
+      "tag": "0009_pending_drafts_kind_metadata",
+      "breakpoints": true
     }
   ]
 }
