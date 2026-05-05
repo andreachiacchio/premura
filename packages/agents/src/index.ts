@@ -3,9 +3,12 @@
 // La risoluzione moduleResolution=bundler nel tsconfig + import senza
 // estensione funziona ovunque (apps/api con tsx, apps/web con webpack,
 // vitest tests).
+export * from './agent-action-logger';
+export * from './context-readers';
 export * from './dna-extractor';
 export * from './dna-insights-merger';
 export * from './draft-generator';
+export * from './draft-generator-pipeline';
 export * from './guest-dna';
 export * from './kit-composer';
 export * from './message-writer';

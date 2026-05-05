@@ -1,6 +1,7 @@
 import type { Database } from '@premura/db';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { enqueueDraftGeneration } from '../../jobs/draft-generation-queue';
 import { extractInboundMessages, whatsappWebhookPayloadSchema } from './whatsapp-payload';
 import { persistInboundMessage } from './whatsapp-persist';
 import { verifyMetaSignature } from './whatsapp-signature';
@@ -187,6 +188,7 @@ export const whatsappWebhookRoutes: FastifyPluginAsync<WhatsappWebhookPluginOpti
     let duplicates = 0;
     let orphans = 0;
     let errors = 0;
+    let drafts_enqueued = 0;
     for (const flat of flatMessages) {
       try {
         const result = await persistInboundMessage(db, flat);
@@ -203,6 +205,28 @@ export const whatsappWebhookRoutes: FastifyPluginAsync<WhatsappWebhookPluginOpti
             },
             'whatsapp inbound message persisted',
           );
+          // Slice 7a.4: connector Pipeline 1. Enqueue draft-generation
+          // job per il messaggio appena persistito. Solo per inserted
+          // (non duplicate, non orphan): doppio enqueue dello stesso
+          // messageId e' comunque idempotente lato BullMQ (jobId fisso)
+          // e lato pipeline (dedup pending_drafts.replyToMessageId).
+          if (result.messageId) {
+            try {
+              await enqueueDraftGeneration(result.messageId);
+              drafts_enqueued++;
+            } catch (enqueueErr) {
+              // Niente throw: il messaggio e' gia' persistito, l'enqueue
+              // failure e' recuperabile via reprocess manuale. Log error.
+              req.log.error(
+                {
+                  event: 'wa.draft.enqueue_error',
+                  err: enqueueErr,
+                  messageId: result.messageId,
+                },
+                'draft-generation enqueue failed (message already persisted)',
+              );
+            }
+          }
         } else if (result.status === 'duplicate_skipped') {
           duplicates++;
           req.log.info(
@@ -241,6 +265,7 @@ export const whatsappWebhookRoutes: FastifyPluginAsync<WhatsappWebhookPluginOpti
         duplicates,
         orphans,
         errors,
+        drafts_enqueued,
         total: flatMessages.length,
         appId,
       },

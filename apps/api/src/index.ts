@@ -5,13 +5,18 @@ import { createServerClient } from '@premura/db';
 import Fastify from 'fastify';
 import { bookingsRoutes } from './api/bookings';
 import { propertiesRoutes } from './api/properties';
+import { whatsappWebhookRoutes } from './api/webhooks/whatsapp';
+import { draftGenerationQueue } from './jobs/draft-generation-queue';
+// Slice 7a.4: worker BullMQ draft-generation. Top-level import: l'istanza
+// Worker viene creata e inizia subito ad ascoltare la coda. Stesso
+// pattern del worker iCal.
+import { draftGenerationWorker } from './jobs/draft-generation-worker';
 import { startIcalCron } from './jobs/ical-cron';
 // Import top-level: l'istanza Worker viene creata nel modulo importato e
 // inizia subito ad ascoltare la queue 'ical-poll'. Niente lazy load.
 import { icalPollWorker } from './jobs/ical-poll-worker';
 import { icalPollQueue } from './jobs/queues';
 import { attachJwtAuth } from './plugins/jwt-auth';
-import { whatsappWebhookRoutes } from './api/webhooks/whatsapp';
 
 const app = Fastify({
   logger: {
@@ -32,17 +37,19 @@ app.get('/health', () => ({
   timestamp: new Date().toISOString(),
 }));
 
-// Stats della queue iCal poll. Probe ops + dashboard health.
+// Stats delle queue. Probe ops + dashboard health.
 // getJobCounts(...keys) ritorna esattamente i contatori richiesti.
 app.get('/health/jobs', async () => {
-  const counts = await icalPollQueue.getJobCounts(
-    'waiting',
-    'active',
-    'completed',
-    'failed',
-    'delayed',
-  );
-  return { queue: 'ical-poll', counts };
+  const [icalCounts, draftCounts] = await Promise.all([
+    icalPollQueue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed'),
+    draftGenerationQueue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed'),
+  ]);
+  return {
+    queues: [
+      { name: 'ical-poll', counts: icalCounts },
+      { name: 'draft-generation', counts: draftCounts },
+    ],
+  };
 });
 
 // Client Drizzle long-lived per le routes HTTP. Diversamente dal worker
@@ -79,14 +86,15 @@ const port = Number(process.env.PORT ?? 3000);
 await app.listen({ port, host: '0.0.0.0' });
 app.log.info(`Premura listening on :${port}`);
 app.log.info('ical poll worker started');
+app.log.info('draft generation worker started');
 
-// Graceful shutdown: prima fermo il cron (niente nuovi enqueue), poi il
+// Graceful shutdown: prima fermo il cron (niente nuovi enqueue), poi i
 // worker (drain dei job in-flight + disconnect Redis), poi Fastify. L'ordine
 // evita che enqueue partiti dal cron trovino connessioni gia' chiuse.
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, 'shutdown requested');
   icalCron.stop();
-  await icalPollWorker.close();
+  await Promise.all([icalPollWorker.close(), draftGenerationWorker.close()]);
   await app.close();
   await apiClient.close();
   process.exit(0);
