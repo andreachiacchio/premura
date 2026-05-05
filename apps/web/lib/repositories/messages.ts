@@ -133,6 +133,20 @@ export async function insertInboundMessage(
     }).catch((err) => {
       console.warn('[messages-repo] DNA extraction trigger failed', err);
     });
+
+    // Slice 11: trigger Pipeline 5 (Draft Generator). Fire-and-forget,
+    // niente await. Skip per orphan, body short, dedup.
+    if (hostId) {
+      const { triggerDraftGeneration } = await import('../draft-generator-pipeline');
+      triggerDraftGeneration(db, {
+        messageId: insertedMsg.id,
+        bookingId: input.bookingId,
+        body: input.body,
+        hostId,
+      }).catch((err) => {
+        console.warn('[messages-repo] draft generation trigger failed', err);
+      });
+    }
   }
 
   return {

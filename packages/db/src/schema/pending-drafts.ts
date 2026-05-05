@@ -7,13 +7,15 @@ import { messages } from './messages';
 // Draft di risposta o azione proposta in attesa di approvazione host
 // (modalità 🟡 Draft della matrice delega).
 //
-// Due "kind" supportati (slice 7a.3):
-//   - 'message_reply': Conversation Agent ha generato risposta a un
-//     messaggio inbound dell'ospite. message_id richiesto.
-//   - 'deflection_wa_invite': Premura ha generato un nudge da inviare
-//     in-platform (Booking inbox / Airbnb inbox) per spostare la
-//     conversazione su WhatsApp. Triggered all'arrivo di una nuova
-//     prenotazione, prima che l'ospite abbia scritto. message_id null.
+// Tre "kind" supportati:
+//   - 'message_reply': legacy slice 6, draft generico associato a
+//     un message_id (deprecato a favore di reply_draft).
+//   - 'deflection_wa_invite' (slice 7a.3): Premura ha generato un nudge
+//     da inviare in-platform per spostare conversazione su WhatsApp.
+//     message_id null.
+//   - 'reply_draft' (slice 11): Conversation Agent ha generato risposta
+//     concreta a un messaggio inbound. reply_to_message_id richiesto,
+//     metadata include classification + confidence.
 //
 // Flusso (entrambi):
 //   1. Trigger (messaggio inbound | new booking)
@@ -50,10 +52,19 @@ export const pendingDrafts = pgTable(
     suggestedAction: text('suggested_action'),
 
     // Metadata libero. Esempi:
-    //   deflection_wa_invite -> { target_channel: 'booking_inbox',
-    //                              source_booking_id, wa_number }
-    //   message_reply        -> { intent_classification, latency_ms_target }
+    //   deflection_wa_invite -> { target_channel, source_booking_id,
+    //                              wa_number }
+    //   reply_draft          -> { confidence, classification,
+    //                              suggested_action, voice_profile_version,
+    //                              dna_snapshot, property_knowledge_used }
     metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}),
+
+    // Slice 11: messaggio inbound che ha triggerato un reply_draft.
+    // Indipendente dal messageId legacy (kind='message_reply').
+    // FK su messages, set null on delete.
+    replyToMessageId: uuid('reply_to_message_id').references(() => messages.id, {
+      onDelete: 'set null',
+    }),
 
     status: pendingDraftStatusEnum('status').notNull().default('pending'),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
@@ -73,5 +84,6 @@ export const pendingDrafts = pgTable(
     index('pending_drafts_status_idx').on(t.status),
     index('pending_drafts_expires_at_idx').on(t.expiresAt),
     index('pending_drafts_kind_idx').on(t.kind),
+    index('pending_drafts_reply_to_message_idx').on(t.replyToMessageId),
   ],
 );

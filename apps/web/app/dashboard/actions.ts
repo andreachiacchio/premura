@@ -7,6 +7,7 @@ import { getOrCreateDeflectionDraft, markDeflectionSent } from '@/lib/deflection
 import { findOwnership } from '@/lib/repositories/bookings';
 import { findHostWaNumber } from '@/lib/repositories/hosts';
 import { createProperty } from '@/lib/repositories/properties';
+import { approveAndSendReplyDraft, rejectReplyDraft } from '@/lib/repositories/reply-drafts';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
@@ -172,5 +173,59 @@ export async function markDeflectionSentAction(draftId: string): Promise<void> {
   }
 
   await markDeflectionSent(db, id);
+  revalidatePath('/dashboard');
+}
+
+// Slice 11 — Reply draft actions (approve/edit/reject).
+//
+// approveReplyDraftAction: usato dal bottone "Invia". Body rimane il
+// draft originale. Insert outbound message + update draft status.
+//
+// editAndSendReplyDraftAction: usato dal bottone "Invia modifiche"
+// dopo edit inline. Body custom passato dal client. status='modified'
+// (humanOverride=true tracciato anche nel logger se serve).
+//
+// rejectReplyDraftAction: usato dal bottone "Scarta". Update status,
+// niente outbound message. Tracciato in agent_actions in slice
+// futura via markHumanOverride sull'action ID corrispondente.
+
+const replyDraftBodySchema = z.string().trim().min(2).max(2000);
+
+export async function approveReplyDraftAction(draftId: string): Promise<void> {
+  const id = idSchema.parse(draftId);
+  const hostId = await getCurrentHostId();
+  const { db } = await getDb();
+  // Per "Invia" senza modifiche serve recuperare il draft originale.
+  const { pendingDrafts } = await import('@premura/db');
+  const { eq, and: andOp } = await import('drizzle-orm');
+  const [draft] = await db
+    .select({ body: pendingDrafts.draftResponse, hostId: pendingDrafts.hostId })
+    .from(pendingDrafts)
+    .where(andOp(eq(pendingDrafts.id, id), eq(pendingDrafts.kind, 'reply_draft')))
+    .limit(1);
+  if (!draft || draft.hostId !== hostId) {
+    throw new Error(NOT_FOUND_MESSAGE);
+  }
+  await approveAndSendReplyDraft(db, id, draft.body, hostId);
+  revalidatePath('/dashboard');
+}
+
+export async function editAndSendReplyDraftAction(
+  draftId: string,
+  finalBody: string,
+): Promise<void> {
+  const id = idSchema.parse(draftId);
+  const body = replyDraftBodySchema.parse(finalBody);
+  const hostId = await getCurrentHostId();
+  const { db } = await getDb();
+  await approveAndSendReplyDraft(db, id, body, hostId);
+  revalidatePath('/dashboard');
+}
+
+export async function rejectReplyDraftAction(draftId: string): Promise<void> {
+  const id = idSchema.parse(draftId);
+  const hostId = await getCurrentHostId();
+  const { db } = await getDb();
+  await rejectReplyDraft(db, id, hostId);
   revalidatePath('/dashboard');
 }

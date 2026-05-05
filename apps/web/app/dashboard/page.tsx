@@ -3,6 +3,7 @@ import { getDb } from '@/lib/db';
 import { getOnboardingState, urlForStep } from '@/lib/onboarding';
 import { findByHostId } from '@/lib/repositories/bookings';
 import { findByHostId as findPropertiesByHostId } from '@/lib/repositories/properties';
+import { listPendingReplyDraftsForHost } from '@/lib/repositories/reply-drafts';
 import { isIncompleteDataSource } from '@/lib/types';
 import { redirect } from 'next/navigation';
 import { BookingsList } from './_components/BookingsList';
@@ -10,6 +11,7 @@ import { DashboardHeader } from './_components/DashboardHeader';
 import { EmptyOnboardingState } from './_components/EmptyOnboardingState';
 import { EmptyState } from './_components/EmptyState';
 import { IncompleteAlert } from './_components/IncompleteAlert';
+import { ReplyDraftCard } from './_components/ReplyDraftCard';
 import { completeBookingAction, createPropertyAction, skipBookingAction } from './actions';
 
 // Server component: render server-side, fetch via repository drizzle
@@ -53,7 +55,10 @@ export default async function DashboardPage() {
     );
   }
 
-  const bookings = await findByHostId({ db, hostId });
+  const [bookings, replyDrafts] = await Promise.all([
+    findByHostId({ db, hostId }),
+    listPendingReplyDraftsForHost(db, hostId),
+  ]);
 
   const incompleteToCompleteCount = bookings.filter(
     (b) => isIncompleteDataSource(b.dataSource) && !b.hostSkippedCompletion,
@@ -68,6 +73,17 @@ export default async function DashboardPage() {
       ) : (
         <EmptyState />
       )}
+
+      {replyDrafts.length > 0 ? (
+        <section className="mx-5 mt-3 flex flex-col gap-3">
+          <h2 className="text-eyebrow uppercase tracking-wider text-ink-mute">
+            Draft da approvare ({replyDrafts.length})
+          </h2>
+          {replyDrafts.map((d) => (
+            <ReplyDraftCard key={d.id} draft={d} />
+          ))}
+        </section>
+      ) : null}
 
       <BookingsList
         bookings={bookings}
