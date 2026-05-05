@@ -118,13 +118,18 @@ export async function insertInboundMessage(
   // niente await: una failure dell'extraction non deve bloccare la
   // persistenza del messaggio. Skip per orphan (no booking) e per body
   // signal-only (gestito dentro triggerDnaExtraction).
+  // Slice 8.2: include hostId (recuperato via booking->property->host)
+  // per loggare l'azione in agent_actions.
   if (input.bookingId && insertedMsg.id) {
     const { triggerDnaExtraction } = await import('../dna-extraction-pipeline');
+    const { findHostIdForBooking } = await import('./bookings');
+    const hostId = await findHostIdForBooking(db, input.bookingId).catch(() => null);
     triggerDnaExtraction(db, {
       messageId: insertedMsg.id,
       bookingId: input.bookingId,
       body: input.body,
       sentAt: input.sentAt,
+      hostId: hostId ?? undefined,
     }).catch((err) => {
       console.warn('[messages-repo] DNA extraction trigger failed', err);
     });

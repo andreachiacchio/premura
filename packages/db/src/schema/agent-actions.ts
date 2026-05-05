@@ -1,17 +1,20 @@
 import {
+  boolean,
+  decimal,
+  index,
+  integer,
+  jsonb,
   pgTable,
-  uuid,
-  varchar,
   text,
   timestamp,
-  integer,
-  decimal,
-  jsonb,
-  index,
+  uuid,
+  varchar,
 } from 'drizzle-orm/pg-core';
-import { agentTypeEnum, agentActionStatusEnum } from './enums';
-import { hosts } from './hosts';
 import { bookings } from './bookings';
+import { agentActionStatusEnum, agentTypeEnum } from './enums';
+import { guestProfiles } from './guest-profiles';
+import { hosts } from './hosts';
+import { messages } from './messages';
 
 // Audit log di ogni decisione / azione di un agente.
 // Pilastro "Observabilità totale" (CLAUDE.md §4): niente black box.
@@ -57,6 +60,15 @@ export const agentActions = pgTable(
     errorMessage: text('error_message'),
     errorStack: text('error_stack'),
 
+    // Slice 8.2: FK opzionali per query "tutte le azioni AI sul X".
+    guestProfileId: uuid('guest_profile_id').references(() => guestProfiles.id, {
+      onDelete: 'set null',
+    }),
+    messageId: uuid('message_id').references(() => messages.id, { onDelete: 'set null' }),
+    // Slice 8.2: true quando l'host modifica/scarta la decisione
+    // dell'agente. Update lazy quando si registra un override.
+    humanOverride: boolean('human_override').notNull().default(false),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -65,5 +77,7 @@ export const agentActions = pgTable(
     index('agent_actions_agent_idx').on(t.agent),
     index('agent_actions_status_idx').on(t.status),
     index('agent_actions_created_at_idx').on(t.createdAt),
+    index('agent_actions_guest_profile_idx').on(t.guestProfileId),
+    index('agent_actions_message_idx').on(t.messageId),
   ],
 );
