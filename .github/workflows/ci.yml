@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+# Cancel in-progress runs su nuovo push allo stesso PR/branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-build:
+    name: vitest + typecheck + build + smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (per-workspace)
+        run: |
+          pnpm --filter @premura/web typecheck
+          pnpm --filter @premura/api typecheck
+
+      - name: Vitest (full suite)
+        run: pnpm test
+
+      - name: Static check — no inline closures su form action
+        # Catches il bug RSC fixato in slice 7a.5: inline arrow functions
+        # come <form action={() => ...}> non sono server-action references
+        # e crasha al render con "Functions cannot be passed directly to
+        # Client Components". Usa .bind(null, ...) invece.
+        run: |
+          if grep -rn 'action={(.*) =>\|action={async' apps/web/app --include='*.tsx' --include='*.ts'; then
+            echo "::error::Inline closures in <form action> non sono server actions valide. Usa .bind() o crea una server action dedicata."
+            exit 1
+          fi
+
+      - name: Build apps/web
+        run: pnpm --filter @premura/web build
+
+      - name: Build apps/api
+        run: pnpm --filter @premura/api build || true
+        # apps/api non ha ancora un build target esplicito (tsx runtime).
+        # Lasciato non-fail per ora; sara' enforced quando aggiungiamo
+        # il build step Fastify (slice deploy follow-up).
+
+      - name: Playwright smoke (route SSR)
+        run: pnpm --filter @premura/web test:e2e
