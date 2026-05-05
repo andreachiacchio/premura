@@ -92,6 +92,13 @@
       "when": 1778300000000,
       "tag": "0012_hosts_onboarding_step",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1778400000000,
+      "tag": "0013_host_voice_auto_extraction",
+      "breakpoints": true
     }
   ]
 }
