@@ -1,14 +1,16 @@
 import 'dotenv/config';
-import Fastify from 'fastify';
-import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import { createServerClient } from '@premura/db';
+import Fastify from 'fastify';
+import { bookingsRoutes } from './api/bookings';
+import { propertiesRoutes } from './api/properties';
+import { startIcalCron } from './jobs/ical-cron';
 // Import top-level: l'istanza Worker viene creata nel modulo importato e
 // inizia subito ad ascoltare la queue 'ical-poll'. Niente lazy load.
 import { icalPollWorker } from './jobs/ical-poll-worker';
 import { icalPollQueue } from './jobs/queues';
-import { startIcalCron } from './jobs/ical-cron';
-import { bookingsRoutes } from './api/bookings';
+import { attachJwtAuth } from './plugins/jwt-auth';
 
 const app = Fastify({
   logger: {
@@ -47,8 +49,17 @@ app.get('/health/jobs', async () => {
 // Postgres a vita app. Chiusa nello shutdown gracieful.
 const apiClient = createServerClient();
 
-// Routes M2a.4: completion form Booking + skip. Auth host JWT verra' in slice 6.
+// Slice 6.5.2: JWT validation Fastify per route protette. attachJwtAuth
+// (non plugin: deve agire sul context root) intercetta tutte le route
+// registrate DOPO. Esclude /health* e /webhooks/* dove la sicurezza
+// e' delegata a signature verify (es. WhatsApp HMAC).
+attachJwtAuth(app, { excludePaths: ['/health', '/webhooks/'] });
+
+// Routes M2a.4: completion form Booking + skip.
 await app.register(bookingsRoutes, { prefix: '/api/bookings', db: apiClient.db });
+
+// Slice 6.5.3: trigger one-shot iCal poll dopo creazione property.
+await app.register(propertiesRoutes, { prefix: '/api/properties', db: apiClient.db });
 
 // TODO: register webhooks, dashboard API, cleaner endpoints
 
