@@ -6,22 +6,131 @@ Questo slice chiude tre debiti tracciati da settimane, tutti piccoli, tutti util
 
 ## 6.5.1 — SMTP Resend per email magic link brandizzata
 
-**Stato:** **IN ATTESA CREDENZIALI ANDREA.**
+**Stato:** **codice ready-to-deploy, in attesa credenziali Andrea.**
 
-Cosa serve:
-1. Account Resend (https://resend.com): signup gratuito, free tier 100 email/giorno (sufficiente per pilot Andrea).
-2. Domain `premura.it` verificato in Resend: setup record SPF + DKIM via Vercel/registrar (~10 min, propagation ~1h).
-3. API key generata in Resend Dashboard.
-4. Configurazione Supabase Auth: Settings > Auth > SMTP Settings:
+Aggiornamento 5 mag 2026:
+- Codice client Premura pronto e testato. File:
+  `apps/web/lib/email-resend.ts` (REST API wrapper, no SDK npm
+  dipendenza). 15 unit test verdi.
+- Template magic link brandizzato HTML+plaintext pronto. File:
+  `apps/web/lib/email-templates.ts`. Identita' visiva slice 10a
+  (palette ivory/ink/terracotta, font Fraunces+Inter, copy italiano
+  in tono Premura).
+- Env var `RESEND_API_KEY` aggiunta a `.env.example`.
+- Codice e' dormant: viene chiamato solo se `RESEND_API_KEY` e'
+  popolato. Niente disruption nello stato attuale.
+
+### Step 1 — Signup Resend (Andrea, 2 min)
+
+1. Vai su https://resend.com/signup.
+2. Login con email Andrea (usare la stessa email Premura).
+3. Free tier: 100 email/giorno + 1 dominio verificato. Sufficiente
+   per pilot e prime fasi early access.
+
+### Step 2 — Aggiungi dominio premura.it a Resend (Andrea, 5 min)
+
+1. Resend Dashboard > Domains > Add Domain.
+2. Dominio: `premura.it` (root) oppure `mail.premura.it` (sottodominio
+   dedicato — preferito per evitare conflitti SPF con altri servizi).
+3. Region: `eu-west-1` (Frankfurt) per latenza Italia + GDPR.
+4. Resend mostra 3 record DNS da configurare:
+   - 1× **SPF**: TXT su `mail.premura.it` con valore tipo
+     `v=spf1 include:amazonses.com ~all`.
+   - 2× **DKIM**: 2 CNAME su `resend._domainkey.mail.premura.it` e
+     `resend2._domainkey.mail.premura.it`.
+
+### Step 3 — Configura DNS Vercel (Andrea, 10 min + propagation 1h)
+
+1. Vercel Dashboard > premura.it project > Settings > Domains.
+2. Click su `premura.it` > DNS tab.
+3. Aggiungi i 3 record copiati da Resend Step 2 (TXT SPF + 2 CNAME
+   DKIM).
+4. Salva. Propagation ~1h (puo' essere 5 min se DNS Vercel veloce).
+5. Torna su Resend Dashboard > Domains > premura.it > click
+   "Verify". Aspetta finche' diventa verde.
+
+### Step 4 — Genera API Key Resend (Andrea, 1 min)
+
+1. Resend Dashboard > API Keys > Create API Key.
+2. Name: `premura-prod`.
+3. Permission: `Sending access` (write only, no full access).
+4. Domain: `premura.it`.
+5. Copia il valore `re_xxxxxxxxxxxx`. **Mostrato una sola volta.**
+
+### Step 5 — Setta env var su Fly + Vercel (Andrea o Claude)
+
+Su Fly (apps/api se mai serve email da li'):
+```bash
+flyctl secrets set RESEND_API_KEY="re_xxx..." -a premura-api-staging
+```
+
+Su Vercel (apps/web, dove sta il codice client):
+```bash
+vercel env add RESEND_API_KEY production
+# incolla re_xxx...
+vercel env add RESEND_API_KEY preview
+# stesso valore
+```
+
+Niente push di codice necessario: il codice e' gia' deployato e
+attiva il client appena la env var e' popolata.
+
+### Step 6 — Configura Supabase Auth SMTP (Andrea, 5 min)
+
+Per il flow magic link (gestito da Supabase Auth), la chiave Resend
+viene esposta al SMTP server di Resend, non al SDK lato Premura.
+
+1. Supabase Dashboard > Project > Authentication > Email Templates.
+2. Click "Enable Custom SMTP" (icon ingranaggio).
+3. Settings:
    - Host: `smtp.resend.com`
    - Port: `587`
    - User: `resend`
-   - Password: `<RESEND_API_KEY>`
-   - Sender email: `noreply@premura.it`
+   - Password: `<RESEND_API_KEY>` (la stessa di Step 4)
+   - Sender email: `noreply@mail.premura.it` (o `noreply@premura.it`
+     a seconda del dominio configurato Step 2)
    - Sender name: `Premura`
-5. Template email magic link in Supabase: localizzato italiano + logo Premura.
+4. Save.
 
-Una volta fatto, il rate limit Supabase default (~4 email/h) sblocca: si passa al rate limit Resend (10 email/secondo, 100/giorno).
+### Step 7 — Template magic link in Supabase (Andrea, 5 min)
+
+1. Supabase Dashboard > Authentication > Email Templates > Magic Link.
+2. **Subject:** `Accedi a Premura` (export `MAGIC_LINK_SUBJECT` in
+   `apps/web/lib/email-templates.ts`).
+3. **Body (HTML):** copia-incolla output di
+   `buildMagicLinkHtml({ confirmationUrl: '{{ .ConfirmationURL }}' })`.
+   La variabile Supabase `{{ .ConfirmationURL }}` si interpola al
+   momento dell'invio.
+4. Save.
+
+### Step 8 — Smoke test (Andrea + Claude)
+
+1. Apri finestra incognito su `https://premura.it/login`.
+2. Inserisci email Andrea, click "Manda link".
+3. Verifica:
+   - Email ricevuta entro 30s.
+   - Sender = `noreply@mail.premura.it` (o `noreply@premura.it`).
+   - Layout brandizzato (palette ivory + bottone terracotta).
+   - Click sul bottone → redirect a `/auth/callback` → `/dashboard`.
+
+Una volta fatto, il rate limit Supabase default (~4 email/h) sblocca:
+si passa al rate limit Resend (10 email/secondo, 100/giorno).
+
+### Cosa fa il codice ready-to-deploy
+
+- `apps/web/lib/email-resend.ts`:
+  - `createResendClient({ apiKey?, fetcher? })`: throw se `RESEND_API_KEY`
+    mancante. Override `fetcher` per test con mock.
+  - `sendEmailViaResend(input)`: convenience env-based.
+  - `ResendClientError` con `statusCode` per error handling 4xx/5xx.
+- `apps/web/lib/email-templates.ts`:
+  - `buildMagicLinkHtml({ recipientName?, confirmationUrl, brandName? })`
+  - `buildMagicLinkText(...)` plaintext fallback per client che non
+    rendono HTML.
+  - `MAGIC_LINK_SUBJECT` costante.
+- `apps/web/tests/email-resend.test.ts`: 15 unit test verdi (mock
+  fetch, copre happy path, error 4xx, network error, response senza
+  id, template HTML/plaintext + branding).
 
 Decisione: **non bloccante**, ma utile dopo che si fanno test multipli sul magic link. Andrea decide quando fare il setup esterno; il codice non cambia.
 
