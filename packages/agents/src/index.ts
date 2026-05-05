@@ -1,8 +1,13 @@
-export * from './dna-extractor.js';
-export * from './draft-generator.js';
-export * from './dna-insights-merger.js';
-export * from './guest-dna.js';
-export * from './kit-composer.js';
-export * from './message-writer.js';
-export * from './voice-profile-merger.js';
-export * from './voice-profiler.js';
+// Barrel export. Niente estensione .js: Next.js webpack non risolve
+// .js su file .ts (vs tsx runtime + tsc bundler che lo fanno).
+// La risoluzione moduleResolution=bundler nel tsconfig + import senza
+// estensione funziona ovunque (apps/api con tsx, apps/web con webpack,
+// vitest tests).
+export * from './dna-extractor';
+export * from './dna-insights-merger';
+export * from './draft-generator';
+export * from './guest-dna';
+export * from './kit-composer';
+export * from './message-writer';
+export * from './voice-profile-merger';
+export * from './voice-profiler';

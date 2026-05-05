@@ -2,7 +2,6 @@ import { type DraftOutput, decideRouting, generateReplyDraft } from '@premura/ag
 import {
   type Database,
   bookings,
-  conversations,
   messages,
   pendingDrafts,
   properties,
