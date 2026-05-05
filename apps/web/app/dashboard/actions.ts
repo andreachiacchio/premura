@@ -1,7 +1,7 @@
 'use server';
 
-import { completeBookingManual, skipBookingCompletion } from '@/lib/api';
-import { getCurrentHostId } from '@/lib/auth';
+import { completeBookingManual, skipBookingCompletion, triggerIcalPollNow } from '@/lib/api';
+import { getCurrentAccessToken, getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getOrCreateDeflectionDraft, markDeflectionSent } from '@/lib/deflection-draft';
 import { findOwnership } from '@/lib/repositories/bookings';
@@ -96,7 +96,7 @@ export async function createPropertyAction(formData: FormData): Promise<void> {
   });
 
   const { db } = await getDb();
-  await createProperty({
+  const created = await createProperty({
     db,
     hostId,
     name: payload.name,
@@ -106,6 +106,18 @@ export async function createPropertyAction(formData: FormData): Promise<void> {
         ? payload.icalBookingUrl
         : undefined,
   });
+
+  // Slice 6.5.3: trigger one-shot iCal poll immediato. Best-effort: se
+  // fallisce, il prossimo cron tick (max 15 min) fara' il poll comunque.
+  // Solo se la property ha icalBookingUrl (altrimenti niente da pollare).
+  if (payload.icalBookingUrl && payload.icalBookingUrl.length > 0) {
+    try {
+      const token = await getCurrentAccessToken();
+      await triggerIcalPollNow(created.id, token);
+    } catch (err) {
+      console.warn('[createPropertyAction] iCal poll trigger failed', err);
+    }
+  }
 
   revalidatePath('/dashboard');
 }
