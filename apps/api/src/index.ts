@@ -11,6 +11,7 @@ import { startIcalCron } from './jobs/ical-cron';
 import { icalPollWorker } from './jobs/ical-poll-worker';
 import { icalPollQueue } from './jobs/queues';
 import { attachJwtAuth } from './plugins/jwt-auth';
+import { whatsappWebhookRoutes } from './api/webhooks/whatsapp';
 
 const app = Fastify({
   logger: {
@@ -61,7 +62,13 @@ await app.register(bookingsRoutes, { prefix: '/api/bookings', db: apiClient.db }
 // Slice 6.5.3: trigger one-shot iCal poll dopo creazione property.
 await app.register(propertiesRoutes, { prefix: '/api/properties', db: apiClient.db });
 
-// TODO: register webhooks, dashboard API, cleaner endpoints
+// Slice 7a.1: webhook WhatsApp Cloud API (opzione I, bootstrap su numero
+// Business esistente Andrea). Il plugin registra un content-type parser
+// custom per esporre rawBody (necessario per HMAC) — l'encapsulation
+// Fastify lo isola dal resto dell'app.
+await app.register(whatsappWebhookRoutes, { db: apiClient.db });
+
+// TODO: register dashboard API, cleaner endpoints
 
 // Cron iCal avviato dopo il worker (worker gia' importato top-level) e prima
 // di app.listen, cosi' eventuali tick che partono mentre l'app sta per andare
