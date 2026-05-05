@@ -21,20 +21,30 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 9.15.0
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
 
+      - name: Debug env
+        run: |
+          node --version
+          pnpm --version
+          which bash
+          bash --version | head -1
+          echo "PWD=$(pwd)"
+          ls -la
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck (per-workspace)
-        run: |
-          pnpm --filter @premura/web typecheck
-          pnpm --filter @premura/api typecheck
+      - name: Typecheck apps/web
+        run: pnpm --filter @premura/web typecheck
+
+      - name: Typecheck apps/api
+        run: pnpm --filter @premura/api typecheck
 
       - name: Vitest (full suite)
         run: pnpm test
@@ -45,19 +55,13 @@ jobs:
         # e crasha al render con "Functions cannot be passed directly to
         # Client Components". Usa .bind(null, ...) invece.
         run: |
-          if grep -rn 'action={(.*) =>\|action={async' apps/web/app --include='*.tsx' --include='*.ts'; then
+          if grep -rnE 'action=\{\(.*\) =>|action=\{async' apps/web/app --include='*.tsx' --include='*.ts'; then
             echo "::error::Inline closures in <form action> non sono server actions valide. Usa .bind() o crea una server action dedicata."
             exit 1
           fi
 
       - name: Build apps/web
         run: pnpm --filter @premura/web build
-
-      - name: Build apps/api
-        run: pnpm --filter @premura/api build || true
-        # apps/api non ha ancora un build target esplicito (tsx runtime).
-        # Lasciato non-fail per ora; sara' enforced quando aggiungiamo
-        # il build step Fastify (slice deploy follow-up).
 
       - name: Smoke route SSR (next start + curl)
         run: pnpm --filter @premura/web test:smoke
