@@ -4,23 +4,34 @@ import { advanceFromGmailAction, skipToNextStepAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
+// Slice 10a — Gmail connect step.
+
 export default function OnboardingGmailPage() {
   return (
     <OnboardingShell
       step="gmail"
-      title="Connetti la tua Gmail"
-      subtitle="Premura legge le notifiche email Booking e Airbnb per sapere quando un ospite ti scrive. Niente altre email vengono lette."
+      title="La tua Gmail"
+      subtitle="Mi serve per leggere le notifiche di Booking e Airbnb e capire quando un ospite ti scrive. Niente altro."
     >
-      <div className="flex flex-col gap-3">
-        <ul className="space-y-2 rounded-card bg-peach/40 px-4 py-3 text-body-sm text-blu-deep/80">
-          <li>Solo notifiche Booking + Airbnb</li>
-          <li>Mai email personali</li>
-          <li>Puoi disconnettere quando vuoi</li>
+      <div className="flex flex-col gap-5">
+        <ul className="space-y-2 rounded-card border border-line bg-paper-deep px-5 py-4 text-body-sm text-ink-soft">
+          <li className="flex items-start gap-2">
+            <span className="mt-1 size-1.5 shrink-0 rounded-full bg-ok" />
+            Leggo solo notifiche da Booking e Airbnb.
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-1 size-1.5 shrink-0 rounded-full bg-ok" />
+            Le altre email restano private.
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-1 size-1.5 shrink-0 rounded-full bg-ok" />
+            Disconnetti quando vuoi, senza chiedere.
+          </li>
         </ul>
 
         <Link
           href="/connect-gmail"
-          className="mt-4 w-full rounded-button bg-terracotta px-4 py-3 text-center font-semibold text-ivory transition-opacity hover:opacity-90"
+          className="mt-2 inline-flex h-12 w-full items-center justify-center rounded-full bg-terracotta px-6 text-body font-medium text-paper shadow-md transition-colors hover:bg-terracotta-2"
         >
           Connetti Gmail
         </Link>
@@ -28,16 +39,16 @@ export default function OnboardingGmailPage() {
         <form action={advanceFromGmailAction}>
           <button
             type="submit"
-            className="w-full rounded-button bg-blu-deep/5 px-4 py-3 font-medium text-blu-deep/80 transition-colors hover:bg-blu-deep/10"
+            className="inline-flex h-12 w-full items-center justify-center rounded-full border border-line bg-transparent px-6 text-body font-medium text-ink transition-colors hover:bg-line-soft"
           >
-            Ho gia' connesso, vai avanti
+            L'ho gia' connessa
           </button>
         </form>
 
         <form action={() => skipToNextStepAction('gmail')}>
           <button
             type="submit"
-            className="w-full text-body-sm text-blu-deep/50 underline-offset-2 hover:underline"
+            className="text-body-sm text-ink-mute underline-offset-2 hover:text-ink hover:underline"
           >
             Salta per ora
           </button>

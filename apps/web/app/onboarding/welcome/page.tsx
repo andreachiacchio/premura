@@ -3,16 +3,19 @@ import { submitWelcomeAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
+// Slice 10a — Welcome step. Identita' Premura: serif Fraunces per
+// headline, body Inter, palette ivory/ink/terracotta.
+
 export default function OnboardingWelcomePage() {
   return (
     <OnboardingShell
       step="welcome"
-      title="Benvenuto in Premura"
-      subtitle="Iniziamo con i tuoi dati. Bastano 2 minuti."
+      title="Benvenuto. Iniziamo."
+      subtitle="Mi presento per bene tra qualche minuto. Prima ho bisogno di sapere come ti chiamo."
     >
-      <form action={submitWelcomeAction} className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-body-sm font-medium text-blu-deep">Come ti chiami?</span>
+      <form action={submitWelcomeAction} className="flex flex-col gap-6">
+        <label className="flex flex-col gap-2">
+          <span className="text-body-sm font-medium text-ink-soft">Il tuo nome</span>
           <input
             type="text"
             name="fullName"
@@ -20,25 +23,31 @@ export default function OnboardingWelcomePage() {
             minLength={2}
             maxLength={255}
             placeholder="Andrea Chiacchio"
-            className="rounded-input border border-blu-deep/20 bg-white px-3 py-2.5 font-inter text-[15px] text-blu-deep focus:border-terracotta focus:outline-none focus:ring-2 focus:ring-terracotta/20"
+            className="h-12 rounded-card border border-line bg-paper px-4 text-body text-ink placeholder:text-ink-mute focus:border-terracotta-soft focus:outline-none focus:ring-2 focus:ring-terracotta-soft/40"
           />
         </label>
 
-        <fieldset className="flex flex-col gap-2">
-          <legend className="text-body-sm font-medium text-blu-deep">Lingua dell'app</legend>
-          <label className="flex items-center gap-2.5 rounded-card border border-blu-deep/15 bg-white px-3.5 py-2.5 cursor-pointer hover:bg-peach/30">
-            <input type="radio" name="locale" value="it-IT" defaultChecked />
-            <span className="text-[15px] text-blu-deep">Italiano</span>
+        <fieldset className="flex flex-col gap-2.5">
+          <legend className="text-body-sm font-medium text-ink-soft">La lingua dell'app</legend>
+          <label className="flex items-center gap-3 rounded-card border border-line bg-paper px-4 py-3 cursor-pointer transition-colors hover:border-terracotta-soft has-[:checked]:border-terracotta has-[:checked]:bg-paper-deep">
+            <input
+              type="radio"
+              name="locale"
+              value="it-IT"
+              defaultChecked
+              className="size-4 accent-terracotta"
+            />
+            <span className="text-body text-ink">Italiano</span>
           </label>
-          <label className="flex items-center gap-2.5 rounded-card border border-blu-deep/15 bg-white px-3.5 py-2.5 cursor-pointer hover:bg-peach/30">
-            <input type="radio" name="locale" value="en-US" />
-            <span className="text-[15px] text-blu-deep">English</span>
+          <label className="flex items-center gap-3 rounded-card border border-line bg-paper px-4 py-3 cursor-pointer transition-colors hover:border-terracotta-soft has-[:checked]:border-terracotta has-[:checked]:bg-paper-deep">
+            <input type="radio" name="locale" value="en-US" className="size-4 accent-terracotta" />
+            <span className="text-body text-ink">English</span>
           </label>
         </fieldset>
 
         <button
           type="submit"
-          className="mt-4 w-full rounded-button bg-terracotta px-4 py-3 font-semibold text-ivory transition-opacity hover:opacity-90"
+          className="mt-4 inline-flex h-12 w-full items-center justify-center rounded-full bg-terracotta px-6 text-body font-medium text-paper shadow-md transition-colors hover:bg-terracotta-2 active:translate-y-px"
         >
           Continua
         </button>

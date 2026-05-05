@@ -285,6 +285,51 @@ Strategia per host che usano già Smoobu / Hostaway / Lodgify: OAuth 1-click →
 
 ---
 
+## Slice 8.4 — Host voice profiler automatico (5 maggio 2026)
+
+**Stato:** mergiato in main.
+
+- [x] Migration 0013 (host_voice_profiles +9 colonne Modo 2 auto-extraction).
+- [x] `packages/agents/voice-profiler.ts` — Sonnet 4.6 + tool_use + Zod, MESSAGE_TOPICS chiuso.
+- [x] `packages/agents/voice-profile-merger.ts` — weighted MA decay 0.95, voiceConfidence logaritmica plateau ~50.
+- [x] `apps/web/lib/voice-profile-pipeline.ts` — orchestratore fire-and-forget, BATCH_SIZE 5.
+- [x] Hook in `markDeflectionSent` (slice 7a.3).
+- [ ] Cabling esteso a parser AI Airbnb message + Conversation Agent inbound (slice 8.4.1, richiede worker BullMQ async per webhook WA).
+- [ ] **No UI host** (anti-pattern: Premura impara in background, l'host non vede ne' modifica).
+
+---
+
+## Slice 10a — Visual identity foundation (5 maggio 2026)
+
+**Stato:** mergiato in main.
+
+- [x] Design tokens estratti dal prototipo `demo/premura-prototype.html` in `apps/web/app/globals.css` (palette ivory/ink/terracotta/gold, typography Fraunces/Inter, radii, shadow tinted ink, easing).
+- [x] Componenti shadcn (`button`, `badge`, `card`, `dialog`, `form`, `input`, `label`) con stile Premura (preesistenti slice 6, allineati).
+- [x] Login + auth callback gia' allineati slice 6.
+- [x] Onboarding pages refactorate slice 9 prep -> slice 10a: serif headlines, palette tokens, microcopy umano italiano in prima persona Premura ("Mi presento", "Penso io a tutto il resto", "Ti scrivo via email").
+- [x] Dashboard **NON toccata**: rimane stile slice 6 fino a slice 10b (sessione futura quando Pipeline 1 ha dati prod).
+
+---
+
+## Slice 12 — Property knowledge ingestion (5 maggio 2026)
+
+**Stato:** mergiato in main.
+
+(Vedi PR slice 12 per dettagli implementazione.)
+
+---
+
+## Debt 6.5.1 — SMTP Resend ready-to-deploy (5 maggio 2026)
+
+**Stato:** codice + doc pronti, **in attesa credenziali Andrea**.
+
+- [x] `apps/web/lib/email-resend.ts` — client wrapper Resend SDK (mock-friendly).
+- [x] Template magic link brandizzato (HTML + plaintext, italiano).
+- [x] `docs/SLICE-6-5-DEBTS.md` §6.5.1 procedura completa: signup Resend, DNS Vercel SPF + DKIM, verifica dominio, generazione API key, configurazione Supabase Auth SMTP.
+- [ ] Andrea: signup Resend + DNS records Vercel + provide `RESEND_API_KEY` su Fly secrets.
+
+---
+
 ## Fase 4 — WhatsApp + Conversation Agent (settimana 4-5)
 
 **Obiettivo:** messaggistica bidirezionale funzionante.

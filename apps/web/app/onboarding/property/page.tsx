@@ -3,16 +3,18 @@ import { submitFirstPropertyAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
+// Slice 10a — Property step.
+
 export default function OnboardingPropertyPage() {
   return (
     <OnboardingShell
       step="property"
-      title="Aggiungi la tua prima struttura"
-      subtitle="Premura gestira' le prenotazioni e i messaggi degli ospiti per questa struttura."
+      title="La prima struttura"
+      subtitle="Aggiungi il primo appartamento. Penso io a tutto il resto: messaggi, recensioni, ospiti."
     >
-      <form action={submitFirstPropertyAction} className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-body-sm font-medium text-blu-deep">Nome struttura</span>
+      <form action={submitFirstPropertyAction} className="flex flex-col gap-5">
+        <label className="flex flex-col gap-2">
+          <span className="text-body-sm font-medium text-ink-soft">Nome della struttura</span>
           <input
             type="text"
             name="name"
@@ -20,12 +22,12 @@ export default function OnboardingPropertyPage() {
             minLength={2}
             maxLength={255}
             placeholder="La Goccia di S.Gennaro"
-            className="rounded-input border border-blu-deep/20 bg-white px-3 py-2.5 font-inter text-[15px] text-blu-deep focus:border-terracotta focus:outline-none focus:ring-2 focus:ring-terracotta/20"
+            className="h-12 rounded-card border border-line bg-paper px-4 text-body text-ink placeholder:text-ink-mute focus:border-terracotta-soft focus:outline-none focus:ring-2 focus:ring-terracotta-soft/40"
           />
         </label>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-body-sm font-medium text-blu-deep">Citta'</span>
+        <label className="flex flex-col gap-2">
+          <span className="text-body-sm font-medium text-ink-soft">Citta'</span>
           <input
             type="text"
             name="city"
@@ -33,28 +35,29 @@ export default function OnboardingPropertyPage() {
             minLength={2}
             maxLength={128}
             placeholder="Napoli"
-            className="rounded-input border border-blu-deep/20 bg-white px-3 py-2.5 font-inter text-[15px] text-blu-deep focus:border-terracotta focus:outline-none focus:ring-2 focus:ring-terracotta/20"
+            className="h-12 rounded-card border border-line bg-paper px-4 text-body text-ink placeholder:text-ink-mute focus:border-terracotta-soft focus:outline-none focus:ring-2 focus:ring-terracotta-soft/40"
           />
         </label>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-body-sm font-medium text-blu-deep">
-            URL iCal Booking <span className="text-blu-deep/50">(opzionale)</span>
+        <label className="flex flex-col gap-2">
+          <span className="text-body-sm font-medium text-ink-soft">
+            Calendario Booking <span className="text-ink-mute">(facoltativo)</span>
           </span>
           <input
             type="url"
             name="icalBookingUrl"
-            placeholder="https://ical.booking.com/v1/export?t=..."
-            className="rounded-input border border-blu-deep/20 bg-white px-3 py-2.5 font-inter text-[14px] text-blu-deep focus:border-terracotta focus:outline-none focus:ring-2 focus:ring-terracotta/20"
+            placeholder="https://ical.booking.com/..."
+            className="h-12 rounded-card border border-line bg-paper px-4 text-body-sm text-ink placeholder:text-ink-mute focus:border-terracotta-soft focus:outline-none focus:ring-2 focus:ring-terracotta-soft/40"
           />
-          <span className="text-[12px] text-blu-deep/60">
-            Lo trovi su admin.booking.com &rarr; Calendari &rarr; Esporta calendario.
+          <span className="text-body-sm text-ink-mute">
+            Lo trovi su <em>admin.booking.com</em> &rarr; Calendari &rarr; Esporta calendario. Lo
+            aggiungi anche dopo se preferisci.
           </span>
         </label>
 
         <button
           type="submit"
-          className="mt-4 w-full rounded-button bg-terracotta px-4 py-3 font-semibold text-ivory transition-opacity hover:opacity-90"
+          className="mt-4 inline-flex h-12 w-full items-center justify-center rounded-full bg-terracotta px-6 text-body font-medium text-paper shadow-md transition-colors hover:bg-terracotta-2 active:translate-y-px"
         >
           Continua
         </button>
