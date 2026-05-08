@@ -1,4 +1,13 @@
-import { index, jsonb, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { bookings } from './bookings';
 import { pendingDraftStatusEnum } from './enums';
 import { hosts } from './hosts';
@@ -75,6 +84,21 @@ export const pendingDrafts = pgTable(
     // questo differisce da draft_response).
     finalResponseSent: text('final_response_sent'),
 
+    // ─── Slice 7B: tracking outbound Meta Cloud API ───
+    //
+    // sent_at: timestamp 200 da Meta (separato da approved_at, il click
+    // host puo' essere precedente alla send se la API lagga).
+    // rejection_reason: opzionale, dato dall'host al click Scarta.
+    // meta_message_id: wamid Meta (duplica messages.platform_message_id
+    // ma evita join nei fast path UI).
+    // error_log: ultima failure (Meta 4xx body o 5xx fallito).
+    // retry_count: tentativi BullMQ (max 3 prima di status='failed').
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    rejectionReason: text('rejection_reason'),
+    metaMessageId: varchar('meta_message_id', { length: 255 }),
+    errorLog: text('error_log'),
+    retryCount: integer('retry_count').notNull().default(0),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -85,5 +109,6 @@ export const pendingDrafts = pgTable(
     index('pending_drafts_expires_at_idx').on(t.expiresAt),
     index('pending_drafts_kind_idx').on(t.kind),
     index('pending_drafts_reply_to_message_idx').on(t.replyToMessageId),
+    index('pending_drafts_meta_message_idx').on(t.metaMessageId),
   ],
 );

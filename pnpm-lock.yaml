@@ -107,6 +107,9 @@ importers:
       '@premura/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@premura/integrations':
+        specifier: workspace:*
+        version: link:../../packages/integrations
       '@premura/shared':
         specifier: workspace:*
         version: link:../../packages/shared

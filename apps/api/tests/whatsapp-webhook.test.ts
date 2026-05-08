@@ -153,7 +153,8 @@ describe('POST /webhooks/whatsapp - event delivery con signature verify', () => 
       payload,
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ received: true, persisted: 0 });
+    // Slice 7B aggiunge status_events nella response (anche 0 se nessuno).
+    expect(res.json()).toEqual({ received: true, persisted: 0, status_events: 0 });
   });
 
   it('signature mancante -> 401', async () => {

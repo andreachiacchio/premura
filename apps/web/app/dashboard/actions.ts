@@ -176,26 +176,38 @@ export async function markDeflectionSentAction(draftId: string): Promise<void> {
   revalidatePath('/dashboard');
 }
 
-// Slice 11 — Reply draft actions (approve/edit/reject).
+// Slice 11 / 7B — Reply draft actions (approve/edit/reject).
 //
 // approveReplyDraftAction: usato dal bottone "Invia". Body rimane il
-// draft originale. Insert outbound message + update draft status.
+// draft originale. Slice 7B: chiama Meta Cloud API per inviare
+// realmente al guest. Ritorna l'esito strutturato (sent/failed/...) cosi'
+// l'UI mostra toast appropriato senza throw generico.
 //
 // editAndSendReplyDraftAction: usato dal bottone "Invia modifiche"
 // dopo edit inline. Body custom passato dal client. status='modified'
-// (humanOverride=true tracciato anche nel logger se serve).
+// + invio Meta come sopra.
 //
-// rejectReplyDraftAction: usato dal bottone "Scarta". Update status,
-// niente outbound message. Tracciato in agent_actions in slice
-// futura via markHumanOverride sull'action ID corrispondente.
+// rejectReplyDraftAction: usato dal bottone "Scarta". Slice 7B accetta
+// reason opzionale (audit). Niente outbound message.
 
 const replyDraftBodySchema = z.string().trim().min(2).max(2000);
+const rejectionReasonSchema = z.string().trim().max(500).optional();
 
-export async function approveReplyDraftAction(draftId: string): Promise<void> {
+// Risultato pubblico per l'UI: enumeration per tipi di esito senza
+// leakare dettagli implementativi (Meta error body, ecc.). Lato client
+// si fa switch per mostrare toast giusto.
+export type ApproveActionResult =
+  | { ok: true; metaMessageId: string }
+  | {
+      ok: false;
+      reason: 'not_found' | 'no_guest_phone' | 'channel_not_supported' | 'send_failed';
+      detail?: string;
+    };
+
+export async function approveReplyDraftAction(draftId: string): Promise<ApproveActionResult> {
   const id = idSchema.parse(draftId);
   const hostId = await getCurrentHostId();
   const { db } = await getDb();
-  // Per "Invia" senza modifiche serve recuperare il draft originale.
   const { pendingDrafts } = await import('@premura/db');
   const { eq, and: andOp } = await import('drizzle-orm');
   const [draft] = await db
@@ -204,28 +216,48 @@ export async function approveReplyDraftAction(draftId: string): Promise<void> {
     .where(andOp(eq(pendingDrafts.id, id), eq(pendingDrafts.kind, 'reply_draft')))
     .limit(1);
   if (!draft || draft.hostId !== hostId) {
-    throw new Error(NOT_FOUND_MESSAGE);
+    return { ok: false, reason: 'not_found' };
   }
-  await approveAndSendReplyDraft(db, id, draft.body, hostId);
+  const result = await approveAndSendReplyDraft(db, id, draft.body, hostId);
   revalidatePath('/dashboard');
+  return mapApproveResult(result);
 }
 
 export async function editAndSendReplyDraftAction(
   draftId: string,
   finalBody: string,
-): Promise<void> {
+): Promise<ApproveActionResult> {
   const id = idSchema.parse(draftId);
   const body = replyDraftBodySchema.parse(finalBody);
   const hostId = await getCurrentHostId();
   const { db } = await getDb();
-  await approveAndSendReplyDraft(db, id, body, hostId);
+  const result = await approveAndSendReplyDraft(db, id, body, hostId);
   revalidatePath('/dashboard');
+  return mapApproveResult(result);
 }
 
-export async function rejectReplyDraftAction(draftId: string): Promise<void> {
+function mapApproveResult(
+  r: Awaited<ReturnType<typeof approveAndSendReplyDraft>>,
+): ApproveActionResult {
+  if (r.status === 'sent') return { ok: true, metaMessageId: r.metaMessageId };
+  if (r.status === 'already_sent') {
+    return r.metaMessageId
+      ? { ok: true, metaMessageId: r.metaMessageId }
+      : { ok: false, reason: 'send_failed', detail: 'gia processato senza wamid' };
+  }
+  if (r.status === 'not_found') return { ok: false, reason: 'not_found' };
+  if (r.status === 'no_guest_phone') return { ok: false, reason: 'no_guest_phone' };
+  if (r.status === 'channel_not_supported') {
+    return { ok: false, reason: 'channel_not_supported', detail: r.channel };
+  }
+  return { ok: false, reason: 'send_failed', detail: r.error };
+}
+
+export async function rejectReplyDraftAction(draftId: string, reason?: string): Promise<void> {
   const id = idSchema.parse(draftId);
+  const parsedReason = rejectionReasonSchema.parse(reason);
   const hostId = await getCurrentHostId();
   const { db } = await getDb();
-  await rejectReplyDraft(db, id, hostId);
+  await rejectReplyDraft(db, id, hostId, parsedReason);
   revalidatePath('/dashboard');
 }

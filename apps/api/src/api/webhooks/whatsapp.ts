@@ -1,10 +1,12 @@
 import type { Database } from '@premura/db';
+import { parseStatusEvents } from '@premura/integrations';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { enqueueDraftGeneration } from '../../jobs/draft-generation-queue';
 import { extractInboundMessages, whatsappWebhookPayloadSchema } from './whatsapp-payload';
 import { persistInboundMessage } from './whatsapp-persist';
 import { verifyMetaSignature } from './whatsapp-signature';
+import { applyOutboundStatusUpdate } from './whatsapp-status-persist';
 
 // Webhook WhatsApp Cloud API per messaggi inbound (slice 7a.1, opzione I).
 //
@@ -173,15 +175,67 @@ export const whatsappWebhookRoutes: FastifyPluginAsync<WhatsappWebhookPluginOpti
       );
     }
 
+    // Slice 7B: status events outbound (sent/delivered/read/failed).
+    // Parsiamo l'array "statuses" parallelo a "messages" e aggiorniamo
+    // messages.deliveredAt/readAt/failedAt + pending_drafts.status='failed'
+    // se applicabile. Idempotente: stesso evento puo' arrivare piu' volte.
+    const statusEvents = parseStatusEvents(req.body);
+    let statusUpdated = 0;
+    let statusUnmatched = 0;
+    for (const ev of statusEvents) {
+      try {
+        const result = await applyOutboundStatusUpdate(db, {
+          wamid: ev.wamid,
+          status: ev.status,
+          timestamp: ev.timestamp,
+          errorMessage: ev.errorMessage,
+        });
+        if (result.matched) {
+          statusUpdated++;
+          req.log.info(
+            {
+              event: 'wa.status.applied',
+              wamid: ev.wamid,
+              status: ev.status,
+              messageId: result.messageId,
+              draftId: result.draftId,
+              applied: result.applied,
+            },
+            'whatsapp outbound status applied',
+          );
+        } else {
+          statusUnmatched++;
+          req.log.debug(
+            { event: 'wa.status.unmatched', wamid: ev.wamid, status: ev.status },
+            'whatsapp status per outbound non nostro (skip)',
+          );
+        }
+      } catch (err) {
+        req.log.error(
+          { event: 'wa.status.error', err, wamid: ev.wamid, status: ev.status },
+          'whatsapp status apply failed',
+        );
+      }
+    }
+
     const flatMessages = extractInboundMessages(parsed.data);
-    if (flatMessages.length === 0) {
-      // Probabilmente status update (delivered/read) o webhook system.
-      // Niente da persistere, ack 200.
+    if (flatMessages.length === 0 && statusEvents.length === 0) {
+      // Niente messages NE statuses: probabilmente system event. Ack.
       req.log.debug(
-        { event: 'wa.parse.no_messages', appId, wabaIds: incomingWabaIds },
-        'whatsapp webhook senza messaggi (probabile status update)',
+        { event: 'wa.parse.no_payload', appId, wabaIds: incomingWabaIds },
+        'whatsapp webhook senza messages ne statuses (probabile system event)',
       );
-      return reply.code(200).send({ received: true, persisted: 0 });
+      return reply.code(200).send({ received: true, persisted: 0, status_events: 0 });
+    }
+    if (flatMessages.length === 0) {
+      // Solo statuses, gia' processati sopra.
+      return reply.code(200).send({
+        received: true,
+        persisted: 0,
+        status_events: statusEvents.length,
+        status_updated: statusUpdated,
+        status_unmatched: statusUnmatched,
+      });
     }
 
     let inserted = 0;
@@ -266,12 +320,19 @@ export const whatsappWebhookRoutes: FastifyPluginAsync<WhatsappWebhookPluginOpti
         orphans,
         errors,
         drafts_enqueued,
+        status_events: statusEvents.length,
+        status_updated: statusUpdated,
+        status_unmatched: statusUnmatched,
         total: flatMessages.length,
         appId,
       },
       'whatsapp webhook batch processed',
     );
-    return reply.code(200).send({ received: true, persisted: inserted });
+    return reply.code(200).send({
+      received: true,
+      persisted: inserted,
+      status_events: statusEvents.length,
+    });
   });
 };
 

@@ -68,7 +68,18 @@ function ctaByLanguage(lang: string, waNumber: string): string {
   }
 }
 
-export type DeflectionDraftStatus = 'pending' | 'approved' | 'rejected' | 'modified' | 'expired';
+// Slice 7B: enum DB esteso con 'sent' + 'failed' (outbound Meta tracking).
+// Per i deflection draft questi stati non vengono mai prodotti (deflection
+// sta in pending|approved|rejected|expired) ma il tipo deve riflettere la
+// union completa per assignment compatibility con le row Drizzle.
+export type DeflectionDraftStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'modified'
+  | 'expired'
+  | 'sent'
+  | 'failed';
 
 export type DeflectionDraftRow = {
   id: string;
