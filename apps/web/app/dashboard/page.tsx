@@ -4,6 +4,7 @@ import { getOnboardingState, urlForStep } from '@/lib/onboarding';
 import { findByHostId } from '@/lib/repositories/bookings';
 import { findByHostId as findPropertiesByHostId } from '@/lib/repositories/properties';
 import { listPendingReplyDraftsForHost } from '@/lib/repositories/reply-drafts';
+import { listUpcomingCheckins } from '@/lib/repositories/upcoming-checkins';
 import { isIncompleteDataSource } from '@/lib/types';
 import { redirect } from 'next/navigation';
 import { BookingsList } from './_components/BookingsList';
@@ -12,6 +13,7 @@ import { EmptyOnboardingState } from './_components/EmptyOnboardingState';
 import { EmptyState } from './_components/EmptyState';
 import { IncompleteAlert } from './_components/IncompleteAlert';
 import { ReplyDraftCard } from './_components/ReplyDraftCard';
+import { UpcomingCheckinsCard } from './_components/UpcomingCheckinsCard';
 import { completeBookingAction, createPropertyAction, skipBookingAction } from './actions';
 
 // Server component: render server-side, fetch via repository drizzle
@@ -55,18 +57,28 @@ export default async function DashboardPage() {
     );
   }
 
-  const [bookings, replyDrafts] = await Promise.all([
+  const [bookings, replyDrafts, upcoming] = await Promise.all([
     findByHostId({ db, hostId }),
     listPendingReplyDraftsForHost(db, hostId),
+    listUpcomingCheckins(db, hostId),
   ]);
 
   const incompleteToCompleteCount = bookings.filter(
     (b) => isIncompleteDataSource(b.dataSource) && !b.hostSkippedCompletion,
   ).length;
 
+  // Slice A: counter prossimi check-in da configurare (senza guest_phone).
+  const upcomingTotal = upcoming.length;
+  const upcomingMissingPhone = upcoming.filter((b) => !b.guestPhone).length;
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-ivory">
       <DashboardHeader hostFirstName="Andrea" />
+
+      {/* Slice A: card "Prossimi check-in" — gateway per attivare booking. */}
+      {upcomingTotal > 0 ? (
+        <UpcomingCheckinsCard total={upcomingTotal} missing={upcomingMissingPhone} />
+      ) : null}
 
       {incompleteToCompleteCount > 0 ? (
         <IncompleteAlert count={incompleteToCompleteCount} />
