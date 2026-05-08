@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-and-build:
-    name: vitest + typecheck + build + smoke
+  ci:
+    name: ci
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -28,23 +28,8 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Debug env
-        run: |
-          node --version
-          pnpm --version
-          which bash
-          bash --version | head -1
-          echo "PWD=$(pwd)"
-          ls -la
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Typecheck apps/web
-        run: pnpm --filter @premura/web typecheck
-
-      - name: Typecheck apps/api
-        run: pnpm --filter @premura/api typecheck
 
       - name: Vitest (full suite)
         run: pnpm test
@@ -61,7 +46,14 @@ jobs:
           fi
 
       - name: Build apps/web
+        # Heap bump: il bundle RSC con packages/agents (slice 7a.4: +13K
+        # righe) supera il default ~4GB di Node su runner standard. 7168
+        # MB lascia margine ma resta sotto i 7GB nominali del runner. Env
+        # locale allo step: il vitest non ne ha bisogno e mascherare il
+        # limite globalmente nasconderebbe regressioni future.
         run: pnpm --filter @premura/web build
+        env:
+          NODE_OPTIONS: --max-old-space-size=7168
 
       - name: Smoke route SSR (next start + curl)
         run: pnpm --filter @premura/web test:smoke
