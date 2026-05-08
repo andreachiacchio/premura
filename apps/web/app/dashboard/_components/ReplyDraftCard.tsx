@@ -48,11 +48,29 @@ export function ReplyDraftCard({ draft }: { draft: ReplyDraftCardData }) {
           ? 'Airbnb'
           : 'email';
 
+  // Slice 7B: messaggi user-facing per gli esiti dell'approve action
+  // (Meta API call). Sostituisce il try/catch generico precedente.
+  const reasonToMessage = (reason: string, detail?: string): string => {
+    switch (reason) {
+      case 'not_found':
+        return "Draft non trovato. Forse e' gia' stato gestito.";
+      case 'no_guest_phone':
+        return 'Numero ospite mancante. Aggiungilo dalla scheda prenotazione.';
+      case 'channel_not_supported':
+        return `Canale "${detail}" non ancora supportato. Solo WhatsApp.`;
+      case 'send_failed':
+        return `Invio fallito${detail ? `: ${detail.slice(0, 200)}` : ''}.`;
+      default:
+        return 'Errore inatteso.';
+    }
+  };
+
   const handleSend = (): void => {
     setError(null);
     startTransition(async () => {
       try {
-        await approveReplyDraftAction(draft.id);
+        const result = await approveReplyDraftAction(draft.id);
+        if (!result.ok) setError(reasonToMessage(result.reason, result.detail));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Invio fallito');
       }
@@ -67,18 +85,19 @@ export function ReplyDraftCard({ draft }: { draft: ReplyDraftCardData }) {
     }
     startTransition(async () => {
       try {
-        await editAndSendReplyDraftAction(draft.id, editedBody);
+        const result = await editAndSendReplyDraftAction(draft.id, editedBody);
+        if (!result.ok) setError(reasonToMessage(result.reason, result.detail));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Invio fallito');
       }
     });
   };
 
-  const handleReject = (): void => {
+  const handleReject = (reason?: string): void => {
     setError(null);
     startTransition(async () => {
       try {
-        await rejectReplyDraftAction(draft.id);
+        await rejectReplyDraftAction(draft.id, reason);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Scarto fallito');
       }
@@ -173,7 +192,18 @@ export function ReplyDraftCard({ draft }: { draft: ReplyDraftCardData }) {
             </button>
             <button
               type="button"
-              onClick={handleReject}
+              onClick={() => {
+                // Slice 7B: per ora reject senza modal reason (UI minimale).
+                // Reason e' opzionale lato repository — slice 7B.1 aggiungera'
+                // il modal con dropdown ("non e' contestuale", "tono sbagliato",
+                // "ho gia' risposto a mano").
+                const reason = window.confirm(
+                  'Scartare il draft?\n\nOK = scarta. Annulla = chiudi.',
+                )
+                  ? undefined
+                  : null;
+                if (reason !== null) handleReject();
+              }}
               disabled={pending}
               className="inline-flex h-10 items-center gap-1.5 rounded-full border border-line bg-transparent px-4 text-body-sm font-medium text-ink-soft hover:text-ink-mute disabled:opacity-50"
             >

@@ -1,9 +1,25 @@
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', {
-  apiVersion: '2024-12-18.acacia' as Stripe.LatestApiVersion,
-  typescript: true,
-});
+// Slice 7B: lazy init invece di module-load. Importare il barrel
+// @premura/integrations da apps/web (per WhatsApp helpers) caricava
+// questo modulo che istanziava Stripe; senza STRIPE_SECRET_KEY (es.
+// in vitest test env) il constructor throw. Ora il client viene creato
+// alla prima chiamata API, e i test che non toccano Stripe non ne
+// soffrono.
+let _stripe: Stripe | null = null;
+function getStripe(): Stripe {
+  if (!_stripe) {
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) {
+      throw new Error('Stripe not configured: missing STRIPE_SECRET_KEY');
+    }
+    _stripe = new Stripe(key, {
+      apiVersion: '2024-12-18.acacia' as Stripe.LatestApiVersion,
+      typescript: true,
+    });
+  }
+  return _stripe;
+}
 
 /**
  * Two types of charges in Premura:
@@ -21,7 +37,7 @@ export async function createCustomer(input: {
   email: string;
   fullName?: string;
 }): Promise<{ customerId: string }> {
-  const customer = await stripe.customers.create({
+  const customer = await getStripe().customers.create({
     email: input.email,
     name: input.fullName,
     metadata: { hostId: input.hostId },
@@ -36,7 +52,7 @@ export async function createSubscription(input: {
   priceId: string; // Stripe Price ID for the tiered monthly subscription
   trialDays?: number;
 }): Promise<{ subscriptionId: string; status: string; clientSecret?: string }> {
-  const sub = await stripe.subscriptions.create({
+  const sub = await getStripe().subscriptions.create({
     customer: input.customerId,
     items: [{ price: input.priceId }],
     trial_period_days: input.trialDays,
@@ -47,13 +63,13 @@ export async function createSubscription(input: {
 
   const invoice = sub.latest_invoice as Stripe.Invoice | null;
   const pi = invoice?.payment_intent as Stripe.PaymentIntent | null | string;
-  const clientSecret = typeof pi === 'object' && pi ? pi.client_secret ?? undefined : undefined;
+  const clientSecret = typeof pi === 'object' && pi ? (pi.client_secret ?? undefined) : undefined;
 
   return { subscriptionId: sub.id, status: sub.status, clientSecret };
 }
 
 export async function cancelSubscription(subscriptionId: string): Promise<void> {
-  await stripe.subscriptions.cancel(subscriptionId);
+  await getStripe().subscriptions.cancel(subscriptionId);
 }
 
 // ===== PER-KIT CHARGE (off-session) =====
@@ -65,7 +81,7 @@ export async function chargeForKit(input: {
   kitId: string;
   description: string; // e.g. "Kit Anna — Falanghina + sfogliatelle"
 }): Promise<{ paymentIntentId: string; status: string }> {
-  const pi = await stripe.paymentIntents.create({
+  const pi = await getStripe().paymentIntents.create({
     customer: input.customerId,
     amount: input.amountEurCents,
     currency: 'eur',
@@ -94,5 +110,5 @@ export function constructWebhookEvent(
   signature: string,
   secret: string = process.env.STRIPE_WEBHOOK_SECRET ?? '',
 ): Stripe.Event {
-  return stripe.webhooks.constructEvent(payload, signature, secret);
+  return getStripe().webhooks.constructEvent(payload, signature, secret);
 }

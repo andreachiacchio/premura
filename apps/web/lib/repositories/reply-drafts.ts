@@ -1,7 +1,14 @@
 import { type Database, bookings, messages, pendingDrafts, properties } from '@premura/db';
+import { WhatsappSendError, sendText } from '@premura/integrations';
 import { and, desc, eq } from 'drizzle-orm';
 
-// Slice 11 — Repository helpers per reply_draft pending.
+// Slice 11 / 7B — Repository helpers per reply_draft pending.
+//
+// Slice 7B (outbound): approveAndSendReplyDraft chiama davvero Meta
+// Cloud API per inviare il messaggio al guest, poi traccia status
+// ('sent' su 200, 'failed' su errore non recuperabile). Retry inline
+// 1x su 5xx/429 (transient). Per resilienza piu' robusta (cron retry,
+// dead-letter), TODO follow-up con worker BullMQ in apps/api.
 
 export type ReplyDraftView = {
   id: string;
@@ -9,7 +16,7 @@ export type ReplyDraftView = {
   hostId: string;
   draftBody: string;
   reasoning: string | null;
-  status: 'pending' | 'approved' | 'rejected' | 'modified' | 'expired';
+  status: 'pending' | 'approved' | 'rejected' | 'modified' | 'expired' | 'sent' | 'failed';
   metadata: {
     confidence?: number;
     classification?: string;
@@ -91,17 +98,44 @@ export async function listPendingReplyDraftsForHost(
   }));
 }
 
-// Marca draft come inviato: insert messages outbound + update draft.
-// Idempotente: clic multipli non duplicano message.
+export type ApproveResult =
+  | { status: 'sent'; messageId: string; metaMessageId: string }
+  | { status: 'already_sent'; metaMessageId: string | null }
+  | { status: 'not_found' }
+  | { status: 'no_guest_phone' }
+  | { status: 'failed'; error: string }
+  | { status: 'channel_not_supported'; channel: string };
+
+// Slice 7B: approve + invio outbound via Meta Cloud API (canale whatsapp).
+// Step:
+//  1. Fetch draft + booking + guest_phone (singola query JOIN).
+//  2. Validate: draft esiste, status=pending, guest_phone presente,
+//     canale=whatsapp (per ora; slice 7B v1 fa solo WA).
+//  3. Mark status='approved' temporaneamente (idempotency lock).
+//  4. Call sendText (Meta Cloud API). Retry 1x su 5xx/429.
+//  5. Su success: status='sent', sent_at, meta_message_id;
+//     insert messages row con platform_message_id=wamid.
+//  6. Su failure: status='failed', error_log.
+//
+// Idempotenza: status check pre-send. Se gia' sent/failed/approved,
+// non rifa la chiamata. Race su click multipli: l'UPDATE atomico
+// con WHERE status='pending' garantisce singolo invio.
 export async function approveAndSendReplyDraft(
   db: Database,
   draftId: string,
   finalBody: string,
   hostId: string,
-): Promise<{ status: 'sent' | 'already_sent' | 'not_found'; messageId?: string }> {
-  const [draft] = await db
-    .select()
+): Promise<ApproveResult> {
+  // Single query: draft + booking guest_phone + inbound channel.
+  const [row] = await db
+    .select({
+      draft: pendingDrafts,
+      guestPhone: bookings.guestPhone,
+      inboundChannel: messages.channel,
+    })
     .from(pendingDrafts)
+    .innerJoin(bookings, eq(pendingDrafts.bookingId, bookings.id))
+    .leftJoin(messages, eq(pendingDrafts.replyToMessageId, messages.id))
     .where(
       and(
         eq(pendingDrafts.id, draftId),
@@ -110,34 +144,91 @@ export async function approveAndSendReplyDraft(
       ),
     )
     .limit(1);
-  if (!draft) return { status: 'not_found' };
-  if (draft.status === 'approved') return { status: 'already_sent' };
 
-  // Determina canale outbound dal messaggio inbound originale.
-  let outboundChannel: 'whatsapp' | 'booking_inbox' | 'airbnb_inbox' | 'email' = 'whatsapp';
-  if (draft.replyToMessageId) {
-    const [inbound] = await db
-      .select({ channel: messages.channel })
-      .from(messages)
-      .where(eq(messages.id, draft.replyToMessageId))
-      .limit(1);
-    if (inbound?.channel) {
-      outboundChannel = inbound.channel as typeof outboundChannel;
-    }
+  if (!row) return { status: 'not_found' };
+  const { draft, guestPhone, inboundChannel } = row;
+
+  // Idempotency: gia' processato.
+  if (draft.status === 'sent' || draft.status === 'approved' || draft.status === 'modified') {
+    return { status: 'already_sent', metaMessageId: draft.metaMessageId };
+  }
+  if (draft.status !== 'pending') {
+    return { status: 'failed', error: `unexpected status: ${draft.status}` };
   }
 
-  const now = new Date();
-  const wasModified = finalBody !== draft.draftResponse;
+  if (!guestPhone) {
+    return { status: 'no_guest_phone' };
+  }
 
-  await db
+  // Canale inbound originale (whatsapp | booking_inbox | airbnb_inbox |
+  // email). Slice 7B v1 supporta solo whatsapp; per gli altri non
+  // sappiamo ancora come inviare outbound (Booking/Airbnb sono read-only,
+  // email e' fattibile ma non in questo slice).
+  const outboundChannel: 'whatsapp' | 'booking_inbox' | 'airbnb_inbox' | 'email' =
+    (inboundChannel as 'whatsapp' | 'booking_inbox' | 'airbnb_inbox' | 'email') ?? 'whatsapp';
+  if (outboundChannel !== 'whatsapp') {
+    return { status: 'channel_not_supported', channel: outboundChannel };
+  }
+
+  const wasModified = finalBody !== draft.draftResponse;
+  const now = new Date();
+
+  // Lock atomico: passa a 'approved' SOLO se status='pending'. Race
+  // condition (doppio click): la seconda update non matcha (status
+  // gia' approved) e ritorniamo already_sent.
+  const [locked] = await db
     .update(pendingDrafts)
     .set({
       status: wasModified ? 'modified' : 'approved',
       approvedAt: now,
       finalResponseSent: finalBody,
     })
-    .where(eq(pendingDrafts.id, draftId));
+    .where(and(eq(pendingDrafts.id, draftId), eq(pendingDrafts.status, 'pending')))
+    .returning({ id: pendingDrafts.id });
+  if (!locked) {
+    // Race: qualcun altro l'ha gia' approvato. Re-leggi per vedere lo
+    // stato corrente e ritornare il metaMessageId se sent.
+    const [latest] = await db
+      .select({ metaMessageId: pendingDrafts.metaMessageId })
+      .from(pendingDrafts)
+      .where(eq(pendingDrafts.id, draftId))
+      .limit(1);
+    return { status: 'already_sent', metaMessageId: latest?.metaMessageId ?? null };
+  }
 
+  // Send via Meta. Retry 1x su 5xx/429.
+  let wamid: string;
+  let lastError: string | null = null;
+  let retried = false;
+  while (true) {
+    try {
+      const result = await sendText(guestPhone, finalBody);
+      wamid = result.messageId;
+      break;
+    } catch (err) {
+      const isWa = err instanceof WhatsappSendError;
+      const errStr = isWa ? `${err.status}: ${err.body.slice(0, 500)}` : String(err);
+      lastError = errStr;
+      const retryable = isWa ? err.retryable : true; // network/timeout = retry
+      if (retryable && !retried) {
+        retried = true;
+        await new Promise((r) => setTimeout(r, 1000));
+        continue;
+      }
+      // Non recuperabile o retry esaurito: status='failed' + error_log.
+      await db
+        .update(pendingDrafts)
+        .set({
+          status: 'failed',
+          errorLog: errStr,
+          retryCount: retried ? 1 : 0,
+        })
+        .where(eq(pendingDrafts.id, draftId));
+      return { status: 'failed', error: errStr };
+    }
+  }
+
+  // Success: persist outbound message + finalize draft state.
   const [insertedMsg] = await db
     .insert(messages)
     .values({
@@ -149,22 +240,47 @@ export async function approveAndSendReplyDraft(
       toEntity: 'guest',
       body: finalBody,
       sentAt: now,
+      platformMessageId: wamid,
+      recipientExternalId: guestPhone,
       metadata: {
         reply_draft_id: draftId,
         was_modified: wasModified,
         sent_via_dashboard: true,
+        retried: retried,
       },
     })
     .returning({ id: messages.id });
 
-  return { status: 'sent', messageId: insertedMsg?.id };
+  await db
+    .update(pendingDrafts)
+    .set({
+      status: 'sent',
+      sentAt: now,
+      metaMessageId: wamid,
+      retryCount: retried ? 1 : 0,
+    })
+    .where(eq(pendingDrafts.id, draftId));
+
+  return {
+    status: 'sent',
+    messageId: insertedMsg?.id ?? '',
+    metaMessageId: wamid,
+  };
 }
 
+export type RejectResult =
+  | { status: 'rejected' }
+  | { status: 'not_found' }
+  | { status: 'already_processed' };
+
+// Slice 7B: opzionale `reason` per audit (perche' l'host ha rejected).
+// Salvato in pending_drafts.rejection_reason, max 500 char.
 export async function rejectReplyDraft(
   db: Database,
   draftId: string,
   hostId: string,
-): Promise<{ status: 'rejected' | 'not_found' | 'already_processed' }> {
+  reason?: string,
+): Promise<RejectResult> {
   const [draft] = await db
     .select({ id: pendingDrafts.id, status: pendingDrafts.status })
     .from(pendingDrafts)
@@ -181,7 +297,11 @@ export async function rejectReplyDraft(
 
   await db
     .update(pendingDrafts)
-    .set({ status: 'rejected', rejectedAt: new Date() })
+    .set({
+      status: 'rejected',
+      rejectedAt: new Date(),
+      rejectionReason: reason?.trim().slice(0, 500) ?? null,
+    })
     .where(eq(pendingDrafts.id, draftId));
   return { status: 'rejected' };
 }

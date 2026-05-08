@@ -34,15 +34,15 @@ export const bookingEmailEventTypeEnum = pgEnum('booking_email_event_type', [
 // ─────────────────────────────────────────────────────────────
 
 export const kitStatusEnum = pgEnum('kit_status', [
-  'pending_dna',            // in attesa di Guest DNA
-  'pending_quiz',           // in attesa che l'ospite completi il quiz
-  'composing',              // agent sta componendo
-  'awaiting_approval',      // in attesa di conferma host (se non auto-approva)
-  'ordered',                // ordine inviato al fornitore
-  'delivered_to_cleaner',   // consegnato a casa cleaner
-  'placed_in_property',     // cleaner ha sistemato nella struttura
-  'confirmed_by_guest',     // ospite ha confermato
-  'failed',                 // fallimento in uno step (notifica host)
+  'pending_dna', // in attesa di Guest DNA
+  'pending_quiz', // in attesa che l'ospite completi il quiz
+  'composing', // agent sta componendo
+  'awaiting_approval', // in attesa di conferma host (se non auto-approva)
+  'ordered', // ordine inviato al fornitore
+  'delivered_to_cleaner', // consegnato a casa cleaner
+  'placed_in_property', // cleaner ha sistemato nella struttura
+  'confirmed_by_guest', // ospite ha confermato
+  'failed', // fallimento in uno step (notifica host)
 ]);
 
 // ─────────────────────────────────────────────────────────────
@@ -77,25 +77,20 @@ export const conversationChannelEnum = pgEnum('conversation_channel', [
 export const messageDirectionEnum = pgEnum('message_direction', ['inbound', 'outbound']);
 
 // Entità mittente/destinatario di un messaggio
-export const messageEntityEnum = pgEnum('message_entity', [
-  'premura',
-  'host',
-  'cleaner',
-  'guest',
-]);
+export const messageEntityEnum = pgEnum('message_entity', ['premura', 'host', 'cleaner', 'guest']);
 
 // Stage di un messaggio outbound programmato (5 fasi + cleaner/host alert)
 export const messageStageEnum = pgEnum('message_stage', [
-  'pre_arrival_welcome',    // Fase 2 — T-48h contatto
-  'pre_arrival_quiz',       // Fase 2 — quiz 60s
-  'kit_reveal',             // Fase 3 — mattina check-in con foto kit
-  'mid_stay_checkin',       // Fase 4 — giorno 2 sera
-  'post_stay_survey',       // Fase 5 — T+24h sondaggio privato
-  'post_stay_recovery',     // Fase 5 — recovery feedback negativo
+  'pre_arrival_welcome', // Fase 2 — T-48h contatto
+  'pre_arrival_quiz', // Fase 2 — quiz 60s
+  'kit_reveal', // Fase 3 — mattina check-in con foto kit
+  'mid_stay_checkin', // Fase 4 — giorno 2 sera
+  'post_stay_survey', // Fase 5 — T+24h sondaggio privato
+  'post_stay_recovery', // Fase 5 — recovery feedback negativo
   'post_stay_review_nudge', // Fase 5 — nudge recensione pubblica
-  'cleaner_brief',          // briefing cleaner
-  'host_alert',             // alert escalate all'host
-  'conversation_reply',     // risposta ad inbound (non programmato)
+  'cleaner_brief', // briefing cleaner
+  'host_alert', // alert escalate all'host
+  'conversation_reply', // risposta ad inbound (non programmato)
   'other',
 ]);
 
@@ -119,6 +114,9 @@ export const pendingDraftStatusEnum = pgEnum('pending_draft_status', [
   'rejected',
   'modified',
   'expired',
+  // Slice 7B: stati post-approvazione per tracking Meta Cloud API.
+  'sent', // Meta ha accettato il messaggio (200 + wamid)
+  'failed', // Meta ha rejected o retry esauriti
 ]);
 
 // ─────────────────────────────────────────────────────────────
@@ -131,10 +129,10 @@ export const autopilotRequestTypeEnum = pgEnum('autopilot_request_type', [
   'info_parking',
   'info_checkin',
   'info_neighborhood',
-  'early_checkin_short',    // ≤ 1h
-  'early_checkin_long',     // > 1h
-  'late_checkout_short',    // ≤ 1h
-  'late_checkout_long',     // > 1h
+  'early_checkin_short', // ≤ 1h
+  'early_checkin_long', // > 1h
+  'late_checkout_short', // ≤ 1h
+  'late_checkout_long', // > 1h
   'discount_request',
   'extra_services',
   'complaint_item_broken',
@@ -166,19 +164,19 @@ export const voiceMessageLengthEnum = pgEnum('voice_message_length', ['short', '
 
 // Stato di un payout al cleaner (€2/kit)
 export const payoutStatusEnum = pgEnum('payout_status', [
-  'pending',     // kit consegnato, in attesa validazione
-  'confirmed',   // validato (foto cleaner o conferma ospite)
-  'scheduled',   // aggregato in job mensile, pronto per trasferimento
-  'paid',        // trasferito via Stripe Connect
-  'failed',      // errore trasferimento (retry manuale)
-  'cancelled',   // annullato (kit contestato)
+  'pending', // kit consegnato, in attesa validazione
+  'confirmed', // validato (foto cleaner o conferma ospite)
+  'scheduled', // aggregato in job mensile, pronto per trasferimento
+  'paid', // trasferito via Stripe Connect
+  'failed', // errore trasferimento (retry manuale)
+  'cancelled', // annullato (kit contestato)
 ]);
 
 // Come è stato validato il payout
 export const payoutValidationMethodEnum = pgEnum('payout_validation_method', [
-  'cleaner_photo',        // foto cleaner (primario)
-  'guest_confirmation',   // fallback conferma ospite entro 24h
-  'manual',               // forzato da host/admin
+  'cleaner_photo', // foto cleaner (primario)
+  'guest_confirmation', // fallback conferma ospite entro 24h
+  'manual', // forzato da host/admin
 ]);
 
 // ─────────────────────────────────────────────────────────────
@@ -198,25 +196,25 @@ export const localPartnerTypeEnum = pgEnum('local_partner_type', [
 
 // Agente che ha eseguito l'azione loggata
 export const agentTypeEnum = pgEnum('agent_type', [
-  'guest_dna',       // Agent 1
-  'kit_composer',    // Agent 2
-  'message_writer',  // Agent 3
-  'conversation',    // Agent 4
-  'onboarding',      // Agent 5
-  'system',          // azioni automatiche non-agent (scheduler, webhook)
+  'guest_dna', // Agent 1
+  'kit_composer', // Agent 2
+  'message_writer', // Agent 3
+  'conversation', // Agent 4
+  'onboarding', // Agent 5
+  'system', // azioni automatiche non-agent (scheduler, webhook)
 ]);
 
 // Esito dell'azione agente
 export const agentActionStatusEnum = pgEnum('agent_action_status', [
   'success',
   'error',
-  'partial',  // eseguita ma con warning (es. fallback fornitore)
+  'partial', // eseguita ma con warning (es. fallback fornitore)
 ]);
 
 // Esito del recovery post-feedback negativo
 export const reviewRecoveryOutcomeEnum = pgEnum('review_recovery_outcome', [
-  'recovered',        // ospite lascia comunque recensione positiva o nessuna
-  'negative_posted',  // ospite ha comunque pubblicato recensione negativa
-  'no_response',      // ospite non ha risposto al recovery
-  'pending',          // in corso
+  'recovered', // ospite lascia comunque recensione positiva o nessuna
+  'negative_posted', // ospite ha comunque pubblicato recensione negativa
+  'no_response', // ospite non ha risposto al recovery
+  'pending', // in corso
 ]);

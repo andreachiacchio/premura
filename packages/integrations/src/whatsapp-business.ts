@@ -5,27 +5,54 @@ import { z } from 'zod';
  *
  * Used for two flows:
  *  1. Cleaner briefing (outbound template + free-form in 24h window)
- *  2. Guest messaging fallback (when Booking/Airbnb messaging is too slow)
+ *  2. Guest messaging (slice 7B): host approva draft → manda al guest
+ *
+ * Slice 7B: env vars rinominate da WHATSAPP_* a META_* per coerenza
+ * con le secrets su Fly e con le label del Meta Developer Portal.
+ * Bumped da v21.0 a v25.0 (latest stable di maggio 2026, supporta
+ * status events + media uploads). Phone normalize unchanged.
  *
  * Docs: https://developers.facebook.com/docs/whatsapp/cloud-api
  */
 
-const API_VERSION = 'v21.0';
+const API_VERSION = 'v25.0';
 const BASE_URL = `https://graph.facebook.com/${API_VERSION}`;
 
-const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-
-function assertConfig(): void {
+function getEnv(): { phoneNumberId: string; accessToken: string } {
+  // Lazy-read: i process.env vengono popolati dopo l'import in alcuni
+  // contesti test (vi.stubEnv). Read-time lookup invece di module-load.
+  // Fallback ai vecchi WHATSAPP_* per compat durante migrazione.
+  const phoneNumberId = process.env.META_PHONE_NUMBER_ID ?? process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const accessToken = process.env.META_ACCESS_TOKEN ?? process.env.WHATSAPP_ACCESS_TOKEN;
   if (!phoneNumberId || !accessToken) {
-    throw new Error('WhatsApp not configured: missing env vars');
+    throw new Error('WhatsApp not configured: missing META_PHONE_NUMBER_ID or META_ACCESS_TOKEN');
+  }
+  return { phoneNumberId, accessToken };
+}
+
+// Errore strutturato per distinguere 4xx (permanente, no retry) da 5xx
+// (transiente, retry). Il caller (approveAndSendReplyDraft) usa lo
+// status per decidere se enqueue retry o segnare 'failed' subito.
+export class WhatsappSendError extends Error {
+  readonly status: number;
+  readonly body: string;
+  readonly retryable: boolean;
+
+  constructor(status: number, body: string) {
+    super(`WhatsApp send failed ${status}: ${body.slice(0, 500)}`);
+    this.name = 'WhatsappSendError';
+    this.status = status;
+    this.body = body;
+    // 4xx = permanente (auth, payload invalido, recipient invalid).
+    // 5xx + 429 = transiente, retry.
+    this.retryable = status >= 500 || status === 429;
   }
 }
 
 // ===== SEND TEXT MESSAGE (free-form, requires active 24h window) =====
 
 export async function sendText(to: string, body: string): Promise<{ messageId: string }> {
-  assertConfig();
+  const { phoneNumberId, accessToken } = getEnv();
 
   const res = await fetch(`${BASE_URL}/${phoneNumberId}/messages`, {
     method: 'POST',
@@ -43,7 +70,7 @@ export async function sendText(to: string, body: string): Promise<{ messageId: s
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`WhatsApp send failed ${res.status}: ${err}`);
+    throw new WhatsappSendError(res.status, err);
   }
 
   const json = (await res.json()) as { messages: [{ id: string }] };
@@ -58,7 +85,7 @@ export async function sendTemplate(params: {
   languageCode: string;
   variables: string[];
 }): Promise<{ messageId: string }> {
-  assertConfig();
+  const { phoneNumberId, accessToken } = getEnv();
 
   const res = await fetch(`${BASE_URL}/${phoneNumberId}/messages`, {
     method: 'POST',
@@ -161,8 +188,10 @@ export function parseInboundWebhook(payload: unknown): InboundMessage[] {
 
 // ===== DOWNLOAD MEDIA (cleaner photos) =====
 
-export async function downloadMedia(mediaId: string): Promise<{ buffer: Buffer; mimeType: string }> {
-  assertConfig();
+export async function downloadMedia(
+  mediaId: string,
+): Promise<{ buffer: Buffer; mimeType: string }> {
+  const { accessToken } = getEnv();
 
   // Step 1: get media URL
   const urlRes = await fetch(`${BASE_URL}/${mediaId}`, {
@@ -181,6 +210,87 @@ export async function downloadMedia(mediaId: string): Promise<{ buffer: Buffer; 
     buffer: Buffer.from(await mediaRes.arrayBuffer()),
     mimeType: urlData.mime_type,
   };
+}
+
+// ===== STATUS WEBHOOK PARSER (slice 7B) =====
+//
+// Meta invia status events ("statuses" payload) per ogni outbound message:
+// sent → delivered → read (o failed). Il webhook /webhooks/whatsapp gia'
+// esistente filtra i payload per "messages" (inbound). Qui parsiamo
+// l'array "statuses" parallelo.
+
+const statusEventSchema = z
+  .object({
+    id: z.string(), // wamid del messaggio outbound (= meta_message_id su pending_drafts)
+    status: z.enum(['sent', 'delivered', 'read', 'failed']),
+    timestamp: z.string(), // unix epoch seconds
+    recipient_id: z.string().optional(),
+    errors: z
+      .array(
+        z
+          .object({
+            code: z.number().optional(),
+            title: z.string().optional(),
+            message: z.string().optional(),
+          })
+          .passthrough(),
+      )
+      .optional(),
+  })
+  .passthrough();
+
+const statusesPayloadSchema = z
+  .object({
+    entry: z.array(
+      z
+        .object({
+          id: z.string(),
+          changes: z.array(
+            z
+              .object({
+                field: z.literal('messages'),
+                value: z
+                  .object({
+                    statuses: z.array(statusEventSchema).optional(),
+                  })
+                  .passthrough(),
+              })
+              .passthrough(),
+          ),
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough();
+
+export type WhatsappStatusEvent = {
+  wamid: string;
+  status: 'sent' | 'delivered' | 'read' | 'failed';
+  timestamp: Date;
+  recipient: string | null;
+  errorMessage: string | null;
+};
+
+export function parseStatusEvents(payload: unknown): WhatsappStatusEvent[] {
+  const parsed = statusesPayloadSchema.safeParse(payload);
+  if (!parsed.success) return [];
+  const out: WhatsappStatusEvent[] = [];
+  for (const entry of parsed.data.entry) {
+    for (const change of entry.changes) {
+      const statuses = change.value.statuses ?? [];
+      for (const s of statuses) {
+        const errMsg = s.errors?.[0]?.message ?? s.errors?.[0]?.title ?? null;
+        out.push({
+          wamid: s.id,
+          status: s.status,
+          timestamp: new Date(Number(s.timestamp) * 1000),
+          recipient: s.recipient_id ?? null,
+          errorMessage: errMsg,
+        });
+      }
+    }
+  }
+  return out;
 }
 
 // ===== HELPERS =====
