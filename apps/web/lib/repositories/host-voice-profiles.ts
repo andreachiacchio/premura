@@ -4,9 +4,6 @@ import { and, desc, eq } from 'drizzle-orm';
 
 // Slice 8.4 — Repository host_voice_profiles.
 //
-// getHostVoiceProfile: helper esposto per draft generator futuro
-// (Conversation Agent userà questo come system prompt context).
-//
 // upsertVoiceProfile: lookup-or-insert + UPDATE atomico con merged
 // fields. Race condition lock-free accettata (bassa concorrenza:
 // outbound host messaggi seriali).
@@ -14,61 +11,15 @@ import { and, desc, eq } from 'drizzle-orm';
 // fetchRecentOutboundForHost: sliding window N=20 messaggi outbound
 // piu' recenti dell'host (across tutte le properties / canali),
 // usati come input al voice profiler.
+//
+// Slice 7a.4: getHostVoiceProfile (read-only) spostato in
+// @premura/agents (context-readers) per condivisione apps/web +
+// apps/api worker. Re-export qui per compat dei call-site interni.
 
-export type VoiceProfileSummary = {
-  id: string;
-  hostId: string;
-  avgSentenceLength: number | null;
-  formalityScore: number | null;
-  emojiUsageRate: number | null;
-  commonPhrases: Array<{ phrase: string; count: number }>;
-  greetingPatterns: string[];
-  closingPatterns: string[];
-  languageDistribution: Record<string, number>;
-  messagesAnalyzed: number;
-  voiceConfidence: number;
-  processedMessageIds: string[];
-};
-
-export async function getHostVoiceProfile(
-  db: Database,
-  hostId: string,
-): Promise<VoiceProfileSummary | null> {
-  const [row] = await db
-    .select({
-      id: hostVoiceProfiles.id,
-      hostId: hostVoiceProfiles.hostId,
-      avgSentenceLength: hostVoiceProfiles.avgSentenceLength,
-      formalityScore: hostVoiceProfiles.formalityScore,
-      emojiUsageRate: hostVoiceProfiles.emojiUsageRate,
-      commonPhrases: hostVoiceProfiles.commonPhrases,
-      greetingPatterns: hostVoiceProfiles.greetingPatterns,
-      closingPatterns: hostVoiceProfiles.closingPatterns,
-      languageDistribution: hostVoiceProfiles.languageDistribution,
-      messagesAnalyzed: hostVoiceProfiles.messagesAnalyzed,
-      voiceConfidence: hostVoiceProfiles.voiceConfidence,
-      processedMessageIds: hostVoiceProfiles.processedMessageIds,
-    })
-    .from(hostVoiceProfiles)
-    .where(eq(hostVoiceProfiles.hostId, hostId))
-    .limit(1);
-
-  if (!row) return null;
-  return {
-    id: row.id,
-    hostId: row.hostId,
-    avgSentenceLength: row.avgSentenceLength ? Number(row.avgSentenceLength) : null,
-    formalityScore: row.formalityScore ? Number(row.formalityScore) : null,
-    emojiUsageRate: row.emojiUsageRate ? Number(row.emojiUsageRate) : null,
-    commonPhrases: row.commonPhrases ?? [],
-    greetingPatterns: row.greetingPatterns ?? [],
-    closingPatterns: row.closingPatterns ?? [],
-    languageDistribution: row.languageDistribution ?? {},
-    messagesAnalyzed: row.messagesAnalyzed,
-    voiceConfidence: Number(row.voiceConfidence ?? 0),
-    processedMessageIds: row.processedMessageIds ?? [],
-  };
-}
+export {
+  type VoiceProfileSummary,
+  getHostVoiceProfile,
+} from '@premura/agents';
 
 export async function upsertVoiceProfile(
   db: Database,

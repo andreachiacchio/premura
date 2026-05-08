@@ -17,43 +17,14 @@ import { and, eq } from 'drizzle-orm';
 // Pre-check ownership pattern slice 6 fase 6.5: l'host puo' modificare
 // solo le proprie property.
 //
-// getPropertyKnowledge: helper esposto per Conversation Agent futuro
-// (slice 11 system prompt context).
+// Slice 7a.4: getPropertyKnowledge (read-only) spostato in
+// @premura/agents (context-readers) per condivisione apps/web +
+// apps/api worker. Re-export qui per compat dei call-site interni.
 
-export type PropertyKnowledgeView = {
-  propertyId: string;
-  keybox: KeyboxInfo | null;
-  wifi: WifiInfo | null;
-  parking: ParkingInfo | null;
-  houseRules: HouseRules | null;
-  emergencyContacts: EmergencyContact[];
-  nearbyEssentials: NearbyEssential[];
-  additionalInfo: string | null;
-  updatedAt: Date | null;
-};
-
-export async function getPropertyKnowledge(
-  db: Database,
-  propertyId: string,
-): Promise<PropertyKnowledgeView | null> {
-  const [row] = await db
-    .select()
-    .from(propertyKnowledge)
-    .where(eq(propertyKnowledge.propertyId, propertyId))
-    .limit(1);
-  if (!row) return null;
-  return {
-    propertyId: row.propertyId,
-    keybox: row.keybox,
-    wifi: row.wifi,
-    parking: row.parking,
-    houseRules: row.houseRules,
-    emergencyContacts: row.emergencyContacts,
-    nearbyEssentials: row.nearbyEssentials,
-    additionalInfo: row.additionalInfo,
-    updatedAt: row.updatedAt,
-  };
-}
+export {
+  type PropertyKnowledgeView,
+  getPropertyKnowledge,
+} from '@premura/agents';
 
 // Verifica ownership: la property deve appartenere all'host. Helper
 // per le server action (pre-check pattern slice 6 fase 6.5).
