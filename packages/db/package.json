@@ -6,6 +6,10 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
+    "migrate": "tsx ../../scripts/migrate.ts",
+    "migrate:dry": "tsx ../../scripts/migrate.ts --dry-run",
+    "migrate:generate": "drizzle-kit generate",
+    "migrate:check": "tsx ../../scripts/migrate-check.ts",
     "seed:goccia": "tsx src/scripts/seed-goccia-user.ts"
   },
   "dependencies": {
