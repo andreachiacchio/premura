@@ -45,7 +45,7 @@ export default function OnboardingGmailPage() {
           </button>
         </form>
 
-        <form action={() => skipToNextStepAction('gmail')}>
+        <form action={skipToNextStepAction.bind(null, 'gmail')}>
           <button
             type="submit"
             className="text-body-sm text-ink-mute underline-offset-2 hover:text-ink hover:underline"

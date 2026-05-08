@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
+    "test:smoke": "bash ./scripts/smoke-routes.sh",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
