@@ -1,8 +1,10 @@
+import { findActiveSurvey } from '@premura/agents';
 import type { Database } from '@premura/db';
 import { parseStatusEvents } from '@premura/integrations';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { enqueueDraftGeneration } from '../../jobs/draft-generation-queue';
+import { enqueueSurveyProcessInbound } from '../../jobs/survey-queue';
 import { extractInboundMessages, whatsappWebhookPayloadSchema } from './whatsapp-payload';
 import { persistInboundMessage } from './whatsapp-persist';
 import { verifyMetaSignature } from './whatsapp-signature';
@@ -259,25 +261,39 @@ export const whatsappWebhookRoutes: FastifyPluginAsync<WhatsappWebhookPluginOpti
             },
             'whatsapp inbound message persisted',
           );
-          // Slice 7a.4: connector Pipeline 1. Enqueue draft-generation
-          // job per il messaggio appena persistito. Solo per inserted
-          // (non duplicate, non orphan): doppio enqueue dello stesso
-          // messageId e' comunque idempotente lato BullMQ (jobId fisso)
-          // e lato pipeline (dedup pending_drafts.replyToMessageId).
-          if (result.messageId) {
+          // Slice 7a.4 + Slice B: routing inbound.
+          // Priorita':
+          //  1. Se c'e' una survey attiva per questo booking → enqueue
+          //     'process-inbound' su survey-queue (Sonnet 4.6 turn).
+          //  2. Altrimenti → enqueue draft-generation (slice 7a.4 default).
+          // L'idempotenza e' garantita lato consumer (jobId fissi).
+          if (result.messageId && result.bookingId) {
             try {
-              await enqueueDraftGeneration(result.messageId);
-              drafts_enqueued++;
+              const activeSurvey = await findActiveSurvey(db, result.bookingId);
+              if (activeSurvey) {
+                await enqueueSurveyProcessInbound(result.bookingId, result.messageId);
+                req.log.info(
+                  {
+                    event: 'wa.routing.survey',
+                    messageId: result.messageId,
+                    bookingId: result.bookingId,
+                    quizId: activeSurvey.quizId,
+                  },
+                  'inbound routed to survey pipeline',
+                );
+              } else {
+                await enqueueDraftGeneration(result.messageId);
+                drafts_enqueued++;
+              }
             } catch (enqueueErr) {
-              // Niente throw: il messaggio e' gia' persistito, l'enqueue
-              // failure e' recuperabile via reprocess manuale. Log error.
               req.log.error(
                 {
-                  event: 'wa.draft.enqueue_error',
+                  event: 'wa.routing.error',
                   err: enqueueErr,
                   messageId: result.messageId,
+                  bookingId: result.bookingId,
                 },
-                'draft-generation enqueue failed (message already persisted)',
+                'inbound routing failed (message already persisted)',
               );
             }
           }

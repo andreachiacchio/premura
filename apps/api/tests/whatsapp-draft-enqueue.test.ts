@@ -17,6 +17,21 @@ vi.mock('../src/jobs/draft-generation-queue', () => ({
   DRAFT_GENERATION_QUEUE_NAME: 'draft-generation',
 }));
 
+// Slice B: mock survey routing. Default: nessuna survey attiva (legacy
+// behavior, draft-generation enqueue procede). I test specifici del
+// survey routing vivono in survey-routing.test.ts.
+const surveyEnqueueMock = vi.fn().mockResolvedValue(undefined);
+vi.mock('../src/jobs/survey-queue', () => ({
+  enqueueSurveyProcessInbound: (...args: unknown[]) => surveyEnqueueMock(...args),
+}));
+vi.mock('@premura/agents', async () => {
+  const actual = (await vi.importActual('@premura/agents')) as Record<string, unknown>;
+  return {
+    ...actual,
+    findActiveSurvey: vi.fn().mockResolvedValue(null),
+  };
+});
+
 // Mock persist: per controllare l'esito del persist (inserted / duplicate /
 // orphan) senza un DB vero. Cosi' testiamo SOLO il connector logic.
 const persistMock = vi.fn();

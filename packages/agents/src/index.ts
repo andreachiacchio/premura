@@ -10,6 +10,8 @@ export * from './dna-insights-merger';
 export * from './draft-generator';
 export * from './draft-generator-pipeline';
 export * from './guest-dna';
+export * from './survey-conductor';
+export * from './survey-pipeline';
 export * from './kit-composer';
 export * from './message-writer';
 export * from './voice-profile-merger';

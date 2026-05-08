@@ -1,4 +1,4 @@
-import { type Database, bookings, properties } from '@premura/db';
+import { type Database, bookings, guestQuizzes, properties } from '@premura/db';
 import { and, asc, eq, gte, lte, ne } from 'drizzle-orm';
 
 // Slice A — Repository helpers per la dashboard "Prossimi check-in".
@@ -7,6 +7,8 @@ import { and, asc, eq, gte, lte, ne } from 'drizzle-orm';
 // day, locale) e +14gg. Soglia inferiore = oggi (no booking gia'
 // iniziati / scaduti). Soglia superiore = +14gg (oltre il quale
 // l'host non ha senso pre-configurare il numero).
+
+export type SurveyStatus = 'not_yet' | 'sent' | 'completed' | 'skipped';
 
 export type UpcomingCheckinRow = {
   id: string;
@@ -21,6 +23,10 @@ export type UpcomingCheckinRow = {
   guestPhone: string | null;
   premuraActiveAt: Date | null;
   guestPhoneSource: string | null;
+  // Slice B: stato survey pre-arrival.
+  surveyStatus: SurveyStatus;
+  surveySentAt: Date | null;
+  surveyCompletedAt: Date | null;
 };
 
 const WINDOW_DAYS = 14;
@@ -49,9 +55,14 @@ export async function listUpcomingCheckins(
       guestPhone: bookings.guestPhone,
       premuraActiveAt: bookings.premuraActiveAt,
       guestPhoneSource: bookings.guestPhoneSource,
+      // Slice B: LEFT JOIN guest_quizzes per stato survey.
+      surveySentAt: guestQuizzes.sentAt,
+      surveyCompletedAt: guestQuizzes.completedAt,
+      surveySkippedAt: guestQuizzes.skippedAt,
     })
     .from(bookings)
     .innerJoin(properties, eq(properties.id, bookings.propertyId))
+    .leftJoin(guestQuizzes, eq(guestQuizzes.bookingId, bookings.id))
     .where(
       and(
         eq(properties.hostId, hostId),
@@ -62,7 +73,34 @@ export async function listUpcomingCheckins(
     )
     .orderBy(asc(bookings.checkinAt));
 
-  return rows;
+  return rows.map((r) => ({
+    id: r.id,
+    guestFullName: r.guestFullName,
+    guestFirstName: r.guestFirstName,
+    propertyId: r.propertyId,
+    propertyName: r.propertyName,
+    checkinAt: r.checkinAt,
+    checkoutAt: r.checkoutAt,
+    numGuests: r.numGuests,
+    platform: r.platform,
+    guestPhone: r.guestPhone,
+    premuraActiveAt: r.premuraActiveAt,
+    guestPhoneSource: r.guestPhoneSource,
+    surveyStatus: deriveSurveyStatus(r.surveySentAt, r.surveyCompletedAt, r.surveySkippedAt),
+    surveySentAt: r.surveySentAt,
+    surveyCompletedAt: r.surveyCompletedAt,
+  }));
+}
+
+function deriveSurveyStatus(
+  sentAt: Date | null,
+  completedAt: Date | null,
+  skippedAt: Date | null,
+): SurveyStatus {
+  if (completedAt) return 'completed';
+  if (skippedAt) return 'skipped';
+  if (sentAt) return 'sent';
+  return 'not_yet';
 }
 
 // Set guest_phone + activate booking. Idempotente:

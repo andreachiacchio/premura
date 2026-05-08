@@ -1,15 +1,22 @@
-import {
-  pgTable,
-  uuid,
-  timestamp,
-  jsonb,
-  index,
-} from 'drizzle-orm/pg-core';
+import { index, jsonb, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { bookings } from './bookings';
 
-// Micro-quiz 60s pre-arrivo (4 swipe stile Tinder) inviato all'ospite
-// quando la confidence del Guest DNA è bassa (<0.7) oppure sempre, a
-// discrezione dell'host. Le risposte aggiornano il Guest DNA.
+// Quiz pre-arrivo per ospiti.
+//
+// Originale (milestone 4.4): 4 swipe stile Tinder — questions/responses
+// strutturati come Q-A (id, options).
+//
+// Slice B: survey conversazionale Sonnet 4.6 multi-turn — Premura conduce
+// 3 domande in chat naturale, estrae fields (specialOccasion, allergies,
+// preferences) e li salva in `responses`.
+//
+// Tipo coesistente: guest_quizzes ospita entrambi i formati.
+//  - questions/options: vuoto per slice B conversazionale (no domande
+//    pre-definite, agent improvvisa)
+//  - responses: { specialOccasion, foodAllergies, preferences } per slice
+//    B; { questionId: optionId } per swipe legacy
+//  - conversation_messages: array {role, content, ts} per slice B; vuoto
+//    per swipe legacy
 export const guestQuizzes = pgTable(
   'guest_quizzes',
   {
@@ -22,17 +29,39 @@ export const guestQuizzes = pgTable(
     completedAt: timestamp('completed_at', { withTimezone: true }),
     skippedAt: timestamp('skipped_at', { withTimezone: true }),
 
-    // Domande generate dinamicamente in base al booking (vedi milestone 4.4)
-    questions: jsonb('questions').notNull().$type<QuizQuestion[]>(),
+    // Slice B: motivo skip per analytics + audit.
+    // 'no_response_96h' | 'guest_declined' | 'manual' | futuro 'opt_out_link'
+    skippedReason: varchar('skipped_reason', { length: 32 }),
 
-    // Risposte dell'ospite indicizzate per question id
-    responses: jsonb('responses').$type<Record<string, string>>(),
+    // Domande generate dinamicamente in base al booking (vedi milestone 4.4).
+    // Vuoto/[] per slice B conversazionale.
+    questions: jsonb('questions').notNull().$type<QuizQuestion[]>().default([]),
+
+    // Risposte dell'ospite. Per slice B: extracted fields (vedi sopra).
+    // Per swipe legacy: { questionId: optionId }.
+    responses: jsonb('responses').$type<Record<string, unknown>>(),
+
+    // Slice B: turn-by-turn conversation log per debug + thread UI.
+    // Array {role: 'guest'|'premura', content, ts}.
+    conversationMessages: jsonb('conversation_messages')
+      .notNull()
+      .$type<Array<{ role: 'guest' | 'premura'; content: string; ts: string }>>()
+      .default([]),
+
+    // Slice B: lingua conversazione (it|en) determinata al send-time.
+    language: varchar('language', { length: 8 }).notNull().default('it'),
+
+    // Slice B: timestamp turni (utile per cron timeout).
+    lastOutboundAt: timestamp('last_outbound_at', { withTimezone: true }),
+    lastInboundAt: timestamp('last_inbound_at', { withTimezone: true }),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index('guest_quizzes_booking_idx').on(t.bookingId),
     index('guest_quizzes_completed_at_idx').on(t.completedAt),
+    // Slice B: filtro fast cron per survey pending.
+    index('guest_quizzes_pending_idx').on(t.sentAt, t.completedAt, t.skippedAt),
   ],
 );
 
@@ -47,4 +76,24 @@ export type QuizQuestion = {
     label: string;
     sub?: string;
   }>;
+};
+
+// Slice B: shape `responses` per survey conversazionale.
+export type ConversationalSurveyResponses = {
+  specialOccasion?:
+    | 'anniversary'
+    | 'birthday'
+    | 'honeymoon'
+    | 'business'
+    | 'family'
+    | 'other'
+    | 'none';
+  foodAllergies?: string;
+  preferences?: string;
+};
+
+export type ConversationTurn = {
+  role: 'guest' | 'premura';
+  content: string;
+  ts: string;
 };

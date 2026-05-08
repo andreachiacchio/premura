@@ -32,6 +32,7 @@ export default async function UpcomingCheckinsPage(): Promise<React.JSX.Element>
     guestPhone: r.guestPhone,
     premuraActiveAt: r.premuraActiveAt ? r.premuraActiveAt.toISOString() : null,
     guestPhoneSource: r.guestPhoneSource,
+    surveyStatus: r.surveyStatus,
   }));
 
   const total = data.length;
