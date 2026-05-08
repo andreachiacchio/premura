@@ -1,17 +1,18 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
+  decimal,
+  index,
+  integer,
   pgTable,
-  uuid,
-  varchar,
   text,
   timestamp,
-  integer,
-  decimal,
-  boolean,
-  index,
   uniqueIndex,
+  uuid,
+  varchar,
 } from 'drizzle-orm/pg-core';
-import { platformEnum, bookingStatusEnum } from './enums';
+import { bookingStatusEnum, platformEnum } from './enums';
+import { hosts } from './hosts';
 import { properties } from './properties';
 
 // Prenotazione. Entry point di ogni workflow Premura.
@@ -123,6 +124,24 @@ export const bookings = pgTable(
     // complete.
     manualCompletionAt: timestamp('manual_completion_at', { withTimezone: true }),
 
+    // ─── Slice A: attivazione Premura per il booking ───────
+    // Si valorizza al primo set di guest_phone via dashboard. Gate per
+    // tutte le pipeline downstream (slice B survey, C check-in, ecc):
+    // un booking con premura_active_at IS NULL non viene processato.
+    premuraActiveAt: timestamp('premura_active_at', { withTimezone: true }),
+
+    // Audit: chi ha aggiunto il guest_phone via dashboard. NULL per
+    // numeri arrivati dal channel originale (Booking/Airbnb form,
+    // M2a.4 manual filled, ecc).
+    guestPhoneAddedByHostId: uuid('guest_phone_added_by_host_id').references(() => hosts.id, {
+      onDelete: 'set null',
+    }),
+
+    // 'manual' (form dashboard slice A), 'import_csv' (futuro), 'platform'
+    // (numero gia' presente da channel ingestion). VARCHAR no enum per
+    // evolvere la tassonomia senza migration.
+    guestPhoneSource: varchar('guest_phone_source', { length: 32 }),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -144,5 +163,7 @@ export const bookings = pgTable(
     // (filtro per data_source + scope per property). Vedi docs/m2a4-spec.md
     // sezione 2.3.
     index('bookings_data_source_property_idx').on(t.dataSource, t.propertyId),
+    // Slice A: indice per query "Premura attivi" + cron downstream.
+    index('bookings_premura_active_at_idx').on(t.premuraActiveAt),
   ],
 );
