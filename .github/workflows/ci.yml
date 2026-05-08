@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+# Cancel in-progress runs su nuovo push allo stesso PR/branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Vitest (full suite)
+        run: pnpm test
+
+      - name: Static check — no inline closures su form action
+        # Catches il bug RSC fixato in slice 7a.5: inline arrow functions
+        # come <form action={() => ...}> non sono server-action references
+        # e crasha al render con "Functions cannot be passed directly to
+        # Client Components". Usa .bind(null, ...) invece.
+        run: |
+          if grep -rnE 'action=\{\(.*\) =>|action=\{async' apps/web/app --include='*.tsx' --include='*.ts'; then
+            echo "::error::Inline closures in <form action> non sono server actions valide. Usa .bind() o crea una server action dedicata."
+            exit 1
+          fi
+
+      - name: Build apps/web
+        # Heap bump: il bundle RSC con packages/agents (slice 7a.4: +13K
+        # righe) supera il default ~4GB di Node su runner standard. 7168
+        # MB lascia margine ma resta sotto i 7GB nominali del runner. Env
+        # locale allo step: il vitest non ne ha bisogno e mascherare il
+        # limite globalmente nasconderebbe regressioni future.
+        run: pnpm --filter @premura/web build
+        env:
+          NODE_OPTIONS: --max-old-space-size=7168
+
+      - name: Smoke route SSR (next start + curl)
+        run: pnpm --filter @premura/web test:smoke
