@@ -28,6 +28,14 @@ export const cleaners = pgTable(
     deliveryAddress: text('delivery_address').notNull(),
     pickupPointCode: varchar('pickup_point_code', { length: 64 }),
 
+    // Slice F: contatti + profilo cleaner.
+    email: text('email'),
+    notes: text('notes'),
+    languagePreferred: varchar('language_preferred', { length: 8 })
+      .notNull()
+      .default('it'), // 'it' | 'en' | 'es'
+    karenAccepted: boolean('karen_accepted').notNull().default(false),
+
     // Fee base per kit validato (override dei €2 standard se concordato)
     perKitFeeEur: decimal('per_kit_fee_eur', { precision: 6, scale: 2 }).notNull().default('2.00'),
 
@@ -43,5 +51,8 @@ export const cleaners = pgTable(
   (t) => [
     index('cleaners_host_idx').on(t.hostId),
     index('cleaners_active_idx').on(t.isActive),
+    index('cleaners_email_idx').on(t.email),
   ],
 );
+
+export type CleanerLanguage = 'it' | 'en' | 'es';
