@@ -148,6 +148,20 @@
       "when": 1779100000000,
       "tag": "0020_cleaners_v1_block",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1779200000000,
+      "tag": "0021_property_knowledge_v1_block",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1779300000000,
+      "tag": "0022_storage_buckets",
+      "breakpoints": true
     }
   ]
 }
