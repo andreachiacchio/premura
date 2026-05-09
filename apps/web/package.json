@@ -36,6 +36,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.74.0",
+    "resend": "^4.0.0",
     "string-similarity": "^4.0.4",
     "tailwind-merge": "^2.6.0",
     "zod": "^3.24.1"

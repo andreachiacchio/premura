@@ -16,6 +16,10 @@ import { startIcalCron } from './jobs/ical-cron';
 // inizia subito ad ascoltare la queue 'ical-poll'. Niente lazy load.
 import { icalPollWorker } from './jobs/ical-poll-worker';
 import { icalPollQueue } from './jobs/queues';
+import { startSurveyCron } from './jobs/survey-cron';
+import { surveyQueue } from './jobs/survey-queue';
+// Slice B: worker BullMQ pre-arrival-survey. Top-level import.
+import { surveyWorker } from './jobs/survey-worker';
 import { attachJwtAuth } from './plugins/jwt-auth';
 
 const app = Fastify({
@@ -40,14 +44,16 @@ app.get('/health', () => ({
 // Stats delle queue. Probe ops + dashboard health.
 // getJobCounts(...keys) ritorna esattamente i contatori richiesti.
 app.get('/health/jobs', async () => {
-  const [icalCounts, draftCounts] = await Promise.all([
+  const [icalCounts, draftCounts, surveyCounts] = await Promise.all([
     icalPollQueue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed'),
     draftGenerationQueue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed'),
+    surveyQueue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed'),
   ]);
   return {
     queues: [
       { name: 'ical-poll', counts: icalCounts },
       { name: 'draft-generation', counts: draftCounts },
+      { name: 'pre-arrival-survey', counts: surveyCounts },
     ],
   };
 });
@@ -81,20 +87,20 @@ await app.register(whatsappWebhookRoutes, { db: apiClient.db });
 // di app.listen, cosi' eventuali tick che partono mentre l'app sta per andare
 // online trovano la pipeline di processing pronta.
 const icalCron = startIcalCron();
+const surveyCron = startSurveyCron();
 
 const port = Number(process.env.PORT ?? 3000);
 await app.listen({ port, host: '0.0.0.0' });
 app.log.info(`Premura listening on :${port}`);
 app.log.info('ical poll worker started');
 app.log.info('draft generation worker started');
+app.log.info('pre-arrival survey worker started');
 
-// Graceful shutdown: prima fermo il cron (niente nuovi enqueue), poi i
-// worker (drain dei job in-flight + disconnect Redis), poi Fastify. L'ordine
-// evita che enqueue partiti dal cron trovino connessioni gia' chiuse.
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, 'shutdown requested');
   icalCron.stop();
-  await Promise.all([icalPollWorker.close(), draftGenerationWorker.close()]);
+  surveyCron.stop();
+  await Promise.all([icalPollWorker.close(), draftGenerationWorker.close(), surveyWorker.close()]);
   await app.close();
   await apiClient.close();
   process.exit(0);

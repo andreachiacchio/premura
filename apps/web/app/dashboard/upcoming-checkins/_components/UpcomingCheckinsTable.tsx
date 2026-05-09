@@ -15,6 +15,8 @@ import {
 
 const DATE_FMT = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short' });
 
+export type SurveyStatusUI = 'not_yet' | 'sent' | 'completed' | 'skipped';
+
 export type UpcomingCheckinCardData = {
   id: string;
   guestFullName: string;
@@ -28,7 +30,27 @@ export type UpcomingCheckinCardData = {
   guestPhone: string | null;
   premuraActiveAt: string | null;
   guestPhoneSource: string | null;
+  // Slice B: stato survey pre-arrival.
+  surveyStatus: SurveyStatusUI;
 };
+
+const SURVEY_LABELS: Record<SurveyStatusUI, { label: string; cls: string }> = {
+  not_yet: { label: 'In coda', cls: 'bg-line-soft text-ink-mute' },
+  sent: { label: 'Inviata', cls: 'bg-gold-soft text-gold-deep' },
+  completed: { label: 'Completata', cls: 'bg-line-soft text-ok border border-ok/20' },
+  skipped: { label: 'Saltata', cls: 'bg-peach text-terracotta-2' },
+};
+
+function SurveyBadge({ status }: { status: SurveyStatusUI }): React.JSX.Element {
+  const meta = SURVEY_LABELS[status];
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.cls}`}
+    >
+      {meta.label}
+    </span>
+  );
+}
 
 type RowState = {
   draft: string; // valore in edit
@@ -124,6 +146,7 @@ export function UpcomingCheckinsTable({ rows }: { rows: UpcomingCheckinCardData[
             <th className="px-4 py-3 font-medium">Ospiti</th>
             <th className="px-4 py-3 font-medium">Canale</th>
             <th className="px-4 py-3 font-medium">Numero WhatsApp</th>
+            <th className="px-4 py-3 font-medium">Survey</th>
             <th className="px-4 py-3 font-medium">Stato</th>
           </tr>
         </thead>
@@ -200,6 +223,9 @@ export function UpcomingCheckinsTable({ rows }: { rows: UpcomingCheckinCardData[
                     </button>
                   )}
                   {s.error ? <p className="mt-1 text-body-sm text-alert">{s.error}</p> : null}
+                </td>
+                <td className="px-4 py-3">
+                  <SurveyBadge status={r.surveyStatus} />
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
