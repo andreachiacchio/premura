@@ -13,7 +13,7 @@ import { ITEMS_TAXONOMY, type TaxonomyKey } from './items-taxonomy';
 // ─────────────────────────────────────────────────────────────
 
 const MODEL = process.env.CLAUDE_MODEL_PRIMARY ?? 'claude-sonnet-4-6';
-export const KIT_GENERATOR_VERSION = '2026-05-08-v1';
+export const KIT_GENERATOR_VERSION = '2026-05-09-v2';
 
 const TAXONOMY_KEYS = Object.keys(ITEMS_TAXONOMY) as TaxonomyKey[];
 
@@ -113,13 +113,27 @@ ADAPTIVE LOGIC:
 LINGUA:
 - storytelling_it / cardMessage_it sempre in italiano caldo.
 - storytelling_en / cardMessage_en sempre in inglese (traduci concetti, no parole).
-- Tone: caldo, hospitality napoletano. NIENTE marketing, NIENTE lingua sales.
 
-CARD MESSAGE:
-- Max 200 char.
-- Includi nome guest se conosciuto.
-- Firma dell'host (es. "- Andrea").
-- "Buon soggiorno" o equivalente.
+TONO STORYTELLING:
+- Caldo, italiano-mediterraneo (anche in inglese), umano. NO marketing-speak.
+  NO "experience" / "journey" / "amazing" / "unforgettable" inflate.
+- Pensa: come scriverebbe il padrone di casa che ha aperto la propria casa
+  a uno sconosciuto e vuole farlo sentire benvenuto.
+- Storytelling 2-3 frasi MAX, niente paragrafi. Niente CTA, niente firma.
+
+CARD MESSAGE (vincoli stretti):
+- Massimo 15 parole TOTALI (non caratteri, parole).
+- Sempre firmato con "— {hostFullName}" (em-dash + nome host).
+- NIENTE emoji, niente icone, niente caratteri speciali.
+- Includi nome guest se conosciuto (firstName).
+- Italiano + inglese paralleli, stesso registro.
+- Esempi accettabili:
+  IT: "Lena, benvenuta a La Goccia. Buon soggiorno a Napoli. — Andrea"
+  EN: "Mark, welcome. Enjoy your stay in Naples. — Andrea"
+- Esempi RIFIUTATI (NON fare cosi'):
+  ❌ "Lena, hope you have an amazing experience in Naples..." (marketing)
+  ❌ "Welcome to your Naples adventure! 🌟" (emoji + marketing)
+  ❌ "We are so happy to host you for your unforgettable journey..." (inflate)
 
 CONTEXT GUEST:
 {context}

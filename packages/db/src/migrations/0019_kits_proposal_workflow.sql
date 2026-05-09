@@ -50,3 +50,10 @@ ALTER TABLE "kits"
 
 CREATE INDEX IF NOT EXISTS "kits_status_proposal_idx"
   ON "kits" ("status", "proposal_generated_at");
+--> statement-breakpoint
+
+-- ─── property_knowledge: kit_default_placement ─────────────────
+-- Default override "dove lasciare il kit setup" usato nel WA brief Karen.
+-- NULL = "tavolo cucina" default code-side.
+ALTER TABLE "property_knowledge"
+  ADD COLUMN IF NOT EXISTS "kit_default_placement" TEXT;

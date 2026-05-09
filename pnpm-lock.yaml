@@ -240,12 +240,18 @@ importers:
       '@premura/db':
         specifier: workspace:*
         version: link:../db
+      '@premura/integrations':
+        specifier: workspace:*
+        version: link:../integrations
       '@premura/shared':
         specifier: workspace:*
         version: link:../shared
       drizzle-orm:
         specifier: ^0.38.0
         version: 0.38.4(@types/react@19.2.14)(postgres@3.4.9)(react@19.2.5)
+      resend:
+        specifier: ^4.0.0
+        version: 4.8.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       zod:
         specifier: ^3.24.1
         version: 3.25.76

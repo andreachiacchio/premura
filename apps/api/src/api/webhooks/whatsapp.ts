@@ -1,3 +1,8 @@
+import {
+  handleCleanerReplyForKitAcceptance,
+  loadKitNotificationContext,
+  sendKitEmail,
+} from '@premura/agents';
 import type { Database } from '@premura/db';
 import { parseStatusEvents } from '@premura/integrations';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
@@ -243,6 +248,7 @@ export const whatsappWebhookRoutes: FastifyPluginAsync<WhatsappWebhookPluginOpti
     let orphans = 0;
     let errors = 0;
     let drafts_enqueued = 0;
+    let cleaner_acceptances = 0;
     for (const flat of flatMessages) {
       try {
         const result = await persistInboundMessage(db, flat);
@@ -281,13 +287,13 @@ export const whatsappWebhookRoutes: FastifyPluginAsync<WhatsappWebhookPluginOpti
               );
             }
           }
-        } else if (result.status === 'duplicate_skipped') {
-          duplicates++;
-          req.log.info(
-            { event: 'wa.persist.duplicate', messageId: flat.message.id },
-            'whatsapp inbound message duplicate (idempotency hit)',
-          );
         } else if (result.status === 'orphan_inserted') {
+          // Slice C — Cleaner reply detection.
+          // Orphan = no booking match. Karen risponde dal suo numero, non
+          // matcha nessun guest. Verifichiamo se il from corrisponde a
+          // un cleaner del DB con kit briefed e ackowledge.
+          // Eseguito anche per duplicate? No, solo nuovi inbound (inserted
+          // o orphan_inserted). Per duplicate skippiamo.
           orphans++;
           req.log.warn(
             {
@@ -297,6 +303,41 @@ export const whatsappWebhookRoutes: FastifyPluginAsync<WhatsappWebhookPluginOpti
               phoneNumberId: flat.phoneNumberId,
             },
             'whatsapp inbound senza booking match (orphan)',
+          );
+          try {
+            const cleanerResult = await handleCleanerReplyForKitAcceptance(db, flat.message.from);
+            if (cleanerResult.status === 'accepted') {
+              cleaner_acceptances++;
+              req.log.info(
+                {
+                  event: 'wa.cleaner.accepted',
+                  kitId: cleanerResult.kitId,
+                  fromMasked: maskPhone(flat.message.from),
+                },
+                'cleaner reply detected → kit cleanerAcceptedAt updated',
+              );
+              // Email founder cleaner_confirmed (best-effort, no throw).
+              try {
+                const ctx = await loadKitNotificationContext(db, cleanerResult.kitId);
+                if (ctx) await sendKitEmail('cleaner_confirmed', ctx);
+              } catch (emailErr) {
+                req.log.error(
+                  { event: 'wa.cleaner.email_error', err: emailErr },
+                  'cleaner_confirmed email send failed',
+                );
+              }
+            }
+          } catch (cleanerErr) {
+            req.log.error(
+              { event: 'wa.cleaner.error', err: cleanerErr },
+              'cleaner reply handler failed',
+            );
+          }
+        } else if (result.status === 'duplicate_skipped') {
+          duplicates++;
+          req.log.info(
+            { event: 'wa.persist.duplicate', messageId: flat.message.id },
+            'whatsapp inbound message duplicate (idempotency hit)',
           );
         }
       } catch (err) {
@@ -320,6 +361,7 @@ export const whatsappWebhookRoutes: FastifyPluginAsync<WhatsappWebhookPluginOpti
         orphans,
         errors,
         drafts_enqueued,
+        cleaner_acceptances,
         status_events: statusEvents.length,
         status_updated: statusUpdated,
         status_unmatched: statusUnmatched,
@@ -332,6 +374,7 @@ export const whatsappWebhookRoutes: FastifyPluginAsync<WhatsappWebhookPluginOpti
       received: true,
       persisted: inserted,
       status_events: statusEvents.length,
+      cleaner_acceptances,
     });
   });
 };
