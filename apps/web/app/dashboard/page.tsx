@@ -2,6 +2,7 @@ import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getOnboardingState, urlForStep } from '@/lib/onboarding';
 import { findByHostId } from '@/lib/repositories/bookings';
+import { countKitsByStatusForHost } from '@/lib/repositories/kits';
 import { findByHostId as findPropertiesByHostId } from '@/lib/repositories/properties';
 import { listPendingReplyDraftsForHost } from '@/lib/repositories/reply-drafts';
 import { listUpcomingCheckins } from '@/lib/repositories/upcoming-checkins';
@@ -12,6 +13,7 @@ import { DashboardHeader } from './_components/DashboardHeader';
 import { EmptyOnboardingState } from './_components/EmptyOnboardingState';
 import { EmptyState } from './_components/EmptyState';
 import { IncompleteAlert } from './_components/IncompleteAlert';
+import { KitsApprovalCard } from './_components/KitsApprovalCard';
 import { ReplyDraftCard } from './_components/ReplyDraftCard';
 import { UpcomingCheckinsCard } from './_components/UpcomingCheckinsCard';
 import { completeBookingAction, createPropertyAction, skipBookingAction } from './actions';
@@ -57,10 +59,11 @@ export default async function DashboardPage() {
     );
   }
 
-  const [bookings, replyDrafts, upcoming] = await Promise.all([
+  const [bookings, replyDrafts, upcoming, kitStatusCounts] = await Promise.all([
     findByHostId({ db, hostId }),
     listPendingReplyDraftsForHost(db, hostId),
     listUpcomingCheckins(db, hostId),
+    countKitsByStatusForHost(db, hostId),
   ]);
 
   const incompleteToCompleteCount = bookings.filter(
@@ -71,6 +74,10 @@ export default async function DashboardPage() {
   const upcomingTotal = upcoming.length;
   const upcomingMissingPhone = upcoming.filter((b) => !b.guestPhone).length;
 
+  // Slice C: counter kit in attesa di approvazione founder.
+  const pendingKitsCount =
+    (kitStatusCounts.proposed ?? 0) + (kitStatusCounts.modified ?? 0);
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-ivory">
       <DashboardHeader hostFirstName="Andrea" />
@@ -78,6 +85,11 @@ export default async function DashboardPage() {
       {/* Slice A: card "Prossimi check-in" — gateway per attivare booking. */}
       {upcomingTotal > 0 ? (
         <UpcomingCheckinsCard total={upcomingTotal} missing={upcomingMissingPhone} />
+      ) : null}
+
+      {/* Slice C: card "Kit pronti per approvazione" — gateway approval flow. */}
+      {pendingKitsCount > 0 ? (
+        <KitsApprovalCard pendingCount={pendingKitsCount} />
       ) : null}
 
       {incompleteToCompleteCount > 0 ? (
