@@ -1,12 +1,16 @@
 'use server';
 
 import { getDb } from '@/lib/db';
-import { submitSurvey } from '@premura/agents';
+import { submitSurvey, triggerKitProposal } from '@premura/agents';
 import { z } from 'zod';
 
 // Slice B — Server action per submit survey pubblica.
 // Token validation + responses persistence. Niente auth richiesta:
 // la sicurezza e' nel JWT signed.
+//
+// Slice C wiring: dopo il submit con alreadySubmitted=false, fire-and-forget
+// triggerKitProposal(bookingId). Idempotente: se il kit esiste gia' e non e'
+// in stato pending_*, ritorna 'skipped_already_proposed'.
 
 const responsesSchema = z.record(
   z
@@ -37,16 +41,26 @@ export async function submitSurveyAction(
     return { ok: false, reason: result.reason };
   }
 
-  // Notifica founder fire-and-forget: lazy import perche' Resend SDK
-  // non e' transitive di apps/web. Lo importiamo dinamico via
-  // @premura/agents... in realta' Andrea operatore notify e' in
-  // apps/api/src/jobs/survey-handler. Per webapp facciamo un'email
-  // semplificata qui se RESEND_API_KEY e' configurato.
   if (!result.alreadySubmitted) {
     notifyFounderFireAndForget(token).catch(() => {});
+    triggerKitProposalFireAndForget(db, result.bookingId).catch(() => {});
   }
 
   return { ok: true, alreadySubmitted: result.alreadySubmitted };
+}
+
+async function triggerKitProposalFireAndForget(
+  db: Awaited<ReturnType<typeof getDb>>['db'],
+  bookingId: string,
+): Promise<void> {
+  // Slice C: kit proposal generato post-survey. Best-effort, niente throw.
+  // Costo Sonnet ~€0.05-0.08, ~10-20s. Fire-and-forget cosi' la response
+  // della survey non aspetta.
+  try {
+    await triggerKitProposal(db, bookingId);
+  } catch (_e) {
+    // Errore loggato lato agent (Anthropic SDK), niente cascade
+  }
 }
 
 async function notifyFounderFireAndForget(token: string): Promise<void> {

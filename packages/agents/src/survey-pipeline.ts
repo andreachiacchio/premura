@@ -304,7 +304,7 @@ export async function trackSurveyOpen(db: Database, quizId: string): Promise<voi
 }
 
 export type SubmitResult =
-  | { ok: true; alreadySubmitted: boolean }
+  | { ok: true; alreadySubmitted: boolean; bookingId: string }
   | { ok: false; reason: 'invalid_token' | 'expired' | 'not_found' };
 
 export async function submitSurvey(
@@ -320,6 +320,7 @@ export async function submitSurvey(
   const [row] = await db
     .select({
       id: guestQuizzes.id,
+      bookingId: guestQuizzes.bookingId,
       completedAt: guestQuizzes.completedAt,
       tokenExpiresAt: guestQuizzes.tokenExpiresAt,
     })
@@ -327,7 +328,9 @@ export async function submitSurvey(
     .where(eq(guestQuizzes.token, token))
     .limit(1);
   if (!row) return { ok: false, reason: 'not_found' };
-  if (row.completedAt) return { ok: true, alreadySubmitted: true };
+  if (row.completedAt) {
+    return { ok: true, alreadySubmitted: true, bookingId: row.bookingId };
+  }
   if (row.tokenExpiresAt && row.tokenExpiresAt < new Date()) {
     return { ok: false, reason: 'expired' };
   }
@@ -339,7 +342,7 @@ export async function submitSurvey(
       responses,
     })
     .where(eq(guestQuizzes.id, row.id));
-  return { ok: true, alreadySubmitted: false };
+  return { ok: true, alreadySubmitted: false, bookingId: row.bookingId };
 }
 
 // Cron timeout 96h.

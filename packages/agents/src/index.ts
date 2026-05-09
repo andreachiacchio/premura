@@ -13,6 +13,7 @@ export * from './guest-dna';
 export * from './survey-pipeline';
 export * from './survey-planner';
 export * from './survey-token';
+export * from './kit-generator';
 export * from './kit-composer';
 export * from './message-writer';
 export * from './voice-profile-merger';

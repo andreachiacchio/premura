@@ -34,15 +34,31 @@ export const bookingEmailEventTypeEnum = pgEnum('booking_email_event_type', [
 // ─────────────────────────────────────────────────────────────
 
 export const kitStatusEnum = pgEnum('kit_status', [
-  'pending_dna', // in attesa di Guest DNA
-  'pending_quiz', // in attesa che l'ospite completi il quiz
-  'composing', // agent sta componendo
-  'awaiting_approval', // in attesa di conferma host (se non auto-approva)
-  'ordered', // ordine inviato al fornitore
-  'delivered_to_cleaner', // consegnato a casa cleaner
-  'placed_in_property', // cleaner ha sistemato nella struttura
-  'confirmed_by_guest', // ospite ha confermato
-  'failed', // fallimento in uno step (notifica host)
+  // ─── Legacy (milestone 4.x kit composer V1) ───
+  'pending_dna',
+  'pending_quiz',
+  'composing',
+  'awaiting_approval',
+  'ordered',
+  'delivered_to_cleaner',
+  'placed_in_property',
+  'confirmed_by_guest',
+  'failed',
+  // ─── Slice C (Concierge Operator V1 — founder manuale) ───
+  // Flow: pending_survey -> proposed -> approved/rejected/modified
+  // -> ordering -> ordered -> in_transit -> arrived_at_locker
+  // -> picked_up_by_cleaner -> set_up -> delivered_to_guest
+  'pending_survey',
+  'proposed',
+  'approved',
+  'rejected',
+  'modified',
+  'ordering',
+  'in_transit',
+  'arrived_at_locker',
+  'picked_up_by_cleaner',
+  'set_up',
+  'delivered_to_guest',
 ]);
 
 // ─────────────────────────────────────────────────────────────
