@@ -40,6 +40,9 @@ export const propertyKnowledge = pgTable(
       .default([]),
     nearbyEssentials: jsonb('nearby_essentials').$type<NearbyEssential[]>().notNull().default([]),
     additionalInfo: text('additional_info'),
+    // Slice C: override "dove la cleaner deve lasciare il kit setup".
+    // NULL = "tavolo cucina" default code-side nel WA brief Karen.
+    kitDefaultPlacement: text('kit_default_placement'),
 
     updatedBy: uuid('updated_by').references(() => hosts.id, { onDelete: 'set null' }),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

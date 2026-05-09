@@ -134,6 +134,13 @@
       "when": 1778900000000,
       "tag": "0018_guest_quizzes_tap_app",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1779000000000,
+      "tag": "0019_kits_proposal_workflow",
+      "breakpoints": true
     }
   ]
 }
