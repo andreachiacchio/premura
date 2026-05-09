@@ -31,7 +31,11 @@ const idSchema = z.string().uuid();
 // ─── 1. Generate (manual trigger) ─────────────────────────────────
 export type GenerateKitActionResult =
   | { ok: true; kitId: string; itemCount: number; totalEstimatedEur: number }
-  | { ok: false; reason: 'wrong_host' | 'no_survey' | 'no_booking' | 'already_proposed' | 'generator_error'; detail?: string };
+  | {
+      ok: false;
+      reason: 'wrong_host' | 'no_survey' | 'no_booking' | 'already_proposed' | 'generator_error';
+      detail?: string;
+    };
 
 export async function generateKitProposalAction(
   bookingId: string,
@@ -142,7 +146,7 @@ export async function rejectKitAction(
   rejectionReason: string,
 ): Promise<RejectKitActionResult> {
   const id = idSchema.parse(kitId);
-  let parsed;
+  let parsed: z.infer<typeof rejectSchema>;
   try {
     parsed = rejectSchema.parse({ reason: rejectionReason });
   } catch {

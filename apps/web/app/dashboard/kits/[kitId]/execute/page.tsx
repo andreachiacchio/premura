@@ -80,8 +80,8 @@ export default async function KitExecutePage({
     cardMessage:
       p.item.fonte === 'manual_write'
         ? kit.guestLanguage === 'en'
-          ? kit.cardMessageEn ?? kit.cardMessage ?? ''
-          : kit.cardMessage ?? ''
+          ? (kit.cardMessageEn ?? kit.cardMessage ?? '')
+          : (kit.cardMessage ?? '')
         : null,
     executedAt: p.item.executedAt ?? null,
     reasoning: p.item.reasoning ?? '',
@@ -96,9 +96,7 @@ export default async function KitExecutePage({
         >
           ← Dettaglio kit
         </Link>
-        <h1 className="text-2xl font-semibold text-ink">
-          Esegui ordini — {kit.guestFullName}
-        </h1>
+        <h1 className="text-2xl font-semibold text-ink">Esegui ordini — {kit.guestFullName}</h1>
         <p className="mt-1 text-sm text-ink-mute">
           {kit.propertyName} · check-in {checkinFmt}
         </p>
@@ -115,12 +113,8 @@ export default async function KitExecutePage({
         glovoItems={glovoItemsUI}
         manualItems={manualItemsUI}
         amazonOrderByDateFmt={orderByDateFmt}
-        cleanerBriefedAt={
-          kit.cleanerBriefedAt ? kit.cleanerBriefedAt.toISOString() : null
-        }
-        cleanerAcceptedAt={
-          kit.cleanerAcceptedAt ? kit.cleanerAcceptedAt.toISOString() : null
-        }
+        cleanerBriefedAt={kit.cleanerBriefedAt ? kit.cleanerBriefedAt.toISOString() : null}
+        cleanerAcceptedAt={kit.cleanerAcceptedAt ? kit.cleanerAcceptedAt.toISOString() : null}
       />
     </div>
   );

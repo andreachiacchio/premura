@@ -28,12 +28,7 @@ const STATUS_TABS = [
   {
     key: 'executing',
     label: 'In esecuzione',
-    statuses: [
-      'ordering',
-      'in_transit',
-      'arrived_at_locker',
-      'picked_up_by_cleaner',
-    ],
+    statuses: ['ordering', 'in_transit', 'arrived_at_locker', 'picked_up_by_cleaner'],
   },
   {
     key: 'delivered',
@@ -113,15 +108,17 @@ export default async function KitsPage({
         })}
       </nav>
 
-      <KitsList rows={rows.map((r) => ({
-        ...r,
-        checkinAt: r.checkinAt.toISOString(),
-        proposalGeneratedAt: r.proposalGeneratedAt ? r.proposalGeneratedAt.toISOString() : null,
-        approvedAt: r.approvedAt ? r.approvedAt.toISOString() : null,
-        cleanerBriefedAt: r.cleanerBriefedAt ? r.cleanerBriefedAt.toISOString() : null,
-        cleanerAcceptedAt: r.cleanerAcceptedAt ? r.cleanerAcceptedAt.toISOString() : null,
-        cleanerPlacedAt: r.cleanerPlacedAt ? r.cleanerPlacedAt.toISOString() : null,
-      }))} />
+      <KitsList
+        rows={rows.map((r) => ({
+          ...r,
+          checkinAt: r.checkinAt.toISOString(),
+          proposalGeneratedAt: r.proposalGeneratedAt ? r.proposalGeneratedAt.toISOString() : null,
+          approvedAt: r.approvedAt ? r.approvedAt.toISOString() : null,
+          cleanerBriefedAt: r.cleanerBriefedAt ? r.cleanerBriefedAt.toISOString() : null,
+          cleanerAcceptedAt: r.cleanerAcceptedAt ? r.cleanerAcceptedAt.toISOString() : null,
+          cleanerPlacedAt: r.cleanerPlacedAt ? r.cleanerPlacedAt.toISOString() : null,
+        }))}
+      />
     </div>
   );
 }

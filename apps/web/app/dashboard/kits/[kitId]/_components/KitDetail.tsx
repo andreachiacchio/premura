@@ -95,14 +95,8 @@ export function KitDetail({ kit }: { kit: KitDetailUI }): React.JSX.Element {
     });
   }
 
-  function updateItem<K extends keyof KitItem>(
-    idx: number,
-    field: K,
-    value: KitItem[K],
-  ): void {
-    setItems((prev) =>
-      prev.map((it, i) => (i === idx ? { ...it, [field]: value } : it)),
-    );
+  function updateItem<K extends keyof KitItem>(idx: number, field: K, value: KitItem[K]): void {
+    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [field]: value } : it)));
   }
 
   function removeItem(idx: number): void {
@@ -127,9 +121,7 @@ export function KitDetail({ kit }: { kit: KitDetailUI }): React.JSX.Element {
       <section className="mb-6 rounded-lg border border-line bg-white p-4">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-medium text-ink-mute">Tema</h2>
-          {editMode && (
-            <span className="text-xs text-ink-mute">in modifica</span>
-          )}
+          {editMode && <span className="text-xs text-ink-mute">in modifica</span>}
         </div>
         {editMode ? (
           <input
@@ -150,7 +142,7 @@ export function KitDetail({ kit }: { kit: KitDetailUI }): React.JSX.Element {
           </h2>
           <p className="whitespace-pre-line text-sm leading-relaxed text-ink">
             {kit.guestLanguage === 'en'
-              ? kit.storytellingEn ?? kit.storytellingIt
+              ? (kit.storytellingEn ?? kit.storytellingIt)
               : kit.storytellingIt}
           </p>
         </section>
@@ -158,26 +150,19 @@ export function KitDetail({ kit }: { kit: KitDetailUI }): React.JSX.Element {
 
       <section className="mb-6 rounded-lg border border-line bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-medium text-ink">
-            Items ({items.length})
-          </h2>
+          <h2 className="text-base font-medium text-ink">Items ({items.length})</h2>
           <div className="text-sm text-ink-mute">
             €{kit.itemsTotalEur ?? '?'} / €{kit.budgetEur}
           </div>
         </div>
         <ul className="space-y-3">
           {items.map((item, idx) => (
-            <li
-              key={`${item.taxonomyKey}-${idx}`}
-              className="rounded-md border border-line p-3"
-            >
+            <li key={`${item.taxonomyKey}-${idx}`} className="rounded-md border border-line p-3">
               {editMode ? (
                 <div className="space-y-2">
                   <input
                     value={item.specificDescription ?? ''}
-                    onChange={(e) =>
-                      updateItem(idx, 'specificDescription', e.target.value)
-                    }
+                    onChange={(e) => updateItem(idx, 'specificDescription', e.target.value)}
                     className="w-full rounded border border-line px-2 py-1 text-sm"
                   />
                   <div className="flex flex-wrap gap-2 text-xs">
@@ -188,9 +173,7 @@ export function KitDetail({ kit }: { kit: KitDetailUI }): React.JSX.Element {
                         min={1}
                         max={20}
                         value={item.quantity ?? 1}
-                        onChange={(e) =>
-                          updateItem(idx, 'quantity', Number(e.target.value))
-                        }
+                        onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))}
                         className="w-14 rounded border border-line px-1 py-0.5"
                       />
                     </label>
@@ -203,11 +186,7 @@ export function KitDetail({ kit }: { kit: KitDetailUI }): React.JSX.Element {
                         max={100}
                         value={item.estimatedPriceEur ?? 0}
                         onChange={(e) =>
-                          updateItem(
-                            idx,
-                            'estimatedPriceEur',
-                            Number(e.target.value),
-                          )
+                          updateItem(idx, 'estimatedPriceEur', Number(e.target.value))
                         }
                         className="w-20 rounded border border-line px-1 py-0.5"
                       />
@@ -253,9 +232,7 @@ export function KitDetail({ kit }: { kit: KitDetailUI }): React.JSX.Element {
 
       <section className="mb-6 grid gap-4 md:grid-cols-2">
         <div className="rounded-lg border border-line bg-white p-4">
-          <h2 className="mb-2 text-sm font-medium text-ink-mute">
-            Card message IT
-          </h2>
+          <h2 className="mb-2 text-sm font-medium text-ink-mute">Card message IT</h2>
           {editMode ? (
             <textarea
               value={cardMessage}
@@ -269,9 +246,7 @@ export function KitDetail({ kit }: { kit: KitDetailUI }): React.JSX.Element {
           )}
         </div>
         <div className="rounded-lg border border-line bg-white p-4">
-          <h2 className="mb-2 text-sm font-medium text-ink-mute">
-            Card message EN
-          </h2>
+          <h2 className="mb-2 text-sm font-medium text-ink-mute">Card message EN</h2>
           {editMode ? (
             <textarea
               value={cardMessageEn}
@@ -387,8 +362,8 @@ export function KitDetail({ kit }: { kit: KitDetailUI }): React.JSX.Element {
             Audit modifiche ({kit.modificationLog.length})
           </summary>
           <ul className="mt-3 space-y-2 text-xs">
-            {kit.modificationLog.map((mod, i) => (
-              <li key={i} className="border-l-2 border-line pl-3">
+            {kit.modificationLog.map((mod) => (
+              <li key={`${mod.modifiedAt}-${mod.field}`} className="border-l-2 border-line pl-3">
                 <p className="font-medium">{mod.field}</p>
                 <p className="text-ink-mute">{mod.modifiedAt}</p>
               </li>
@@ -399,8 +374,7 @@ export function KitDetail({ kit }: { kit: KitDetailUI }): React.JSX.Element {
 
       {kit.generatorAgentVersion && (
         <p className="mt-6 text-[11px] text-ink-mute">
-          Agent {kit.generatorAgentVersion} · costo $
-          {kit.generatorCostUsd ?? '0'}
+          Agent {kit.generatorAgentVersion} · costo ${kit.generatorCostUsd ?? '0'}
         </p>
       )}
     </>

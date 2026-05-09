@@ -38,9 +38,7 @@ export default async function KitDetailPage({
         </Link>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold text-ink">
-              Kit per {kit.guestFullName}
-            </h1>
+            <h1 className="text-2xl font-semibold text-ink">Kit per {kit.guestFullName}</h1>
             <p className="mt-1 text-sm text-ink-mute">
               {kit.propertyName} · {checkinFmt} → {checkoutFmt} · {kit.nights}{' '}
               {kit.nights === 1 ? 'notte' : 'notti'} · {kit.numAdults}A
@@ -70,18 +68,10 @@ export default async function KitDetailPage({
             : null,
           approvedAt: kit.approvedAt ? kit.approvedAt.toISOString() : null,
           rejectedAt: kit.rejectedAt ? kit.rejectedAt.toISOString() : null,
-          cleanerBriefedAt: kit.cleanerBriefedAt
-            ? kit.cleanerBriefedAt.toISOString()
-            : null,
-          cleanerAcceptedAt: kit.cleanerAcceptedAt
-            ? kit.cleanerAcceptedAt.toISOString()
-            : null,
-          cleanerPlacedAt: kit.cleanerPlacedAt
-            ? kit.cleanerPlacedAt.toISOString()
-            : null,
-          guestConfirmedAt: kit.guestConfirmedAt
-            ? kit.guestConfirmedAt.toISOString()
-            : null,
+          cleanerBriefedAt: kit.cleanerBriefedAt ? kit.cleanerBriefedAt.toISOString() : null,
+          cleanerAcceptedAt: kit.cleanerAcceptedAt ? kit.cleanerAcceptedAt.toISOString() : null,
+          cleanerPlacedAt: kit.cleanerPlacedAt ? kit.cleanerPlacedAt.toISOString() : null,
+          guestConfirmedAt: kit.guestConfirmedAt ? kit.guestConfirmedAt.toISOString() : null,
           checkinAt: kit.checkinAt.toISOString(),
           checkoutAt: kit.checkoutAt.toISOString(),
         }}

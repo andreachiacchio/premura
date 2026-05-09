@@ -1,9 +1,6 @@
 // Slice C — Badge stato kit. Mappa enum → label IT + colore.
 
-const STATUS_META: Record<
-  string,
-  { label: string; cls: string }
-> = {
+const STATUS_META: Record<string, { label: string; cls: string }> = {
   // Slice C statuses
   pending_survey: { label: 'In attesa survey', cls: 'bg-line-soft text-ink-mute' },
   proposed: { label: 'Da approvare', cls: 'bg-gold-soft text-gold-deep' },

@@ -12,8 +12,7 @@ export function KitsApprovalCard({ pendingCount }: { pendingCount: number }): Re
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-gold-deep">
-            🎁 {pendingCount} kit{' '}
-            {pendingCount === 1 ? 'pronto' : 'pronti'} per approvazione
+            🎁 {pendingCount} kit {pendingCount === 1 ? 'pronto' : 'pronti'} per approvazione
           </p>
           <p className="mt-0.5 text-xs text-ink-mute">
             Tocca per rivedere e approvare le proposte di Premura.

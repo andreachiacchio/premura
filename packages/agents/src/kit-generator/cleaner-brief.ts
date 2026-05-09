@@ -72,9 +72,7 @@ export function composeCleanerBrief(input: ComposeBriefInput): string {
     if (it.fonte === 'manual_write') {
       // Biglietto manoscritto: la cleaner scrive il testo a mano.
       const cardLabel = input.cardLanguage === 'en' ? 'Card message' : 'Biglietto manoscritto';
-      lines.push(
-        `- ${cardLabel}: scrivi a mano "${input.cardMessage}" sul biglietto pre-stampato`,
-      );
+      lines.push(`- ${cardLabel}: scrivi a mano "${input.cardMessage}" sul biglietto pre-stampato`);
     } else {
       const desc = it.specificDescription ?? it.taxonomyKey ?? 'item';
       lines.push(`- ${desc}`);
@@ -97,7 +95,7 @@ export function composeCleanerBrief(input: ComposeBriefInput): string {
   lines.push('');
 
   // ─── Foto ────────────────────────────────────────────────────
-  lines.push('📸 PRIMA di uscire: foto del setup completo + carica nell\'app Premura');
+  lines.push("📸 PRIMA di uscire: foto del setup completo + carica nell'app Premura");
   lines.push('');
 
   // ─── Pagamento ───────────────────────────────────────────────
@@ -346,7 +344,7 @@ export async function loadKitNotificationContext(
   if (!row) return null;
 
   const storytelling =
-    row.guestLanguage === 'en' ? row.storytellingEn ?? null : row.storytellingIt ?? null;
+    row.guestLanguage === 'en' ? (row.storytellingEn ?? null) : (row.storytellingIt ?? null);
 
   return {
     kitId: row.kitId,
@@ -360,7 +358,7 @@ export async function loadKitNotificationContext(
     nights: row.nights,
     budgetTargetEur: row.budgetEur,
     itemsTotalEur: row.itemsTotalEur,
-    storyteller: storytelling ? storytelling.split('\n')[0]?.slice(0, 200) ?? null : null,
+    storyteller: storytelling ? (storytelling.split('\n')[0]?.slice(0, 200) ?? null) : null,
     status: row.status,
   };
 }

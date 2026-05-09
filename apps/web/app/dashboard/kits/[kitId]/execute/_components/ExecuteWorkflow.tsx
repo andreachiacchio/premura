@@ -47,10 +47,7 @@ export function ExecuteWorkflow(props: ExecuteWorkflowProps): React.JSX.Element 
   const [glovoState, setGlovoState] = useState(props.glovoItems);
   const [manualState, setManualState] = useState(props.manualItems);
 
-  function toggleItem(
-    idx: number,
-    setter: 'amazon' | 'glovo' | 'manual',
-  ): void {
+  function toggleItem(idx: number, setter: 'amazon' | 'glovo' | 'manual'): void {
     setError(null);
     startTransition(async () => {
       const r = await toggleItemExecutedAction(props.kitId, idx);
@@ -188,8 +185,7 @@ export function ExecuteWorkflow(props: ExecuteWorkflowProps): React.JSX.Element 
                 <>
                   {it.fonte === 'manual_write' && it.cardMessage && (
                     <p className="mt-1 text-xs text-ink-mute">
-                      Karen scrivera':{' '}
-                      <em>"{it.cardMessage}"</em>
+                      Karen scrivera': <em>"{it.cardMessage}"</em>
                     </p>
                   )}
                   {it.fonte === 'manual_print' && (
@@ -237,9 +233,7 @@ export function ExecuteWorkflow(props: ExecuteWorkflowProps): React.JSX.Element 
             .
           </p>
           {accepted ? (
-            <p className="mt-1 text-sm text-ok">
-              👍 Karen ha confermato il brief.
-            </p>
+            <p className="mt-1 text-sm text-ok">👍 Karen ha confermato il brief.</p>
           ) : (
             <p className="mt-1 text-sm text-ink-mute">
               In attesa della conferma di Karen su WhatsApp…

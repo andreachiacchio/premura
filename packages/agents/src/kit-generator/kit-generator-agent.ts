@@ -161,9 +161,7 @@ export async function generateKitProposal(input: KitGeneratorInput): Promise<Kit
         cache_control: { type: 'ephemeral' },
       },
     ],
-    messages: [
-      { role: 'user', content: 'Genera la proposta kit per questo guest.' },
-    ],
+    messages: [{ role: 'user', content: 'Genera la proposta kit per questo guest.' }],
     tools: [
       {
         name: 'emit_kit_proposal',

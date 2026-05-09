@@ -1,17 +1,10 @@
-import {
-  type Database,
-  bookings,
-  guestQuizzes,
-  hosts,
-  kits,
-  properties,
-} from '@premura/db';
+import { type Database, bookings, guestQuizzes, hosts, kits, properties } from '@premura/db';
 import { eq } from 'drizzle-orm';
 import { computeKitBudgetEur } from './items-taxonomy';
 import {
   KIT_GENERATOR_VERSION,
-  generateKitProposal,
   type KitGeneratorInput,
+  generateKitProposal,
 } from './kit-generator-agent';
 
 // ─────────────────────────────────────────────────────────────
@@ -43,10 +36,7 @@ export type GenerateResult =
   | { status: 'skipped_already_proposed'; kitId: string }
   | { status: 'generator_error'; error: string };
 
-export async function triggerKitProposal(
-  db: Database,
-  bookingId: string,
-): Promise<GenerateResult> {
+export async function triggerKitProposal(db: Database, bookingId: string): Promise<GenerateResult> {
   // Fetch context completo.
   const [bookingRow] = await db
     .select({

@@ -252,10 +252,7 @@ export async function modifyKit(
       modifiedBy: hostId,
     });
   }
-  if (
-    modification.cardMessage !== undefined &&
-    modification.cardMessage !== existing.cardMessage
-  ) {
+  if (modification.cardMessage !== undefined && modification.cardMessage !== existing.cardMessage) {
     log.push({
       field: 'cardMessage',
       oldValue: existing.cardMessage,
@@ -305,7 +302,9 @@ export async function toggleItemExecuted(
   kitId: string,
   hostId: string,
   itemIndex: number,
-): Promise<{ ok: true; allExecuted: boolean } | { ok: false; reason: 'not_found' | 'invalid_index' }> {
+): Promise<
+  { ok: true; allExecuted: boolean } | { ok: false; reason: 'not_found' | 'invalid_index' }
+> {
   const existing = await getKitForHost(db, kitId, hostId);
   if (!existing) return { ok: false, reason: 'not_found' };
   if (itemIndex < 0 || itemIndex >= existing.items.length) {
@@ -320,10 +319,7 @@ export async function toggleItemExecuted(
     };
   });
   const allExecuted = updatedItems.every((it) => it.executedAt);
-  await db
-    .update(kits)
-    .set({ items: updatedItems, updatedAt: now })
-    .where(eq(kits.id, kitId));
+  await db.update(kits).set({ items: updatedItems, updatedAt: now }).where(eq(kits.id, kitId));
   return { ok: true, allExecuted };
 }
 
@@ -352,7 +348,8 @@ export async function updateKitStatus(
   }
   const now = new Date();
   const patch: Record<string, unknown> = { status: newStatus, updatedAt: now };
-  if (newStatus === 'picked_up_by_cleaner') patch.cleanerBriefedAt = existing.cleanerBriefedAt ?? now;
+  if (newStatus === 'picked_up_by_cleaner')
+    patch.cleanerBriefedAt = existing.cleanerBriefedAt ?? now;
   if (newStatus === 'set_up') {
     patch.cleanerPlacedAt = now;
     if (extra.cleanerPhotoUrl !== undefined) patch.cleanerPhotoUrl = extra.cleanerPhotoUrl;
@@ -397,6 +394,10 @@ export async function getKitIdForBooking(
 
 // Re-export per server actions (verifica fk hosts.email per email destinatari).
 export async function getHostEmailById(db: Database, hostId: string): Promise<string | null> {
-  const [row] = await db.select({ email: hosts.email }).from(hosts).where(eq(hosts.id, hostId)).limit(1);
+  const [row] = await db
+    .select({ email: hosts.email })
+    .from(hosts)
+    .where(eq(hosts.id, hostId))
+    .limit(1);
   return row?.email ?? null;
 }

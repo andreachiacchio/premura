@@ -21,9 +21,7 @@ export type KitEmailKind =
   | 'cleaner_confirmed'
   | 'cleaner_uploaded_photo';
 
-export type SendEmailResult =
-  | { sent: true; kind: KitEmailKind }
-  | { sent: false; reason: string };
+export type SendEmailResult = { sent: true; kind: KitEmailKind } | { sent: false; reason: string };
 
 export async function sendKitEmail(
   kind: KitEmailKind,
