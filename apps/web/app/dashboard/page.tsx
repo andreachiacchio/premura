@@ -2,6 +2,7 @@ import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getOnboardingState, urlForStep } from '@/lib/onboarding';
 import { findByHostId } from '@/lib/repositories/bookings';
+import { countActiveCleanersForHost } from '@/lib/repositories/cleaners';
 import { countKitsByStatusForHost } from '@/lib/repositories/kits';
 import { findByHostId as findPropertiesByHostId } from '@/lib/repositories/properties';
 import { listPendingReplyDraftsForHost } from '@/lib/repositories/reply-drafts';
@@ -9,6 +10,7 @@ import { listUpcomingCheckins } from '@/lib/repositories/upcoming-checkins';
 import { isIncompleteDataSource } from '@/lib/types';
 import { redirect } from 'next/navigation';
 import { BookingsList } from './_components/BookingsList';
+import { CleanersCard } from './_components/CleanersCard';
 import { DashboardHeader } from './_components/DashboardHeader';
 import { EmptyOnboardingState } from './_components/EmptyOnboardingState';
 import { EmptyState } from './_components/EmptyState';
@@ -59,12 +61,14 @@ export default async function DashboardPage() {
     );
   }
 
-  const [bookings, replyDrafts, upcoming, kitStatusCounts] = await Promise.all([
-    findByHostId({ db, hostId }),
-    listPendingReplyDraftsForHost(db, hostId),
-    listUpcomingCheckins(db, hostId),
-    countKitsByStatusForHost(db, hostId),
-  ]);
+  const [bookings, replyDrafts, upcoming, kitStatusCounts, activeCleanersCount] =
+    await Promise.all([
+      findByHostId({ db, hostId }),
+      listPendingReplyDraftsForHost(db, hostId),
+      listUpcomingCheckins(db, hostId),
+      countKitsByStatusForHost(db, hostId),
+      countActiveCleanersForHost(db, hostId),
+    ]);
 
   const incompleteToCompleteCount = bookings.filter(
     (b) => isIncompleteDataSource(b.dataSource) && !b.hostSkippedCompletion,
@@ -91,6 +95,9 @@ export default async function DashboardPage() {
       {pendingKitsCount > 0 ? (
         <KitsApprovalCard pendingCount={pendingKitsCount} />
       ) : null}
+
+      {/* Slice F: card cleaner — sempre presente per accesso veloce. */}
+      <CleanersCard activeCount={activeCleanersCount} />
 
       {incompleteToCompleteCount > 0 ? (
         <IncompleteAlert count={incompleteToCompleteCount} />

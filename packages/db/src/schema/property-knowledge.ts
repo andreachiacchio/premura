@@ -1,4 +1,4 @@
-import { index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { index, jsonb, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { hosts } from './hosts';
 import { properties } from './properties';
 
@@ -44,6 +44,26 @@ export const propertyKnowledge = pgTable(
     // NULL = "tavolo cucina" default code-side nel WA brief Karen.
     kitDefaultPlacement: text('kit_default_placement'),
 
+    // Slice G: istruzioni testuali check-in/check-out (bilingue, host scrive
+    // come vuole). Usate da welcome-message generator + UI dashboard.
+    checkInInstructions: text('check_in_instructions'),
+    checkOutInstructions: text('check_out_instructions'),
+
+    // Slice G: posti consigliati curati DALL'host (NON dall'agent).
+    // 3+ raccomandati per buona generazione kit. Drag-to-reorder UI side.
+    localTipsCuratedHost: jsonb('local_tips_curated_host')
+      .$type<LocalTip[]>()
+      .notNull()
+      .default([]),
+
+    // Slice G: array URLs Supabase Storage bucket "property-photos".
+    // Max 10 per property in V1.
+    housePhotos: jsonb('house_photos').$type<string[]>().notNull().default([]),
+
+    // Slice G: lingua default per template welcome-message + storytelling
+    // fallback se booking.guestLanguage non disponibile.
+    languageDefault: varchar('language_default', { length: 8 }).notNull().default('it'),
+
     updatedBy: uuid('updated_by').references(() => hosts.id, { onDelete: 'set null' }),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -88,4 +108,22 @@ export type NearbyEssential = {
   name: string;
   address?: string;
   distanceM?: number; // distanza in metri
+};
+
+// Slice G: posto curato dall'host (LocalTipsEditor UI).
+export type LocalTipCategory =
+  | 'pasticceria'
+  | 'ristorante'
+  | 'bar'
+  | 'panorama'
+  | 'shopping'
+  | 'farmacia'
+  | 'altro';
+
+export type LocalTip = {
+  category: LocalTipCategory;
+  name: string;
+  description?: string;
+  address?: string;
+  distanceMin?: number; // minuti a piedi
 };
