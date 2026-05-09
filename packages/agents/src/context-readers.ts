@@ -3,6 +3,7 @@ import {
   type EmergencyContact,
   type HouseRules,
   type KeyboxInfo,
+  type LocalTip,
   type NearbyEssential,
   type ParkingInfo,
   type WifiInfo,
@@ -83,6 +84,13 @@ export type PropertyKnowledgeView = {
   emergencyContacts: EmergencyContact[];
   nearbyEssentials: NearbyEssential[];
   additionalInfo: string | null;
+  // Slice C/G aggiunte.
+  kitDefaultPlacement: string | null;
+  checkInInstructions: string | null;
+  checkOutInstructions: string | null;
+  localTipsCuratedHost: LocalTip[];
+  housePhotos: string[];
+  languageDefault: string;
   updatedAt: Date | null;
 };
 
@@ -105,6 +113,12 @@ export async function getPropertyKnowledge(
     emergencyContacts: row.emergencyContacts,
     nearbyEssentials: row.nearbyEssentials,
     additionalInfo: row.additionalInfo,
+    kitDefaultPlacement: row.kitDefaultPlacement ?? null,
+    checkInInstructions: row.checkInInstructions ?? null,
+    checkOutInstructions: row.checkOutInstructions ?? null,
+    localTipsCuratedHost: row.localTipsCuratedHost ?? [],
+    housePhotos: row.housePhotos ?? [],
+    languageDefault: row.languageDefault ?? 'it',
     updatedAt: row.updatedAt,
   };
 }

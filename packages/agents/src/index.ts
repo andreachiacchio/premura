@@ -10,6 +10,7 @@ export * from './dna-insights-merger';
 export * from './draft-generator';
 export * from './draft-generator-pipeline';
 export * from './guest-dna';
+export * from './knowledge-parser';
 export * from './survey-pipeline';
 export * from './survey-planner';
 export * from './survey-token';
