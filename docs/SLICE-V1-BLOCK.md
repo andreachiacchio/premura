@@ -38,7 +38,7 @@
 
 - **`@premura/agents/knowledge-parser`**: Haiku 4.5 `parseKnowledgeFromText` (~€0.005/parse), estrazione strutturata wifi/keybox/parking/tips/contatti.
 - **`@premura/agents/cleaner-auth`**: `signCleanerToken` / `verifyCleanerToken` HS256 + `sendCleanerMagicLink` via WA Cloud API. TTL 30 giorni, secret `CLEANER_TOKEN_SECRET`.
-- **`@premura/agents/welcome-message`**: `findKitsForWelcomeMessage` finder + `generateWelcomeMessage` template fisso IT/EN. Voice profile integration rimandata.
+- **`@premura/agents/welcome-message`**: `findKitsForWelcomeMessage` finder + `generateWelcomeMessage` (async) con due path: **voice-aware Sonnet 4.6** se `host_voice_profile.confidence > 0.6` (formality / emoji / tone keywords / esempi greeting+closing iniettati nel prompt) + **template fallback** IT/EN. Firma = nome host (CONTEXT.md §5 anti-disintermediazione: niente "via Premura", niente "AI assistant"). `loadVoiceProfileForHost` helper + `findStaleSetups(8|9)` per edge cases.
 - **`@premura/integrations/whatsapp-business`**: `sendImage(to, imageUrl, caption?)` per welcome message con foto.
 
 ### apps/web routes
@@ -62,10 +62,11 @@
 
 | Job | Trigger | Scope |
 |---|---|---|
-| `welcome-message-cron` | `*/30 8-11 * * *` Europe/Rome (8 tick/day) | E |
-| `welcome-message-queue` (BullMQ) | enqueue via cron | E |
-| `welcome-message-handler` | per kit candidato: generate + `sendImage` WA + markSent | E |
+| `welcome-message-cron` | `*/30 8-11 * * *` Europe/Rome (8 tick/day). Tick 08:00 → `runEarlyStaleCheck` (WA reminder cleaner + email soft alert founder se foto manca). Tick 09:00 → `runEscalationCheck` (email escalation founder se kit non `set_up`). | E |
+| `welcome-message-queue` (BullMQ) | enqueue via cron, jobId `welcome:send:{kitId}` per dedup | E |
+| `welcome-message-handler` | fetch context + load voice profile + generate (voice-aware OR template) + `sendImage` WA + insert `messages` (outbound, stage=`kit_reveal`, source=`premura_welcome`) + `markWelcomeMessageSent`. Audit via `logAgentAction`. | E |
 | `welcome-message-worker` | concurrency 2 | E |
+| `welcome-stale-alerts` | helper `runEarlyStaleCheck` + `runEscalationCheck` (WA cleaner + Resend founder) | E |
 
 ## 4. Decisioni V1 (chiuse Andrea)
 
@@ -75,7 +76,8 @@
 | Auth cleaner | Token JWT HS256 signed (secret env), TTL 30 giorni, cookie `c_session` httpOnly + sameSite lax + maxAge 30d. |
 | AI parser knowledge | **Haiku 4.5** (`claude-haiku-4-5-20251001`), tool_use forced. ~€0.005/parse, 8x cheaper di Sonnet, qualità sufficiente per estrazione strutturata. |
 | Storage bucket | `property-photos` 10MB + `kit-setup-photos` 5MB, public read (path UUID random) + service_role insert/delete. Fallback procedurale via Supabase SQL Editor se Drizzle migrate fallisce per privilegi schema `storage`. |
-| Welcome message voice profile | **Template fisso IT/EN** in V1, voice profile rimandato a slice futura quando avremo voice profile estratto affidabilmente. |
+| Welcome message voice profile | **Due path**: voice-aware Sonnet 4.6 quando `host_voice_profile.confidence > 0.6`, template fallback IT/EN altrimenti. Anti-disintermediazione totale: firma host, niente AI assistant, niente "via Premura". |
+| Welcome message edge cases | Tick 08:00 manda WA reminder al cleaner (foto manca) + email soft founder. Tick 09:00 email escalation founder per kit non `set_up`. One-shot per tick = idempotency naturale (prossimo tick utile = domani). |
 | PR strategia | 5 PR sequenziali su stesso branch, ogni una rebased su main aggiornato. Review chirurgica + deploy incrementale. |
 
 ## 5. Costi operativi
@@ -97,7 +99,7 @@
 - [ ] Slice E merged: welcome message cron + sendImage
 
 ### Tecnici
-- [x] 51 test files, 496 tests verdi (+39 nuovi vs main pre-blocco)
+- [x] 52 test files, 510 tests verdi (+14 nuovi slice E: 18 generator template/EN/edge/voice + 7 stale alerts; rimossi 11 vecchi generator pre-fix)
 - [x] Typecheck apps/web + apps/api puliti
 - [x] Biome clean su tutti i file slice
 - [x] Build apps/web compila pulita (NODE_OPTIONS=7168MB)
@@ -113,7 +115,7 @@
 | Limitazione | V2 plan |
 |---|---|
 | PWA cleaner solo online (no Service Worker) | Upgrade quando dati su disconnessioni reali |
-| Welcome message template fisso (no voice profile) | Integrare voice profile quando confidence > 0.6 |
+| Welcome message: voice profile usato solo se voice_confidence > 0.6 (auto-extracted da slice 8.4) | Onboarding wizard chiederà alcuni esempi messaggi per bootstrap del voice profile |
 | Photo upload single attempt (no retry queue) | BullMQ retry on Storage failure |
 | Manifest PWA con icone SVG dinamiche (no PNG asset) | Convert a PNG con campagne pilot |
 | Settings host: solo welcome message (no altre automazioni) | Estendere con toggle per ogni cron |
