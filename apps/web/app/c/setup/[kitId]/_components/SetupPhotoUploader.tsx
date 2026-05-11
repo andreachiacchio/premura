@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRef, useState, useTransition } from 'react';
 import { uploadKitSetupPhotoAction } from '../../../actions';
 
@@ -65,12 +66,12 @@ export function SetupPhotoUploader({
         <p className="mt-1 text-body-sm text-ink-mute">
           Andrea riceve la notifica e il guest riceverà la foto la mattina del check-in.
         </p>
-        <a
+        <Link
           href="/c/dashboard"
           className="mt-4 inline-flex h-11 items-center justify-center rounded-full bg-terracotta px-5 text-body-sm font-medium text-paper hover:bg-terracotta-2"
         >
           Torna alla lista
-        </a>
+        </Link>
       </section>
     );
   }
