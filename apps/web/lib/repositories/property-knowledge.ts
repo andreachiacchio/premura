@@ -3,6 +3,7 @@ import {
   type EmergencyContact,
   type HouseRules,
   type KeyboxInfo,
+  type LocalTip,
   type NearbyEssential,
   type ParkingInfo,
   type WifiInfo,
@@ -49,6 +50,13 @@ export type PropertyKnowledgePatch = Partial<{
   emergencyContacts: EmergencyContact[];
   nearbyEssentials: NearbyEssential[];
   additionalInfo: string | null;
+  // Slice C/G aggiunte.
+  kitDefaultPlacement: string | null;
+  checkInInstructions: string | null;
+  checkOutInstructions: string | null;
+  localTipsCuratedHost: LocalTip[];
+  housePhotos: string[];
+  languageDefault: 'it' | 'en';
 }>;
 
 // Upsert: prima update, fallback insert se row inesistente. Idempotente.
@@ -67,6 +75,12 @@ export async function upsertPropertyKnowledge(
   if ('emergencyContacts' in patch) setValues.emergencyContacts = patch.emergencyContacts;
   if ('nearbyEssentials' in patch) setValues.nearbyEssentials = patch.nearbyEssentials;
   if ('additionalInfo' in patch) setValues.additionalInfo = patch.additionalInfo;
+  if ('kitDefaultPlacement' in patch) setValues.kitDefaultPlacement = patch.kitDefaultPlacement;
+  if ('checkInInstructions' in patch) setValues.checkInInstructions = patch.checkInInstructions;
+  if ('checkOutInstructions' in patch) setValues.checkOutInstructions = patch.checkOutInstructions;
+  if ('localTipsCuratedHost' in patch) setValues.localTipsCuratedHost = patch.localTipsCuratedHost;
+  if ('housePhotos' in patch) setValues.housePhotos = patch.housePhotos;
+  if ('languageDefault' in patch) setValues.languageDefault = patch.languageDefault;
 
   const [updated] = await db
     .update(propertyKnowledge)
@@ -87,6 +101,12 @@ export async function upsertPropertyKnowledge(
     emergencyContacts: patch.emergencyContacts ?? [],
     nearbyEssentials: patch.nearbyEssentials ?? [],
     additionalInfo: patch.additionalInfo ?? null,
+    kitDefaultPlacement: patch.kitDefaultPlacement ?? null,
+    checkInInstructions: patch.checkInInstructions ?? null,
+    checkOutInstructions: patch.checkOutInstructions ?? null,
+    localTipsCuratedHost: patch.localTipsCuratedHost ?? [],
+    housePhotos: patch.housePhotos ?? [],
+    languageDefault: patch.languageDefault ?? 'it',
   });
   return { inserted: true };
 }

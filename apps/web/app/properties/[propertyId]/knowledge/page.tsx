@@ -3,10 +3,16 @@ import { getDb } from '@/lib/db';
 import { findByHostId } from '@/lib/repositories/properties';
 import { getPropertyKnowledge, isPropertyOwnedByHost } from '@/lib/repositories/property-knowledge';
 import { notFound } from 'next/navigation';
+import { AiAssistantModal } from './_components/AiAssistantModal';
+import { HousePhotosEditor } from './_components/HousePhotosEditor';
+import { LocalTipsEditor } from './_components/LocalTipsEditor';
 import {
   saveAdditionalInfoAction,
+  saveCheckInOutInstructionsAction,
   saveHouseRulesAction,
   saveKeyboxAction,
+  saveKitDefaultPlacementAction,
+  saveLanguageDefaultAction,
   saveParkingAction,
   saveWifiAction,
 } from './actions';
@@ -43,6 +49,9 @@ export default async function PropertyKnowledgePage(props: {
   const saveParking = saveParkingAction.bind(null, propertyId);
   const saveHouseRules = saveHouseRulesAction.bind(null, propertyId);
   const saveAdditionalInfo = saveAdditionalInfoAction.bind(null, propertyId);
+  const saveCheckInOut = saveCheckInOutInstructionsAction.bind(null, propertyId);
+  const savePlacement = saveKitDefaultPlacementAction.bind(null, propertyId);
+  const saveLanguage = saveLanguageDefaultAction.bind(null, propertyId);
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-2xl bg-ivory px-5 pt-12 pb-16">
@@ -55,6 +64,9 @@ export default async function PropertyKnowledgePage(props: {
           Compila quello che vuoi, quando vuoi. Tutto si salva da solo. Useremo questi dati per
           rispondere agli ospiti senza svegliarti ogni volta.
         </p>
+        <div className="mt-4">
+          <AiAssistantModal propertyId={propertyId} />
+        </div>
       </header>
 
       <div className="flex flex-col gap-3">
@@ -208,6 +220,34 @@ export default async function PropertyKnowledgePage(props: {
           </form>
         </Section>
 
+        <Section title="Check-in / Check-out">
+          <form action={saveCheckInOut} className="flex flex-col gap-3">
+            <FieldLabel>
+              Istruzioni check-in
+              <textarea
+                name="checkInInstructions"
+                defaultValue={knowledge?.checkInInstructions ?? ''}
+                maxLength={2000}
+                rows={3}
+                placeholder="Es. Citofono &laquo;La Goccia&raquo;. Dopo le 22 chiamare il numero di emergenza."
+                className="rounded-card border border-line bg-paper px-3 py-2 text-body text-ink placeholder:text-ink-mute focus:border-terracotta-soft focus:outline-none"
+              />
+            </FieldLabel>
+            <FieldLabel>
+              Istruzioni check-out
+              <textarea
+                name="checkOutInstructions"
+                defaultValue={knowledge?.checkOutInstructions ?? ''}
+                maxLength={2000}
+                rows={3}
+                placeholder="Es. Lasciare le chiavi sul tavolo, chiudere finestre."
+                className="rounded-card border border-line bg-paper px-3 py-2 text-body text-ink placeholder:text-ink-mute focus:border-terracotta-soft focus:outline-none"
+              />
+            </FieldLabel>
+            <SaveButton />
+          </form>
+        </Section>
+
         <Section title="Contatti d'emergenza">
           <p className="text-body-sm text-ink-soft">
             Idraulico, elettricista, vicino di fiducia. Useremo questi contatti solo in caso di
@@ -219,14 +259,52 @@ export default async function PropertyKnowledgePage(props: {
           </p>
         </Section>
 
-        <Section title="Essenziali nelle vicinanze">
-          <p className="text-body-sm text-ink-soft">
-            Farmacia, supermercato, ristorante consigliato, fermata metro/bus.
-          </p>
-          <p className="mt-2 text-body-sm text-ink-mute">
-            Form essenziali gestito separatamente (slice 12.1: lista dinamica). Per ora compila in
-            &laquo;Note libere&raquo;.
-          </p>
+        <Section title="Posti curati nelle vicinanze">
+          <LocalTipsEditor
+            propertyId={propertyId}
+            initial={knowledge?.localTipsCuratedHost ?? []}
+          />
+        </Section>
+
+        <Section title="Setup omaggio">
+          <form action={savePlacement} className="flex flex-col gap-3">
+            <FieldLabel>
+              Dove la cleaner deve lasciare il kit
+              <input
+                type="text"
+                name="kitDefaultPlacement"
+                defaultValue={knowledge?.kitDefaultPlacement ?? ''}
+                maxLength={200}
+                placeholder="Es. tavolo cucina (default), comodino camera matrimoniale"
+                className="h-11 rounded-card border border-line bg-paper px-3 text-body text-ink placeholder:text-ink-mute focus:border-terracotta-soft focus:outline-none"
+              />
+            </FieldLabel>
+            <p className="text-body-sm text-ink-mute">
+              Se vuoto, il default è &laquo;tavolo cucina&raquo;.
+            </p>
+            <SaveButton />
+          </form>
+        </Section>
+
+        <Section title="Foto della casa">
+          <HousePhotosEditor propertyId={propertyId} initial={knowledge?.housePhotos ?? []} />
+        </Section>
+
+        <Section title="Lingua default">
+          <form action={saveLanguage} className="flex flex-col gap-3">
+            <FieldLabel>
+              Lingua di default per messaggi welcome / storytelling kit
+              <select
+                name="languageDefault"
+                defaultValue={knowledge?.languageDefault ?? 'it'}
+                className="h-11 rounded-card border border-line bg-paper px-3 text-body text-ink focus:border-terracotta-soft focus:outline-none"
+              >
+                <option value="it">Italiano</option>
+                <option value="en">English</option>
+              </select>
+            </FieldLabel>
+            <SaveButton />
+          </form>
         </Section>
 
         <Section title="Note libere">

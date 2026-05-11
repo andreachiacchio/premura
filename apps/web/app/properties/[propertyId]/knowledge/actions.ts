@@ -7,6 +7,13 @@ import {
   isPropertyOwnedByHost,
   upsertPropertyKnowledge,
 } from '@/lib/repositories/property-knowledge';
+import {
+  type Bucket,
+  deletePhotoFromBucket,
+  extractPathFromPublicUrl,
+  uploadPhotoToBucket,
+} from '@/lib/storage';
+import { getPropertyKnowledge, parseKnowledgeFromText } from '@premura/agents';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
@@ -193,6 +200,307 @@ export async function saveAdditionalInfoAction(
     additionalInfo: value && value.length > 0 ? value : null,
   });
   revalidatePath(`/properties/${id}/knowledge`);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Slice G — sezioni nuove.
+// ─────────────────────────────────────────────────────────────
+
+const checkInOutSchema = z.object({
+  checkInInstructions: z.string().trim().max(2000).optional(),
+  checkOutInstructions: z.string().trim().max(2000).optional(),
+});
+
+export async function saveCheckInOutInstructionsAction(
+  propertyId: string,
+  formData: FormData,
+): Promise<void> {
+  const id = idSchema.parse(propertyId);
+  const hostId = await assertOwnership(id);
+  const payload = checkInOutSchema.parse({
+    checkInInstructions: formData.get('checkInInstructions') ?? undefined,
+    checkOutInstructions: formData.get('checkOutInstructions') ?? undefined,
+  });
+  const { db } = await getDb();
+  await upsertPropertyKnowledge(db, id, hostId, {
+    checkInInstructions: payload.checkInInstructions || null,
+    checkOutInstructions: payload.checkOutInstructions || null,
+  });
+  revalidatePath(`/properties/${id}/knowledge`);
+}
+
+const localTipSchema = z.object({
+  category: z.enum([
+    'pasticceria',
+    'ristorante',
+    'bar',
+    'panorama',
+    'shopping',
+    'farmacia',
+    'altro',
+  ]),
+  name: z.string().trim().min(1).max(100),
+  description: z.string().trim().max(280).optional(),
+  address: z.string().trim().max(200).optional(),
+  distanceMin: z.coerce.number().int().min(0).max(120).optional(),
+});
+
+const localTipsArraySchema = z.array(localTipSchema).max(20);
+
+export async function saveLocalTipsAction(propertyId: string, tips: unknown): Promise<void> {
+  const id = idSchema.parse(propertyId);
+  const hostId = await assertOwnership(id);
+  const parsed = localTipsArraySchema.parse(tips);
+  // Normalize: rimuovi description/address vuoti
+  const cleaned = parsed.map((t) => ({
+    category: t.category,
+    name: t.name,
+    description: t.description || undefined,
+    address: t.address || undefined,
+    distanceMin: t.distanceMin,
+  }));
+  const { db } = await getDb();
+  await upsertPropertyKnowledge(db, id, hostId, { localTipsCuratedHost: cleaned });
+  revalidatePath(`/properties/${id}/knowledge`);
+}
+
+const placementSchema = z.string().trim().max(200).optional();
+
+export async function saveKitDefaultPlacementAction(
+  propertyId: string,
+  formData: FormData,
+): Promise<void> {
+  const id = idSchema.parse(propertyId);
+  const hostId = await assertOwnership(id);
+  const value = placementSchema.parse(formData.get('kitDefaultPlacement') ?? undefined);
+  const { db } = await getDb();
+  await upsertPropertyKnowledge(db, id, hostId, {
+    kitDefaultPlacement: value && value.length > 0 ? value : null,
+  });
+  revalidatePath(`/properties/${id}/knowledge`);
+}
+
+const languageDefaultSchema = z.enum(['it', 'en']);
+
+export async function saveLanguageDefaultAction(
+  propertyId: string,
+  formData: FormData,
+): Promise<void> {
+  const id = idSchema.parse(propertyId);
+  const hostId = await assertOwnership(id);
+  const value = languageDefaultSchema.parse(formData.get('languageDefault') ?? 'it');
+  const { db } = await getDb();
+  await upsertPropertyKnowledge(db, id, hostId, { languageDefault: value });
+  revalidatePath(`/properties/${id}/knowledge`);
+}
+
+// ─── Foto upload ──────────────────────────────────────────────────
+const MAX_PHOTOS_PER_PROPERTY = 10;
+
+export type UploadHousePhotoResult =
+  | { ok: true; url: string }
+  | {
+      ok: false;
+      reason: 'too_many' | 'invalid_mime' | 'too_large' | 'upload_error' | 'no_file';
+      detail?: string;
+    };
+
+export async function uploadHousePhotoAction(
+  propertyId: string,
+  formData: FormData,
+): Promise<UploadHousePhotoResult> {
+  const id = idSchema.parse(propertyId);
+  const hostId = await assertOwnership(id);
+  const file = formData.get('photo');
+  if (!(file instanceof File)) {
+    return { ok: false, reason: 'no_file' };
+  }
+  const { db } = await getDb();
+  const knowledge = await getPropertyKnowledge(db, id);
+  const existing = knowledge?.housePhotos ?? [];
+  if (existing.length >= MAX_PHOTOS_PER_PROPERTY) {
+    return { ok: false, reason: 'too_many', detail: `max ${MAX_PHOTOS_PER_PROPERTY}` };
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const result = await uploadPhotoToBucket('property-photos', buffer, file.type, {
+    folder: id,
+  });
+  if (!result.ok) {
+    return { ok: false, reason: result.reason, detail: result.detail };
+  }
+
+  await upsertPropertyKnowledge(db, id, hostId, {
+    housePhotos: [...existing, result.url],
+  });
+  revalidatePath(`/properties/${id}/knowledge`);
+  return { ok: true, url: result.url };
+}
+
+export type DeleteHousePhotoResult = { ok: true } | { ok: false; reason: 'not_found' };
+
+export async function deleteHousePhotoAction(
+  propertyId: string,
+  url: string,
+): Promise<DeleteHousePhotoResult> {
+  const id = idSchema.parse(propertyId);
+  const hostId = await assertOwnership(id);
+  const { db } = await getDb();
+  const knowledge = await getPropertyKnowledge(db, id);
+  const existing = knowledge?.housePhotos ?? [];
+  if (!existing.includes(url)) return { ok: false, reason: 'not_found' };
+
+  const path = extractPathFromPublicUrl('property-photos' as Bucket, url);
+  if (path) {
+    await deletePhotoFromBucket('property-photos', path).catch(() => {
+      // Best-effort: cancellazione DB anche se Storage delete fallisce.
+    });
+  }
+
+  await upsertPropertyKnowledge(db, id, hostId, {
+    housePhotos: existing.filter((u) => u !== url),
+  });
+  revalidatePath(`/properties/${id}/knowledge`);
+  return { ok: true };
+}
+
+// ─── AI parser knowledge ──────────────────────────────────────────
+export type ParseKnowledgeResult =
+  | {
+      ok: true;
+      parsed: Awaited<ReturnType<typeof parseKnowledgeFromText>>['parsed'];
+      costUsd: number;
+      agentVersion: string;
+    }
+  | { ok: false; reason: 'invalid_text' | 'parser_error'; detail?: string };
+
+const parseTextSchema = z.string().trim().min(20).max(15000);
+
+export async function parseKnowledgeAction(
+  propertyId: string,
+  text: string,
+): Promise<ParseKnowledgeResult> {
+  const id = idSchema.parse(propertyId);
+  await assertOwnership(id);
+  let cleanText: string;
+  try {
+    cleanText = parseTextSchema.parse(text);
+  } catch {
+    return { ok: false, reason: 'invalid_text', detail: 'min 20, max 15000 char' };
+  }
+  try {
+    const result = await parseKnowledgeFromText({ text: cleanText });
+    return {
+      ok: true,
+      parsed: result.parsed,
+      costUsd: result.costUsd,
+      agentVersion: result.agentVersion,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: 'parser_error',
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+// applyParsedKnowledge — applica patch confermato dall'host (UI mostra
+// preview prima di salvare). Patch può essere parziale: tutto opzionale.
+const applyParsedSchema = z.object({
+  wifi: z
+    .object({
+      ssid: z.string().max(80).optional(),
+      password: z.string().max(80).optional(),
+      notes: z.string().max(500).optional(),
+    })
+    .optional(),
+  keybox: z
+    .object({
+      code: z.string().max(40).optional(),
+      instructions: z.string().max(2000).optional(),
+    })
+    .optional(),
+  parking: z
+    .object({
+      available: z.boolean().optional(),
+      type: z.enum(['street', 'garage', 'private', 'paid', 'none']).optional(),
+      instructions: z.string().max(2000).optional(),
+    })
+    .optional(),
+  checkInInstructions: z.string().max(2000).optional(),
+  checkOutInstructions: z.string().max(2000).optional(),
+  emergencyContacts: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(128),
+        phone: z.string().min(1).max(64),
+        role: z.string().min(1).max(64),
+      }),
+    )
+    .max(10)
+    .optional(),
+  localTipsCuratedHost: z
+    .array(
+      z.object({
+        category: z.enum([
+          'pasticceria',
+          'ristorante',
+          'bar',
+          'panorama',
+          'shopping',
+          'farmacia',
+          'altro',
+        ]),
+        name: z.string().min(1).max(100),
+        description: z.string().max(280).optional(),
+        address: z.string().max(200).optional(),
+        distanceMin: z.number().int().min(0).max(120).optional(),
+      }),
+    )
+    .max(20)
+    .optional(),
+  languageDefault: z.enum(['it', 'en']).optional(),
+  additionalInfo: z.string().max(5000).optional(),
+});
+
+export type ApplyParsedKnowledgeResult =
+  | { ok: true }
+  | { ok: false; reason: 'invalid_payload'; detail?: string };
+
+export async function applyParsedKnowledgeAction(
+  propertyId: string,
+  patch: unknown,
+): Promise<ApplyParsedKnowledgeResult> {
+  const id = idSchema.parse(propertyId);
+  const hostId = await assertOwnership(id);
+  let parsed: z.infer<typeof applyParsedSchema>;
+  try {
+    parsed = applyParsedSchema.parse(patch);
+  } catch (err) {
+    return {
+      ok: false,
+      reason: 'invalid_payload',
+      detail: err instanceof Error ? err.message : 'invalid',
+    };
+  }
+  const { db } = await getDb();
+  const update: PropertyKnowledgePatch = {};
+  if (parsed.wifi) update.wifi = parsed.wifi;
+  if (parsed.keybox) update.keybox = parsed.keybox;
+  if (parsed.parking) update.parking = parsed.parking;
+  if (parsed.checkInInstructions !== undefined)
+    update.checkInInstructions = parsed.checkInInstructions || null;
+  if (parsed.checkOutInstructions !== undefined)
+    update.checkOutInstructions = parsed.checkOutInstructions || null;
+  if (parsed.emergencyContacts) update.emergencyContacts = parsed.emergencyContacts;
+  if (parsed.localTipsCuratedHost) update.localTipsCuratedHost = parsed.localTipsCuratedHost;
+  if (parsed.languageDefault) update.languageDefault = parsed.languageDefault;
+  if (parsed.additionalInfo !== undefined) update.additionalInfo = parsed.additionalInfo || null;
+
+  await upsertPropertyKnowledge(db, id, hostId, update);
+  revalidatePath(`/properties/${id}/knowledge`);
+  return { ok: true };
 }
 
 export type { PropertyKnowledgePatch };
