@@ -57,12 +57,8 @@ export const kits = pgTable(
     budgetEur: decimal('budget_eur', { precision: 6, scale: 2 }).notNull(),
     itemsTotalEur: decimal('items_total_eur', { precision: 6, scale: 2 }),
     deliveryEur: decimal('delivery_eur', { precision: 6, scale: 2 }),
-    serviceFeeEur: decimal('service_fee_eur', { precision: 6, scale: 2 })
-      .notNull()
-      .default('0.75'),
-    cleanerFeeEur: decimal('cleaner_fee_eur', { precision: 6, scale: 2 })
-      .notNull()
-      .default('2.00'),
+    serviceFeeEur: decimal('service_fee_eur', { precision: 6, scale: 2 }).notNull().default('0.75'),
+    cleanerFeeEur: decimal('cleaner_fee_eur', { precision: 6, scale: 2 }).notNull().default('2.00'),
     cardFeeEur: decimal('card_fee_eur', { precision: 6, scale: 2 }).notNull().default('1.00'),
     totalChargedEur: decimal('total_charged_eur', { precision: 6, scale: 2 }),
 
@@ -89,6 +85,9 @@ export const kits = pgTable(
     cleanerAcceptedAt: timestamp('cleaner_accepted_at', { withTimezone: true }),
     cleanerPlacedAt: timestamp('cleaner_placed_at', { withTimezone: true }),
     cleanerPhotoUrl: text('cleaner_photo_url'),
+
+    // Slice E: timestamp invio welcome message (idempotency cron).
+    welcomeMessageSentAt: timestamp('welcome_message_sent_at', { withTimezone: true }),
 
     // Conferma ospite.
     guestConfirmedAt: timestamp('guest_confirmed_at', { withTimezone: true }),

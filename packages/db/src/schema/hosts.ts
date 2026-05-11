@@ -30,8 +30,12 @@ export const hosts = pgTable(
     onboardingCompleted: boolean('onboarding_completed').notNull().default(false),
     onboardingCompletedAt: timestamp('onboarding_completed_at', { withTimezone: true }),
     // Slice 9 prep: step corrente del flusso onboarding per resume.
-    // Valori: 'welcome' | 'property' | 'gmail' | 'whatsapp' | 'completed'.
+    // Valori: 'welcome' | 'property' | 'calendar' | 'knowledge' | 'cleaner' | 'completed'.
     onboardingStep: varchar('onboarding_step', { length: 32 }).notNull().default('welcome'),
+
+    // Slice E: auto-send welcome message check-in.
+    welcomeAutoSend: boolean('welcome_auto_send').notNull().default(true),
+    welcomeTimeSlot: varchar('welcome_time_slot', { length: 5 }).notNull().default('08:00'),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

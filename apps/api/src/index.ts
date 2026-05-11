@@ -20,6 +20,8 @@ import { startSurveyCron } from './jobs/survey-cron';
 import { surveyQueue } from './jobs/survey-queue';
 // Slice B: worker BullMQ pre-arrival-survey. Top-level import.
 import { surveyWorker } from './jobs/survey-worker';
+import { startWelcomeMessageCron } from './jobs/welcome-message-cron';
+import { welcomeWorker } from './jobs/welcome-message-worker';
 import { attachJwtAuth } from './plugins/jwt-auth';
 
 const app = Fastify({
@@ -88,6 +90,7 @@ await app.register(whatsappWebhookRoutes, { db: apiClient.db });
 // online trovano la pipeline di processing pronta.
 const icalCron = startIcalCron();
 const surveyCron = startSurveyCron();
+const welcomeCron = startWelcomeMessageCron();
 
 const port = Number(process.env.PORT ?? 3000);
 await app.listen({ port, host: '0.0.0.0' });
@@ -95,12 +98,19 @@ app.log.info(`Premura listening on :${port}`);
 app.log.info('ical poll worker started');
 app.log.info('draft generation worker started');
 app.log.info('pre-arrival survey worker started');
+app.log.info('welcome message worker started');
 
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, 'shutdown requested');
   icalCron.stop();
   surveyCron.stop();
-  await Promise.all([icalPollWorker.close(), draftGenerationWorker.close(), surveyWorker.close()]);
+  welcomeCron.stop();
+  await Promise.all([
+    icalPollWorker.close(),
+    draftGenerationWorker.close(),
+    surveyWorker.close(),
+    welcomeWorker.close(),
+  ]);
   await app.close();
   await apiClient.close();
   process.exit(0);
