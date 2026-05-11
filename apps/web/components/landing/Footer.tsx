@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { Container } from "@/components/Container";
+import { Container } from '@/components/Container';
+import Link from 'next/link';
 
 export function Footer() {
   return (
@@ -15,10 +15,11 @@ export function Footer() {
             <span className="text-body-sm text-ink-mute">· Fatto a Napoli.</span>
           </div>
           <div className="flex items-center gap-4 text-body-sm text-ink-mute">
-            <Link
-              href="/privacy"
-              className="hover:text-ink transition-colors"
-            >
+            <Link href="/login" className="hover:text-ink transition-colors">
+              Accedi
+            </Link>
+            <span aria-hidden="true">·</span>
+            <Link href="/privacy" className="hover:text-ink transition-colors">
               Privacy
             </Link>
             <span aria-hidden="true">·</span>

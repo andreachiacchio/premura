@@ -1,10 +1,26 @@
-import { pgTable, uuid, varchar, smallint, timestamp, index } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  index,
+  pgTable,
+  smallint,
+  text,
+  timestamp,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 
-// Waitlist pre-lancio Premura.
-// Popolata dall'endpoint pubblico POST /api/waitlist (apps/web).
-// Nessuna relazione con altre tabelle: raccolta lead, non oggetto di dominio.
-// Dopo il lancio, gli iscritti vengono migrati manualmente a "hosts" quando
-// si registrano con carta.
+// Waitlist / Beta access requests.
+//
+// Pre-lancio (waitlist pura): popolata da POST /api/waitlist con
+// requested_beta_access=false (legacy).
+//
+// Slice I (Premura V1 in beta): la landing chiede esplicitamente
+// "Richiedi accesso alla beta privata". I nuovi record arrivano con
+// requested_beta_access=true. Andrea risponde personalmente entro 24h e
+// quando contatta il lead aggiorna contacted_at. Quando il lead
+// completa signup -> onboarded_at.
+//
+// Nessuna relazione con hosts: si tratta di lead, non oggetto di dominio.
 export const waitlist = pgTable(
   'waitlist',
   {
@@ -16,8 +32,14 @@ export const waitlist = pgTable(
     propertyCount: smallint('property_count'), // 1..99, nullable
 
     // Attribuzione
-    source: varchar('source', { length: 64 }), // es. "direct", da ?ref=<slug>
+    source: varchar('source', { length: 64 }), // es. "direct", "landing_v2", da ?ref=<slug>
     referrer: varchar('referrer', { length: 512 }), // header Referer server-side
+
+    // Slice I — Beta access funnel
+    requestedBetaAccess: boolean('requested_beta_access').notNull().default(false),
+    contactedAt: timestamp('contacted_at', { withTimezone: true }),
+    onboardedAt: timestamp('onboarded_at', { withTimezone: true }),
+    notes: text('notes'),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

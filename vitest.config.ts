@@ -1,6 +1,14 @@
+import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      // Alias '@/' usato dai sorgenti apps/web. Necessario per testare
+      // route handler che importano @/lib/* / @/app/* (slice I e oltre).
+      '@': path.resolve(__dirname, 'apps/web'),
+    },
+  },
   test: {
     globals: false,
     environment: 'node',
