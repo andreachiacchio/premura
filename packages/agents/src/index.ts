@@ -4,6 +4,7 @@
 // estensione funziona ovunque (apps/api con tsx, apps/web con webpack,
 // vitest tests).
 export * from './agent-action-logger';
+export * from './cleaner-auth';
 export * from './context-readers';
 export * from './dna-extractor';
 export * from './dna-insights-merger';
