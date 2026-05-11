@@ -77,6 +77,41 @@ export async function sendText(to: string, body: string): Promise<{ messageId: s
   return { messageId: json.messages[0].id };
 }
 
+// ===== SEND IMAGE (foto + caption, free-form 24h window) =====
+
+export async function sendImage(params: {
+  to: string;
+  imageUrl: string;
+  caption?: string;
+}): Promise<{ messageId: string }> {
+  const { phoneNumberId, accessToken } = getEnv();
+
+  const res = await fetch(`${BASE_URL}/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to: normalizePhone(params.to),
+      type: 'image',
+      image: {
+        link: params.imageUrl,
+        ...(params.caption ? { caption: params.caption } : {}),
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new WhatsappSendError(res.status, err);
+  }
+
+  const json = (await res.json()) as { messages: [{ id: string }] };
+  return { messageId: json.messages[0].id };
+}
+
 // ===== SEND TEMPLATE (approved template, can initiate new conversation) =====
 
 export async function sendTemplate(params: {
