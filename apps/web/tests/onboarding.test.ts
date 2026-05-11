@@ -9,8 +9,8 @@ import {
 } from '../lib/onboarding';
 
 describe('ONBOARDING_STEPS', () => {
-  it('ordine atteso 4 step pre-completed', () => {
-    expect(ONBOARDING_STEPS).toEqual(['welcome', 'property', 'gmail', 'whatsapp']);
+  it('Slice H: ordine atteso 5 step pre-completed', () => {
+    expect(ONBOARDING_STEPS).toEqual(['welcome', 'property', 'calendar', 'knowledge', 'cleaner']);
   });
 });
 
@@ -19,7 +19,7 @@ describe('urlForStep', () => {
     expect(urlForStep('completed')).toBe('/dashboard');
   });
 
-  it.each(['welcome', 'property', 'gmail', 'whatsapp'] as OnboardingStep[])(
+  it.each(['welcome', 'property', 'calendar', 'knowledge', 'cleaner'] as OnboardingStep[])(
     '%s -> /onboarding/%s',
     (step) => {
       expect(urlForStep(step)).toBe(`/onboarding/${step}`);
@@ -30,9 +30,10 @@ describe('urlForStep', () => {
 describe('nextStep', () => {
   it.each([
     ['welcome', 'property'],
-    ['property', 'gmail'],
-    ['gmail', 'whatsapp'],
-    ['whatsapp', 'completed'],
+    ['property', 'calendar'],
+    ['calendar', 'knowledge'],
+    ['knowledge', 'cleaner'],
+    ['cleaner', 'completed'],
     ['completed', 'completed'],
   ] as const)('%s -> %s', (current, expected) => {
     expect(nextStep(current as OnboardingStep)).toBe(expected);
@@ -75,5 +76,17 @@ describe('getOnboardingState', () => {
     const db = makeMockDb({ step: 'unknown-junk', completed: false });
     const state = await getOnboardingState(db, 'host-1');
     expect(state.step).toBe('welcome');
+  });
+
+  it('legacy step "gmail" -> mappato a calendar (Slice H back-compat)', async () => {
+    const db = makeMockDb({ step: 'gmail', completed: false });
+    const state = await getOnboardingState(db, 'host-1');
+    expect(state.step).toBe('calendar');
+  });
+
+  it('legacy step "whatsapp" -> mappato a cleaner', async () => {
+    const db = makeMockDb({ step: 'whatsapp', completed: false });
+    const state = await getOnboardingState(db, 'host-1');
+    expect(state.step).toBe('cleaner');
   });
 });
