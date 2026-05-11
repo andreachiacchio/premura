@@ -39,21 +39,7 @@ export default function OnboardingPropertyPage() {
           />
         </label>
 
-        <label className="flex flex-col gap-2">
-          <span className="text-body-sm font-medium text-ink-soft">
-            Calendario Booking <span className="text-ink-mute">(facoltativo)</span>
-          </span>
-          <input
-            type="url"
-            name="icalBookingUrl"
-            placeholder="https://ical.booking.com/..."
-            className="h-12 rounded-card border border-line bg-paper px-4 text-body-sm text-ink placeholder:text-ink-mute focus:border-terracotta-soft focus:outline-none focus:ring-2 focus:ring-terracotta-soft/40"
-          />
-          <span className="text-body-sm text-ink-mute">
-            Lo trovi su <em>admin.booking.com</em> &rarr; Calendari &rarr; Esporta calendario. Lo
-            aggiungi anche dopo se preferisci.
-          </span>
-        </label>
+        <p className="text-body-sm text-ink-mute">Aggiungi il calendario nello step successivo.</p>
 
         <button
           type="submit"

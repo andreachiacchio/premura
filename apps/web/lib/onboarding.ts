@@ -2,12 +2,30 @@ import { type Database, hosts } from '@premura/db';
 import { eq } from 'drizzle-orm';
 
 // Slice 9 prep: helpers onboarding stepper multi-host.
+// Slice H (V1 block self-service): step ridefiniti per coprire flow
+// completo onboarding (welcome → property → calendar → knowledge →
+// cleaner → completed). Step "gmail" / "whatsapp" deprecati ma
+// accettati per back-compat (host esistenti pre-slice-H restano nel
+// loro step finché non avanzano).
 //
 // Step ordinati. resume capability: dato uno stato corrente, si calcola
 // la pagina target. Una volta completed, redirect a /dashboard.
 
-export const ONBOARDING_STEPS = ['welcome', 'property', 'gmail', 'whatsapp'] as const;
+export const ONBOARDING_STEPS = [
+  'welcome',
+  'property',
+  'calendar',
+  'knowledge',
+  'cleaner',
+] as const;
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number] | 'completed';
+
+// Step legacy back-compat (host pre-slice-H). Mappati allo step "equivalente"
+// nel nuovo flow.
+const LEGACY_STEP_MAP: Record<string, OnboardingStep> = {
+  gmail: 'calendar',
+  whatsapp: 'cleaner',
+};
 
 export type OnboardingState = {
   step: OnboardingStep;
@@ -29,9 +47,13 @@ export async function getOnboardingState(db: Database, hostId: string): Promise<
   }
 
   // Validazione runtime: il DB ha varchar libero, normalizziamo a enum.
+  // Map legacy step → nuovo step equivalente.
   const allowed = new Set<string>([...ONBOARDING_STEPS, 'completed']);
-  const step = (allowed.has(row.step) ? row.step : 'welcome') as OnboardingStep;
-  return { step, completed: row.completed };
+  let stepValue: string = row.step ?? 'welcome';
+  if (!allowed.has(stepValue)) {
+    stepValue = LEGACY_STEP_MAP[stepValue] ?? 'welcome';
+  }
+  return { step: stepValue as OnboardingStep, completed: row.completed };
 }
 
 export async function setOnboardingStep(
@@ -70,7 +92,7 @@ export function urlForStep(step: OnboardingStep): string {
   return `/onboarding/${step}`;
 }
 
-// Step seguente. 'whatsapp' -> 'completed'.
+// Step seguente. 'cleaner' -> 'completed'.
 export function nextStep(step: OnboardingStep): OnboardingStep {
   const idx = ONBOARDING_STEPS.indexOf(step as (typeof ONBOARDING_STEPS)[number]);
   if (idx === -1 || idx === ONBOARDING_STEPS.length - 1) return 'completed';
