@@ -1,18 +1,25 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { deactivateCleanerAction, reactivateCleanerAction } from '../../actions';
+import {
+  deactivateCleanerAction,
+  reactivateCleanerAction,
+  sendCleanerWelcomeWaAction,
+} from '../../actions';
 
 export function CleanerActions({
   cleanerId,
   isActive,
+  karenAccepted,
 }: {
   cleanerId: string;
   isActive: boolean;
+  karenAccepted: boolean;
 }): React.JSX.Element {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [welcomeSent, setWelcomeSent] = useState(false);
 
   function handleDeactivate(): void {
     setError(null);
@@ -31,6 +38,18 @@ export function CleanerActions({
     });
   }
 
+  function handleSendWelcome(): void {
+    setError(null);
+    startTransition(async () => {
+      const r = await sendCleanerWelcomeWaAction(cleanerId);
+      if (!r.ok) {
+        setError(`Errore invio: ${r.reason}${r.detail ? ` — ${r.detail}` : ''}`);
+        return;
+      }
+      setWelcomeSent(true);
+    });
+  }
+
   return (
     <section className="rounded-lg border border-line bg-white p-4">
       <h2 className="mb-3 text-sm font-medium text-ink-mute">Azioni</h2>
@@ -40,6 +59,20 @@ export function CleanerActions({
         </div>
       )}
       <div className="flex flex-wrap gap-3">
+        {isActive && (
+          <button
+            type="button"
+            onClick={handleSendWelcome}
+            disabled={pending}
+            className="rounded-md bg-terracotta px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-terracotta-2 disabled:opacity-60"
+          >
+            {welcomeSent
+              ? '✓ Magic link inviato'
+              : karenAccepted
+                ? '🔁 Invia nuovo magic link'
+                : '📱 Manda magic link cleaner app'}
+          </button>
+        )}
         {isActive ? (
           confirmDeactivate ? (
             <>
@@ -80,9 +113,8 @@ export function CleanerActions({
         )}
       </div>
       <p className="mt-3 text-xs text-ink-mute">
-        Disattivare un cleaner non lo cancella: rimane nello storico e i kit
-        passati. Le property assegnate restano ma non riceveranno nuovi
-        brief finché non assegni un cleaner attivo.
+        Disattivare un cleaner non lo cancella: rimane nello storico e i kit passati. Le property
+        assegnate restano ma non riceveranno nuovi brief finché non assegni un cleaner attivo.
       </p>
     </section>
   );

@@ -9,9 +9,11 @@ import {
   assignCleanerToProperty,
   createCleaner,
   deactivateCleaner,
+  getCleanerForHost,
   reactivateCleaner,
   updateCleaner,
 } from '@/lib/repositories/cleaners';
+import { sendCleanerMagicLink } from '@premura/agents';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
@@ -56,9 +58,7 @@ export type CreateCleanerActionResult =
   | { ok: true; cleanerId: string }
   | { ok: false; reason: 'invalid_phone' | 'invalid_payload'; detail?: string };
 
-export async function createCleanerAction(
-  raw: unknown,
-): Promise<CreateCleanerActionResult> {
+export async function createCleanerAction(raw: unknown): Promise<CreateCleanerActionResult> {
   let parsed: z.infer<typeof createSchema>;
   try {
     parsed = createSchema.parse(raw);
@@ -129,7 +129,8 @@ export async function updateCleanerAction(
   }
   if (parsed.email !== undefined) input.email = emptyToNull(parsed.email);
   if (parsed.deliveryAddress !== undefined) input.deliveryAddress = parsed.deliveryAddress.trim();
-  if (parsed.pickupPointCode !== undefined) input.pickupPointCode = emptyToNull(parsed.pickupPointCode);
+  if (parsed.pickupPointCode !== undefined)
+    input.pickupPointCode = emptyToNull(parsed.pickupPointCode);
   if (parsed.perKitFeeEur !== undefined) {
     input.perKitFeeEur =
       typeof parsed.perKitFeeEur === 'number'
@@ -149,9 +150,7 @@ export async function updateCleanerAction(
   return { ok: true };
 }
 
-export type DeactivateCleanerActionResult =
-  | { ok: true }
-  | { ok: false; reason: 'not_found' };
+export type DeactivateCleanerActionResult = { ok: true } | { ok: false; reason: 'not_found' };
 
 export async function deactivateCleanerAction(
   cleanerId: string,
@@ -198,6 +197,29 @@ export async function assignCleanerToPropertyAction(
   revalidatePath('/dashboard/cleaners');
   if (cid) revalidatePath(`/dashboard/cleaners/${cid}`);
   return { ok: true };
+}
+
+// ─── Slice D — Magic link via WhatsApp ────────────────────────────
+
+export type SendWelcomeWaResult =
+  | { ok: true; messageId: string; url: string }
+  | { ok: false; reason: 'not_found' | 'send_error'; detail?: string };
+
+export async function sendCleanerWelcomeWaAction(cleanerId: string): Promise<SendWelcomeWaResult> {
+  const id = idSchema.parse(cleanerId);
+  const hostId = await getCurrentHostId();
+  const { db } = await getDb();
+  const cleaner = await getCleanerForHost(db, id, hostId);
+  if (!cleaner) return { ok: false, reason: 'not_found' };
+
+  const result = await sendCleanerMagicLink(db, id);
+  if (result.status === 'skipped_no_cleaner') return { ok: false, reason: 'not_found' };
+  if (result.status === 'send_error') {
+    return { ok: false, reason: 'send_error', detail: result.error };
+  }
+
+  revalidatePath(`/dashboard/cleaners/${id}`);
+  return { ok: true, messageId: result.messageId, url: result.url };
 }
 
 function emptyToNull(s: string | null | undefined): string | null {

@@ -52,10 +52,7 @@ export default async function CleanerDetailPage({
 
       <section className="mb-6 grid gap-4 md:grid-cols-2">
         <DetailCard label="Indirizzo consegna" value={cleaner.deliveryAddress} />
-        <DetailCard
-          label="Punto ritiro"
-          value={cleaner.pickupPointCode || '—'}
-        />
+        <DetailCard label="Punto ritiro" value={cleaner.pickupPointCode || '—'} />
         <DetailCard label="Fee per kit" value={`€${cleaner.perKitFeeEur}`} />
         <DetailCard
           label="Metodo pagamento"
@@ -65,10 +62,7 @@ export default async function CleanerDetailPage({
           label="Lingua preferita"
           value={LANGUAGE_LABELS[cleaner.languagePreferred] ?? cleaner.languagePreferred}
         />
-        <DetailCard
-          label="Stato"
-          value={cleaner.isActive ? 'Attivo' : 'Inattivo'}
-        />
+        <DetailCard label="Stato" value={cleaner.isActive ? 'Attivo' : 'Inattivo'} />
       </section>
 
       <section className="mb-6 rounded-lg border border-line bg-white p-4">
@@ -78,10 +72,7 @@ export default async function CleanerDetailPage({
         {assignedProperties.length === 0 ? (
           <p className="text-sm text-ink-mute">
             Nessuna property assegnata. Vai sulle{' '}
-            <Link
-              href="/dashboard"
-              className="text-terracotta underline-offset-2 hover:underline"
-            >
+            <Link href="/dashboard" className="text-terracotta underline-offset-2 hover:underline">
               property
             </Link>{' '}
             per assegnare.
@@ -95,9 +86,7 @@ export default async function CleanerDetailPage({
               >
                 <div>
                   <p className="font-medium">{p.name}</p>
-                  {p.addressLine && (
-                    <p className="text-xs text-ink-mute">{p.addressLine}</p>
-                  )}
+                  {p.addressLine && <p className="text-xs text-ink-mute">{p.addressLine}</p>}
                 </div>
               </li>
             ))}
@@ -112,7 +101,11 @@ export default async function CleanerDetailPage({
         </section>
       )}
 
-      <CleanerActions cleanerId={cleaner.id} isActive={cleaner.isActive} />
+      <CleanerActions
+        cleanerId={cleaner.id}
+        isActive={cleaner.isActive}
+        karenAccepted={cleaner.karenAccepted}
+      />
     </div>
   );
 }
