@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="800" height="500" role="img" aria-label="Screenshot dashboard prossimi check-in">
+  <rect width="800" height="500" fill="#F5EFE4"/>
+  <rect x="0.5" y="0.5" width="799" height="499" fill="none" stroke="#1F3A4D" stroke-width="1" stroke-dasharray="6 6" opacity="0.45"/>
+  <text x="400" y="62" font-family="Inter, sans-serif" font-size="13" fill="#1F3A4D" text-anchor="middle" letter-spacing="2" font-weight="600">SCREENSHOT · DASHBOARD HOST</text>
+  <text x="400" y="240" font-family="Fraunces, Georgia, serif" font-size="46" fill="#1F3A4D" text-anchor="middle">Le prossime prenotazioni</text>
+  <text x="400" y="290" font-family="Inter, sans-serif" font-size="16" fill="#1F3A4D" opacity="0.65" text-anchor="middle">placeholder — sarà sostituito con uno screenshot reale</text>
+  <g opacity="0.35">
+    <rect x="120" y="350" width="560" height="64" rx="12" fill="none" stroke="#1F3A4D" stroke-width="1.5"/>
+    <circle cx="160" cy="382" r="14" fill="none" stroke="#C65D3A" stroke-width="2"/>
+    <rect x="190" y="370" width="160" height="10" rx="3" fill="#1F3A4D"/>
+    <rect x="190" y="388" width="220" height="8" rx="3" fill="#1F3A4D" opacity="0.55"/>
+    <rect x="600" y="372" width="60" height="22" rx="11" fill="#C65D3A"/>
+  </g>
+</svg>

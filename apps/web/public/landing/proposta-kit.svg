@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="800" height="500" role="img" aria-label="Screenshot proposta kit personalizzato">
+  <rect width="800" height="500" fill="#F5EFE4"/>
+  <rect x="0.5" y="0.5" width="799" height="499" fill="none" stroke="#1F3A4D" stroke-width="1" stroke-dasharray="6 6" opacity="0.45"/>
+  <text x="400" y="62" font-family="Inter, sans-serif" font-size="13" fill="#1F3A4D" text-anchor="middle" letter-spacing="2" font-weight="600">SCREENSHOT · KIT GENERATOR</text>
+  <text x="400" y="240" font-family="Fraunces, Georgia, serif" font-size="46" fill="#1F3A4D" text-anchor="middle">Una proposta di kit</text>
+  <text x="400" y="290" font-family="Inter, sans-serif" font-size="16" fill="#1F3A4D" opacity="0.65" text-anchor="middle">placeholder — sarà sostituito con uno screenshot reale</text>
+  <g opacity="0.35">
+    <rect x="140" y="350" width="240" height="80" rx="12" fill="none" stroke="#1F3A4D" stroke-width="1.5"/>
+    <rect x="420" y="350" width="240" height="80" rx="12" fill="none" stroke="#1F3A4D" stroke-width="1.5"/>
+    <rect x="160" y="370" width="160" height="10" rx="3" fill="#1F3A4D"/>
+    <rect x="160" y="390" width="120" height="8" rx="3" fill="#1F3A4D" opacity="0.55"/>
+    <rect x="160" y="408" width="80" height="8" rx="3" fill="#C65D3A"/>
+    <rect x="440" y="370" width="180" height="10" rx="3" fill="#1F3A4D"/>
+    <rect x="440" y="390" width="140" height="8" rx="3" fill="#1F3A4D" opacity="0.55"/>
+    <rect x="440" y="408" width="80" height="8" rx="3" fill="#C65D3A"/>
+  </g>
+</svg>
