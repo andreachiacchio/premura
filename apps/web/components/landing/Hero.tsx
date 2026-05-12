@@ -26,11 +26,11 @@ const ArrowDown = (
 
 export function Hero() {
   return (
-    <section className="pt-14 pb-20 md:pt-24 md:pb-32">
+    <section className="pt-10 pb-12 md:pt-20 md:pb-16">
       <Container>
         <Eyebrow>Premura · per host indipendenti</Eyebrow>
 
-        <Heading level={1} soft={50} className="mt-6 max-w-4xl">
+        <Heading level={1} soft={50} className="mt-5 max-w-4xl">
           Il concierge{' '}
           <span className="hidden md:inline">
             <br />
@@ -44,13 +44,13 @@ export function Hero() {
           </em>
         </Heading>
 
-        <p className="mt-8 max-w-2xl text-body-lg text-ink-soft">
+        <p className="mt-6 max-w-2xl text-body-lg text-ink-soft">
           Per host che vogliono recensioni da 10 senza rinunciare al proprio tempo. Premura è un
           agente AI che studia ogni ospite, scrive messaggi su misura, prepara un pensiero in casa e
           intercetta i problemi prima che diventino recensioni.
         </p>
 
-        <div className="mt-10 flex flex-col gap-4 max-w-xl">
+        <div className="mt-8 flex flex-col gap-4 max-w-xl">
           <div className="inline-flex w-fit items-center gap-2 rounded-full bg-gold-soft px-3 py-1 text-body-sm font-semibold text-ink">
             <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-gold-deep" />
             Beta privata in corso · 10 posti aperti

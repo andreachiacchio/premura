@@ -1,3 +1,4 @@
+import { SubmitButton } from '@/components/forms/SubmitButton';
 import { OnboardingShell } from '../_components/OnboardingShell';
 import { skipToNextStepAction, submitCleanerAction } from '../actions';
 
@@ -64,21 +65,15 @@ export default function OnboardingCleanerPage() {
           <span className="text-body-sm text-ink-mute">Default: €2 per kit validato.</span>
         </label>
 
-        <button
-          type="submit"
-          className="mt-2 inline-flex h-12 w-full items-center justify-center rounded-full bg-terracotta px-6 text-body font-medium text-paper shadow-md transition-colors hover:bg-terracotta-2 active:translate-y-px"
-        >
+        <SubmitButton variant="accent" size="lg" pendingLabel="Procedo…" className="mt-2 w-full">
           Completa setup
-        </button>
+        </SubmitButton>
       </form>
 
       <form action={skip} className="mt-4">
-        <button
-          type="submit"
-          className="text-body-sm text-ink-mute underline-offset-2 hover:underline"
-        >
+        <SubmitButton asSkip pendingLabel="Salto…">
           Lo aggiungo dopo
-        </button>
+        </SubmitButton>
       </form>
     </OnboardingShell>
   );

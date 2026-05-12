@@ -1,3 +1,4 @@
+import { SubmitButton } from '@/components/forms/SubmitButton';
 import { OnboardingShell } from '../_components/OnboardingShell';
 import { skipToNextStepAction } from '../actions';
 import { CalendarForm } from './_components/CalendarForm';
@@ -18,12 +19,9 @@ export default function OnboardingCalendarPage() {
     >
       <CalendarForm />
       <form action={skip} className="mt-6">
-        <button
-          type="submit"
-          className="text-body-sm text-ink-mute underline-offset-2 hover:underline"
-        >
+        <SubmitButton asSkip pendingLabel="Salto…">
           Lo aggiungo dopo
-        </button>
+        </SubmitButton>
       </form>
     </OnboardingShell>
   );

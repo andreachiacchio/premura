@@ -222,7 +222,7 @@ export function BetaRequestForm() {
         rightIcon={submitting ? null : ArrowRight}
         className="w-full"
       >
-        {submitting ? 'Un secondo…' : 'Invia richiesta'}
+        {submitting ? 'Invio richiesta…' : 'Invia richiesta'}
       </Button>
 
       {errored ? (
@@ -238,10 +238,7 @@ export function BetaRequestForm() {
   );
 }
 
-function SuccessCard({
-  fullName,
-  duplicate,
-}: { fullName: string; duplicate: boolean }) {
+function SuccessCard({ fullName, duplicate }: { fullName: string; duplicate: boolean }) {
   const firstName = fullName.split(/\s+/)[0] ?? fullName;
   return (
     <output

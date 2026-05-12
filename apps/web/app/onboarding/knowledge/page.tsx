@@ -1,3 +1,4 @@
+import { SubmitButton } from '@/components/forms/SubmitButton';
 import { OnboardingShell } from '../_components/OnboardingShell';
 import { skipToNextStepAction, submitKnowledgeAction } from '../actions';
 
@@ -102,21 +103,15 @@ export default function OnboardingKnowledgePage() {
           ))}
         </fieldset>
 
-        <button
-          type="submit"
-          className="mt-2 inline-flex h-12 w-full items-center justify-center rounded-full bg-terracotta px-6 text-body font-medium text-paper shadow-md transition-colors hover:bg-terracotta-2 active:translate-y-px"
-        >
+        <SubmitButton variant="accent" size="lg" pendingLabel="Procedo…" className="mt-2 w-full">
           Continua
-        </button>
+        </SubmitButton>
       </form>
 
       <form action={skip} className="mt-4">
-        <button
-          type="submit"
-          className="text-body-sm text-ink-mute underline-offset-2 hover:underline"
-        >
+        <SubmitButton asSkip pendingLabel="Salto…">
           Compilo dopo da dashboard
-        </button>
+        </SubmitButton>
       </form>
     </OnboardingShell>
   );

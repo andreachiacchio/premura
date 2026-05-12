@@ -8,7 +8,7 @@ import { BetaRequestForm } from '@/components/landing/BetaRequestForm';
 
 export function BetaAccessCTA() {
   return (
-    <section id="beta-access" className="py-20 md:py-28 bg-paper-deep scroll-mt-16">
+    <section id="beta-access" className="py-12 md:py-16 bg-paper-deep scroll-mt-16">
       <Container variant="tight">
         <Eyebrow variant="terracotta">Beta privata in corso</Eyebrow>
 
@@ -22,12 +22,12 @@ export function BetaAccessCTA() {
           </em>
         </Heading>
 
-        <p className="mt-6 text-body-lg text-ink-soft">
+        <p className="mt-5 text-body-lg text-ink-soft">
           Stiamo affinando Premura con i primi host indipendenti italiani. Se gestisci 1-5 strutture
           e vuoi vedere come funziona, scrivi qui sotto. Ti rispondo io personalmente entro 24h.
         </p>
 
-        <div className="mt-10">
+        <div className="mt-8">
           <BetaRequestForm />
         </div>
       </Container>

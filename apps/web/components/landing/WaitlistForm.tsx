@@ -1,27 +1,27 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useState, type FormEvent } from "react";
-import { Button } from "@/components/Button";
-import { cn } from "@/lib/cn";
+import { Button } from '@/components/Button';
+import { cn } from '@/lib/cn';
 import {
   MAX_PROPERTY_COUNT,
   MIN_PROPERTY_COUNT,
-  waitlistBodySchema,
   type WaitlistResponse,
-} from "@/lib/waitlist-schema";
+  waitlistBodySchema,
+} from '@/lib/waitlist-schema';
+import Link from 'next/link';
+import { type FormEvent, useState } from 'react';
 
-type Placement = "hero" | "cta";
+type Placement = 'hero' | 'cta';
 
 export interface WaitlistFormProps {
   placement: Placement;
 }
 
 type Status =
-  | { kind: "idle" }
-  | { kind: "submitting" }
-  | { kind: "success"; propertyCount: number; duplicate: boolean }
-  | { kind: "error"; message: string };
+  | { kind: 'idle' }
+  | { kind: 'submitting' }
+  | { kind: 'success'; propertyCount: number; duplicate: boolean }
+  | { kind: 'error'; message: string };
 
 const ArrowRight = (
   <svg
@@ -40,13 +40,13 @@ const ArrowRight = (
 );
 
 export function WaitlistForm({ placement }: WaitlistFormProps) {
-  const [email, setEmail] = useState("");
-  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState('');
+  const [fullName, setFullName] = useState('');
   const [propertyCount, setPropertyCount] = useState<number>(1);
-  const [status, setStatus] = useState<Status>({ kind: "idle" });
+  const [status, setStatus] = useState<Status>({ kind: 'idle' });
 
-  const submitting = status.kind === "submitting";
-  const errored = status.kind === "error";
+  const submitting = status.kind === 'submitting';
+  const errored = status.kind === 'error';
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,25 +54,24 @@ export function WaitlistForm({ placement }: WaitlistFormProps) {
 
     const parsed = waitlistBodySchema.safeParse({
       email,
-      fullName: fullName.trim() === "" ? undefined : fullName,
+      fullName: fullName.trim() === '' ? undefined : fullName,
       propertyCount,
     });
 
     if (!parsed.success) {
       setStatus({
-        kind: "error",
-        message:
-          "Controlla l'email — non mi sembra valida.",
+        kind: 'error',
+        message: "Controlla l'email — non mi sembra valida.",
       });
       return;
     }
 
-    setStatus({ kind: "submitting" });
+    setStatus({ kind: 'submitting' });
 
     try {
-      const res = await fetch("/api/waitlist", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify(parsed.data),
       });
 
@@ -80,7 +79,7 @@ export function WaitlistForm({ placement }: WaitlistFormProps) {
 
       if (json.ok) {
         setStatus({
-          kind: "success",
+          kind: 'success',
           propertyCount,
           duplicate: json.duplicate,
         });
@@ -88,21 +87,21 @@ export function WaitlistForm({ placement }: WaitlistFormProps) {
       }
 
       setStatus({
-        kind: "error",
+        kind: 'error',
         message:
-          json.error === "rate_limit"
-            ? "Troppi tentativi. Riprova tra qualche minuto."
-            : json.message ?? "Qualcosa non va. Riprova tra poco.",
+          json.error === 'rate_limit'
+            ? 'Troppi tentativi. Riprova tra qualche minuto.'
+            : (json.message ?? 'Qualcosa non va. Riprova tra poco.'),
       });
     } catch {
       setStatus({
-        kind: "error",
-        message: "Connessione caduta. Riprova tra poco.",
+        kind: 'error',
+        message: 'Connessione caduta. Riprova tra poco.',
       });
     }
   }
 
-  if (status.kind === "success") {
+  if (status.kind === 'success') {
     return <SuccessCard propertyCount={status.propertyCount} duplicate={status.duplicate} />;
   }
 
@@ -127,9 +126,9 @@ export function WaitlistForm({ placement }: WaitlistFormProps) {
           disabled={submitting}
           placeholder="andrea@esempio.it"
           className={cn(
-            "mt-2 w-full h-12 rounded-[12px] border border-line bg-paper px-4 text-body text-ink placeholder:text-ink-ghost",
-            "transition-colors focus-visible:outline-none focus-visible:border-ink focus-visible:ring-2 focus-visible:ring-ink/20",
-            "disabled:opacity-60",
+            'mt-2 w-full h-12 rounded-[12px] border border-line bg-paper px-4 text-body text-ink placeholder:text-ink-ghost',
+            'transition-colors focus-visible:outline-none focus-visible:border-ink focus-visible:ring-2 focus-visible:ring-ink/20',
+            'disabled:opacity-60',
           )}
         />
       </div>
@@ -148,9 +147,9 @@ export function WaitlistForm({ placement }: WaitlistFormProps) {
           maxLength={255}
           placeholder="Andrea"
           className={cn(
-            "mt-2 w-full h-12 rounded-[12px] border border-line bg-paper px-4 text-body text-ink placeholder:text-ink-ghost",
-            "transition-colors focus-visible:outline-none focus-visible:border-ink focus-visible:ring-2 focus-visible:ring-ink/20",
-            "disabled:opacity-60",
+            'mt-2 w-full h-12 rounded-[12px] border border-line bg-paper px-4 text-body text-ink placeholder:text-ink-ghost',
+            'transition-colors focus-visible:outline-none focus-visible:border-ink focus-visible:ring-2 focus-visible:ring-ink/20',
+            'disabled:opacity-60',
           )}
         />
       </div>
@@ -175,7 +174,7 @@ export function WaitlistForm({ placement }: WaitlistFormProps) {
         rightIcon={submitting ? null : ArrowRight}
         className="w-full"
       >
-        {submitting ? "Un secondo…" : "Entra nella waitlist"}
+        {submitting ? 'Un secondo…' : 'Entra nella waitlist'}
       </Button>
 
       {errored ? (
@@ -185,8 +184,8 @@ export function WaitlistForm({ placement }: WaitlistFormProps) {
       ) : null}
 
       <p className="text-body-sm text-ink-mute">
-        Iscrivendoti accetti di ricevere un&apos;email quando apriamo. Niente
-        newsletter, niente rumore. Cancelli con un click, o leggi la{" "}
+        Iscrivendoti accetti di ricevere un&apos;email quando apriamo. Niente newsletter, niente
+        rumore. Cancelli con un click, o leggi la{' '}
         <Link
           href="/privacy"
           className="underline underline-offset-2 decoration-line hover:text-ink hover:decoration-ink"
@@ -214,17 +213,17 @@ function PropertyStepper({ labelledBy, value, onChange, disabled }: PropertyStep
   const atMin = value <= MIN_PROPERTY_COUNT;
   const atMax = value >= MAX_PROPERTY_COUNT;
 
-  const displayValue = value >= 6 ? "6+" : String(value);
+  const displayValue = value >= 6 ? '6+' : String(value);
   const displayLabel =
-    value === 1 ? "1 struttura" : value >= 6 ? "6+ strutture" : `${value} strutture`;
+    value === 1 ? '1 struttura' : value >= 6 ? '6+ strutture' : `${value} strutture`;
 
   return (
     <div
       role="group"
       aria-labelledby={labelledBy}
       className={cn(
-        "mt-2 flex items-center gap-4 p-2 rounded-full bg-ivory-warm",
-        disabled && "opacity-60",
+        'mt-2 flex items-center gap-4 p-2 rounded-full bg-ivory-warm',
+        disabled && 'opacity-60',
       )}
     >
       <button
@@ -233,19 +232,16 @@ function PropertyStepper({ labelledBy, value, onChange, disabled }: PropertyStep
         disabled={disabled || atMin}
         aria-label="Togli una struttura"
         className={cn(
-          "w-10 h-10 rounded-full bg-paper text-ink text-h3 font-serif shadow-sm grid place-items-center",
-          "transition-transform active:scale-90",
-          "disabled:opacity-35 disabled:cursor-not-allowed disabled:active:scale-100",
+          'w-10 h-10 rounded-full bg-paper text-ink text-h3 font-serif shadow-sm grid place-items-center',
+          'transition-transform active:scale-90',
+          'disabled:opacity-35 disabled:cursor-not-allowed disabled:active:scale-100',
         )}
       >
         −
       </button>
 
       <div className="flex-1 text-center">
-        <div
-          aria-live="polite"
-          className="font-serif text-h3 text-ink leading-none tabular-nums"
-        >
+        <div aria-live="polite" className="font-serif text-h3 text-ink leading-none tabular-nums">
           {displayValue}
         </div>
         <div className="mt-1 text-body-sm text-ink-mute">{displayLabel}</div>
@@ -257,9 +253,9 @@ function PropertyStepper({ labelledBy, value, onChange, disabled }: PropertyStep
         disabled={disabled || atMax}
         aria-label="Aggiungi una struttura"
         className={cn(
-          "w-10 h-10 rounded-full bg-paper text-ink text-h3 font-serif shadow-sm grid place-items-center",
-          "transition-transform active:scale-90",
-          "disabled:opacity-35 disabled:cursor-not-allowed disabled:active:scale-100",
+          'w-10 h-10 rounded-full bg-paper text-ink text-h3 font-serif shadow-sm grid place-items-center',
+          'transition-transform active:scale-90',
+          'disabled:opacity-35 disabled:cursor-not-allowed disabled:active:scale-100',
         )}
       >
         +
@@ -278,9 +274,9 @@ interface SuccessCardProps {
 function SuccessCard({ propertyCount, duplicate }: SuccessCardProps) {
   const countLabel =
     propertyCount === 1
-      ? "1 struttura"
+      ? '1 struttura'
       : propertyCount >= 6
-        ? "6+ strutture"
+        ? '6+ strutture'
         : `${propertyCount} strutture`;
 
   return (
@@ -297,24 +293,20 @@ function SuccessCard({ propertyCount, duplicate }: SuccessCardProps) {
           ✓
         </span>
         <span className="text-eyebrow uppercase font-semibold">
-          {duplicate ? "Ti ho già in lista" : "Ti ho presa"}
+          {duplicate ? 'Ti ho già in lista' : 'Ti ho presa'}
         </span>
       </div>
 
       <p className="mt-4 font-serif text-h3 text-ink leading-snug">
-        {duplicate
-          ? "Eri già con me. Grazie ancora."
-          : "Ti scrivo io, quando è il momento."}
+        {duplicate ? 'Eri già con me. Grazie ancora.' : 'Ti scrivo io, quando è il momento.'}
       </p>
 
       <p className="mt-3 text-body text-ink-soft">
-        Registrata per <strong className="font-semibold text-ink">{countLabel}</strong>.
-        Nessun rumore nel frattempo.
+        Registrata per <strong className="font-semibold text-ink">{countLabel}</strong>. Nessun
+        rumore nel frattempo.
       </p>
 
-      <p className="mt-5 text-body-sm text-ink-mute">
-        — Andrea
-      </p>
+      <p className="mt-5 text-body-sm text-ink-mute">— Andrea</p>
     </div>
   );
 }

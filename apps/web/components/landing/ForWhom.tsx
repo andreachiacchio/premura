@@ -53,14 +53,14 @@ const CrossIcon = (
 
 export function ForWhom() {
   return (
-    <section className="py-20 md:py-28">
+    <section className="py-12 md:py-16">
       <Container>
         <Eyebrow>Onestà prima di tutto</Eyebrow>
         <Heading level={2} className="mt-3 max-w-2xl">
           Premura è giusto per te se…
         </Heading>
 
-        <ul className="mt-10 grid gap-5 md:grid-cols-3">
+        <ul className="mt-8 grid gap-5 md:grid-cols-3">
           {FIT.map((line) => (
             <li key={line} className="flex gap-4 rounded-card border border-line bg-paper p-5">
               {CheckIcon}
@@ -69,11 +69,11 @@ export function ForWhom() {
           ))}
         </ul>
 
-        <Heading level={3} className="mt-16 max-w-2xl">
+        <Heading level={3} className="mt-10 max-w-2xl">
           Non è per te se…
         </Heading>
 
-        <ul className="mt-8 grid gap-5 md:grid-cols-3">
+        <ul className="mt-6 grid gap-5 md:grid-cols-3">
           {NOT_FIT.map((line) => (
             <li
               key={line}

@@ -32,17 +32,17 @@ const SHOTS: Shot[] = [
 
 export function InAction() {
   return (
-    <section className="py-20 md:py-28 bg-paper-deep">
+    <section className="py-12 md:py-16 bg-paper-deep">
       <Container>
         <Eyebrow>Dal vivo</Eyebrow>
         <Heading level={2} className="mt-3 max-w-2xl">
           Premura in azione.
         </Heading>
-        <p className="mt-6 max-w-2xl text-body-lg text-ink-soft">
+        <p className="mt-5 max-w-2xl text-body-lg text-ink-soft">
           Cosa vede un host che usa Premura ogni giorno.
         </p>
 
-        <div className="mt-14 grid gap-8 md:grid-cols-3">
+        <div className="mt-10 grid gap-8 md:grid-cols-3">
           {SHOTS.map((shot) => (
             <figure key={shot.src} className="flex flex-col gap-4">
               <div className="overflow-hidden rounded-card border border-line bg-paper shadow-sm">
