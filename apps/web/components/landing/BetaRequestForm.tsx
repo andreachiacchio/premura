@@ -222,7 +222,7 @@ export function BetaRequestForm() {
         rightIcon={submitting ? null : ArrowRight}
         className="w-full"
       >
-        {submitting ? 'Un secondo…' : 'Invia richiesta'}
+        {submitting ? 'Invio richiesta…' : 'Invia richiesta'}
       </Button>
 
       {errored ? (

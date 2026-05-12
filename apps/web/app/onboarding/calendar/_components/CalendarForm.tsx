@@ -1,5 +1,6 @@
 'use client';
 
+import { SubmitButton } from '@/components/forms/SubmitButton';
 import { useState, useTransition } from 'react';
 import { submitCalendarAction, testIcalUrlAction } from '../../actions';
 
@@ -64,12 +65,9 @@ export function CalendarForm(): React.JSX.Element {
         )}
       </div>
 
-      <button
-        type="submit"
-        className="mt-2 inline-flex h-12 w-full items-center justify-center rounded-full bg-terracotta px-6 text-body font-medium text-paper shadow-md transition-colors hover:bg-terracotta-2 active:translate-y-px"
-      >
+      <SubmitButton variant="accent" size="lg" pendingLabel="Procedo…" className="mt-2 w-full">
         Continua
-      </button>
+      </SubmitButton>
     </form>
   );
 }

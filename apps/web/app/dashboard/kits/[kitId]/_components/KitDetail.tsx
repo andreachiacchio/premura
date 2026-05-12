@@ -278,7 +278,7 @@ export function KitDetail({ kit }: { kit: KitDetailUI }): React.JSX.Element {
                 disabled={pending}
                 className="rounded-md bg-terracotta px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-terracotta-2 disabled:opacity-60"
               >
-                {pending ? 'Approvazione…' : 'Approva e procedi'}
+                {pending ? 'Approvo…' : 'Approva e procedi'}
               </button>
               <button
                 type="button"
@@ -306,7 +306,7 @@ export function KitDetail({ kit }: { kit: KitDetailUI }): React.JSX.Element {
                 disabled={pending}
                 className="rounded-md bg-terracotta px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-terracotta-2 disabled:opacity-60"
               >
-                {pending ? 'Salvataggio…' : 'Salva modifiche'}
+                {pending ? 'Salvataggio modifiche…' : 'Salva modifiche'}
               </button>
               <button
                 type="button"
@@ -339,9 +339,10 @@ export function KitDetail({ kit }: { kit: KitDetailUI }): React.JSX.Element {
                   type="button"
                   onClick={handleReject}
                   disabled={pending}
-                  className="rounded-md bg-terracotta-2 px-4 py-2 text-sm font-medium text-white shadow-sm disabled:opacity-60"
+                  aria-busy={pending}
+                  className="rounded-md bg-terracotta-2 px-4 py-2 text-sm font-medium text-white shadow-sm disabled:opacity-60 disabled:cursor-wait"
                 >
-                  Conferma rifiuto
+                  {pending ? 'Rifiuto…' : 'Conferma rifiuto'}
                 </button>
                 <button
                   type="button"

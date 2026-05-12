@@ -1,3 +1,4 @@
+import { SubmitButton } from '@/components/forms/SubmitButton';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { findByHostId } from '@/lib/repositories/properties';
@@ -366,11 +367,8 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 
 function SaveButton() {
   return (
-    <button
-      type="submit"
-      className="self-start inline-flex h-10 items-center justify-center rounded-full bg-terracotta px-5 text-body-sm font-medium text-paper shadow-sm transition-colors hover:bg-terracotta-2"
-    >
+    <SubmitButton variant="accent" size="md" pendingLabel="Salvataggio…" className="self-start">
       Salva sezione
-    </button>
+    </SubmitButton>
   );
 }

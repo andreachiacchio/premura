@@ -1,3 +1,4 @@
+import { SubmitButton } from '@/components/forms/SubmitButton';
 import { getCurrentCleaner } from '@/lib/cleaner-session';
 import { getDb } from '@/lib/db';
 import { getCleanerForHost } from '@/lib/repositories/cleaners';
@@ -54,12 +55,13 @@ export default async function CleanerProfilePage() {
       </section>
 
       <form action={cleanerLogoutAction} className="mt-8">
-        <button
-          type="submit"
-          className="text-body-sm text-terracotta-2 underline-offset-2 hover:underline"
+        <SubmitButton
+          asSkip
+          pendingLabel="Uscita…"
+          className="text-terracotta-2 decoration-terracotta-2/60 hover:text-terracotta-2 hover:decoration-terracotta-2"
         >
           Esci da Premura
-        </button>
+        </SubmitButton>
       </form>
     </main>
   );

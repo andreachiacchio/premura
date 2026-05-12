@@ -1,3 +1,4 @@
+import { SubmitButton } from '@/components/forms/SubmitButton';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { hosts } from '@premura/db';
@@ -80,12 +81,9 @@ export default async function SettingsPage() {
           </select>
         </label>
 
-        <button
-          type="submit"
-          className="mt-5 inline-flex h-11 items-center justify-center rounded-full bg-terracotta px-5 text-body-sm font-medium text-paper shadow-sm transition-colors hover:bg-terracotta-2"
-        >
+        <SubmitButton variant="accent" size="md" pendingLabel="Salvataggio…" className="mt-5">
           Salva impostazioni
-        </button>
+        </SubmitButton>
       </form>
     </main>
   );

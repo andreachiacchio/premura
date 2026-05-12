@@ -1,3 +1,4 @@
+import { SubmitButton } from '@/components/forms/SubmitButton';
 import { OnboardingShell } from '../_components/OnboardingShell';
 import { submitFirstPropertyAction } from '../actions';
 
@@ -41,12 +42,9 @@ export default function OnboardingPropertyPage() {
 
         <p className="text-body-sm text-ink-mute">Aggiungi il calendario nello step successivo.</p>
 
-        <button
-          type="submit"
-          className="mt-4 inline-flex h-12 w-full items-center justify-center rounded-full bg-terracotta px-6 text-body font-medium text-paper shadow-md transition-colors hover:bg-terracotta-2 active:translate-y-px"
-        >
+        <SubmitButton variant="accent" size="lg" pendingLabel="Procedo…" className="mt-4 w-full">
           Continua
-        </button>
+        </SubmitButton>
       </form>
     </OnboardingShell>
   );
