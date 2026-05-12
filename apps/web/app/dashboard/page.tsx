@@ -25,15 +25,28 @@ import { completeBookingAction, createPropertyAction, skipBookingAction } from '
 // Niente cache di Next: ogni pageload riflette lo stato reale del DB,
 // importante per i flussi mutate-and-revalidate del dialog.
 //
-// La lista mostra solo prenotazioni operative (check-in da oggi - 2gg
-// in avanti, filtro temporale in findByHostId). Le passate sono
-// archivio: non c'e' ancora una vista dedicata in slice 5.
+// HOTFIX dashboard resilience (post bug prod V1):
+// le query di sezione (bookings / drafts / upcoming / kits / cleaners)
+// vengono ora eseguite INDIPENDENTEMENTE con try/catch ciascuna. Se una
+// fallisce per qualunque motivo (migration mancante, RLS, schema drift)
+// il dashboard resta navigabile mostrando empty state per quella sezione
+// invece di un'unica server-side exception. Ogni fail logga su console
+// con prefisso `[dashboard]` per visibilità in Vercel logs.
 //
 // Protezione: middleware Supabase fase 5 redirect /login se non
 // autenticato. getCurrentHostId() throw difensivo se la sessione
 // risultasse assente nonostante il middleware (race a pulizia cookie).
 
 export const dynamic = 'force-dynamic';
+
+async function safeQuery<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    console.error(`[dashboard] ${label} failed`, err);
+    return fallback;
+  }
+}
 
 export default async function DashboardPage() {
   const hostId = await getCurrentHostId();
@@ -42,7 +55,10 @@ export default async function DashboardPage() {
   // Slice 9 prep: redirect al flusso onboarding stepper se l'host non
   // ha completato l'onboarding. Pre-empt il fallback EmptyOnboardingState
   // (che e' stato un MVP minimal pre-stepper).
-  const onboarding = await getOnboardingState(db, hostId);
+  const onboarding = await safeQuery('getOnboardingState', () => getOnboardingState(db, hostId), {
+    step: 'completed' as const,
+    completed: true,
+  });
   if (!onboarding.completed) {
     redirect(urlForStep(onboarding.step));
   }
@@ -50,7 +66,11 @@ export default async function DashboardPage() {
   // Fallback storico: host completato onboarding ma senza property
   // (caso edge — non dovrebbe succedere col nuovo flusso). Manteniamo
   // EmptyOnboardingState per backward-compat con utenti pre-slice 9.
-  const hostProperties = await findPropertiesByHostId({ db, hostId });
+  const hostProperties = await safeQuery(
+    'findPropertiesByHostId',
+    () => findPropertiesByHostId({ db, hostId }),
+    [],
+  );
   if (hostProperties.length === 0) {
     return (
       <main className="mx-auto min-h-screen w-full max-w-md bg-ivory">
@@ -61,14 +81,37 @@ export default async function DashboardPage() {
     );
   }
 
-  const [bookings, replyDrafts, upcoming, kitStatusCounts, activeCleanersCount] =
-    await Promise.all([
-      findByHostId({ db, hostId }),
-      listPendingReplyDraftsForHost(db, hostId),
-      listUpcomingCheckins(db, hostId),
-      countKitsByStatusForHost(db, hostId),
-      countActiveCleanersForHost(db, hostId),
-    ]);
+  // HOTFIX: ogni query e' isolata. Una fail non rompe le altre.
+  // Defaults garantiscono empty-state UI graziosa.
+  const [bookings, replyDrafts, upcoming, kitStatusCounts, activeCleanersCount] = await Promise.all(
+    [
+      safeQuery<Awaited<ReturnType<typeof findByHostId>>>(
+        'findByHostId',
+        () => findByHostId({ db, hostId }),
+        [],
+      ),
+      safeQuery<Awaited<ReturnType<typeof listPendingReplyDraftsForHost>>>(
+        'listPendingReplyDraftsForHost',
+        () => listPendingReplyDraftsForHost(db, hostId),
+        [],
+      ),
+      safeQuery<Awaited<ReturnType<typeof listUpcomingCheckins>>>(
+        'listUpcomingCheckins',
+        () => listUpcomingCheckins(db, hostId),
+        [],
+      ),
+      safeQuery<Record<string, number>>(
+        'countKitsByStatusForHost',
+        () => countKitsByStatusForHost(db, hostId),
+        {},
+      ),
+      safeQuery<number>(
+        'countActiveCleanersForHost',
+        () => countActiveCleanersForHost(db, hostId),
+        0,
+      ),
+    ],
+  );
 
   const incompleteToCompleteCount = bookings.filter(
     (b) => isIncompleteDataSource(b.dataSource) && !b.hostSkippedCompletion,
@@ -79,8 +122,7 @@ export default async function DashboardPage() {
   const upcomingMissingPhone = upcoming.filter((b) => !b.guestPhone).length;
 
   // Slice C: counter kit in attesa di approvazione founder.
-  const pendingKitsCount =
-    (kitStatusCounts.proposed ?? 0) + (kitStatusCounts.modified ?? 0);
+  const pendingKitsCount = (kitStatusCounts.proposed ?? 0) + (kitStatusCounts.modified ?? 0);
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-ivory">
@@ -92,9 +134,7 @@ export default async function DashboardPage() {
       ) : null}
 
       {/* Slice C: card "Kit pronti per approvazione" — gateway approval flow. */}
-      {pendingKitsCount > 0 ? (
-        <KitsApprovalCard pendingCount={pendingKitsCount} />
-      ) : null}
+      {pendingKitsCount > 0 ? <KitsApprovalCard pendingCount={pendingKitsCount} /> : null}
 
       {/* Slice F: card cleaner — sempre presente per accesso veloce. */}
       <CleanersCard activeCount={activeCleanersCount} />
