@@ -238,10 +238,7 @@ export function BetaRequestForm() {
   );
 }
 
-function SuccessCard({
-  fullName,
-  duplicate,
-}: { fullName: string; duplicate: boolean }) {
+function SuccessCard({ fullName, duplicate }: { fullName: string; duplicate: boolean }) {
   const firstName = fullName.split(/\s+/)[0] ?? fullName;
   return (
     <output
