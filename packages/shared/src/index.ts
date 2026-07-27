@@ -8,6 +8,7 @@
 export * from './claude';
 export * from './booking-data-richness';
 export * from './ai-disclosure';
+export * from './outbound-guard';
 
 // ATTENZIONE — non esportare qui i moduli che importano built-in Node.
 //
