@@ -1,13 +1,6 @@
-import {
-  pgTable,
-  uuid,
-  varchar,
-  timestamp,
-  index,
-  uniqueIndex,
-} from 'drizzle-orm/pg-core';
-import { conversationChannelEnum, conversationStatusEnum } from './enums';
+import { index, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { bookings } from './bookings';
+import { conversationChannelEnum, conversationStatusEnum } from './enums';
 
 // Conversazione inbound tra ospite e Premura/host.
 // Una conversazione per coppia (booking, canale): tipicamente 1 conversazione
@@ -34,6 +27,11 @@ export const conversations = pgTable(
     status: conversationStatusEnum('status').notNull().default('active'),
     lastMessageAt: timestamp('last_message_at', { withTimezone: true }),
     closedAt: timestamp('closed_at', { withTimezone: true }),
+
+    // Disclosure AI consegnata in questa conversazione (AI Act art. 50).
+    // NULL = ancora da inviare: va anteposta al primo messaggio
+    // automatico, non ripetuta a ogni messaggio.
+    aiDisclosureSentAt: timestamp('ai_disclosure_sent_at', { withTimezone: true }),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

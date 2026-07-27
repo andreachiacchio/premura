@@ -98,7 +98,11 @@ CREATE TABLE IF NOT EXISTS "guest_consent_events" (
 	"source" "consent_source" NOT NULL,
 	"phone_e164" varchar(20),
 	"consent_text_version" varchar(64),
-	"ip_hash" varchar(64),
+	-- HMAC-SHA256(ip, pepper), non sha256(ip): 4 miliardi di IPv4 si
+	-- invertono con una tabella precalcolata. Pepper in env, NULL se
+	-- non configurato. Vedi packages/shared/src/consent-ip.ts.
+	"ip_hmac" varchar(64),
+	"ip_pepper_version" varchar(16),
 	"user_agent" varchar(255),
 	"recorded_by_host_id" uuid,
 	"notes" text,

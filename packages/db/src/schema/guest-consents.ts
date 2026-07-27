@@ -44,9 +44,23 @@ export const guestConsentEvents = pgTable(
     // 'whatsapp-services-v1-en'. I testi vivono nei file template.
     consentTextVersion: varchar('consent_text_version', { length: 64 }),
 
-    // Prova tecnica minima, in forma non identificante:
-    // hash SHA-256 dell'IP (mai IP in chiaro) + user agent troncato.
-    ipHash: varchar('ip_hash', { length: 64 }),
+    // Prova tecnica minima, in forma non identificante.
+    //
+    // HMAC-SHA256(ip, pepper) e NON sha256(ip) semplice: lo spazio
+    // degli IPv4 è di 4 miliardi di valori, quindi un hash senza
+    // segreto si inverte con una tabella precalcolata in pochi minuti —
+    // sarebbe un dato personale travestito da anonimo. Il pepper vive
+    // in CONSENT_IP_PEPPER (env, mai in repo).
+    //
+    // Senza pepper configurato il campo resta NULL: meglio nessuna
+    // prova tecnica che una prova che è essa stessa una violazione.
+    // Il consenso resta comunque dimostrabile con testo versionato +
+    // timestamp + canale.
+    //
+    // pepper_version consente la rotazione del segreto: gli hash
+    // vecchi restano verificabili contro il pepper con cui sono nati.
+    ipHmac: varchar('ip_hmac', { length: 64 }),
+    ipPepperVersion: varchar('ip_pepper_version', { length: 16 }),
     userAgent: varchar('user_agent', { length: 255 }),
 
     // Chi ha registrato l'evento quando non e' l'ospite stesso

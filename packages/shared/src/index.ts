@@ -7,3 +7,5 @@
 // compatibili con tutti i runtime del repo.
 export * from './claude';
 export * from './booking-data-richness';
+export * from './ai-disclosure';
+export * from './consent-ip';
