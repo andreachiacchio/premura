@@ -3,6 +3,16 @@ import { createHmac } from 'node:crypto';
 /**
  * Impronta non reversibile dell'IP per il registro consensi.
  *
+ * ─── MODULO SERVER-ONLY ───────────────────────────────────────────
+ *
+ * Per via di `node:crypto` questo file NON è esportato dal barrel
+ * `@premura/shared`: quel barrel viene raggiunto dai client component
+ * (lib/types.ts → dashboard/BookingRow.tsx) e il build di Next
+ * fallirebbe con UnhandledSchemeError anche senza mai chiamare la
+ * funzione. Importalo dal percorso diretto:
+ *
+ *   import { fingerprintIp } from '@premura/shared/src/consent-ip';
+ *
  * ─── Perché non un semplice SHA-256 ───────────────────────────────
  *
  * Lo spazio degli indirizzi IPv4 è di ~4,3 miliardi di valori: una

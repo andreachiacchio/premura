@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+// Percorso diretto e non il barrel: consent-ip è server-only
+// (node:crypto) e resta fuori da @premura/shared per non finire nel
+// bundle browser di Next.
 import { CONSENT_IP_PEPPER_VERSION, fingerprintIp } from '../src/consent-ip';
 
 const PEPPER = 'pepper-di-test-non-usare-in-produzione';
