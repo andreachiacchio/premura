@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
-import { upsertBookingFromEmail, cancelBooking, _internals } from '../lib/repositories/bookings';
 import type { Database } from '@premura/db';
+import { describe, expect, it, vi } from 'vitest';
 import type { ParsedAirbnbEmail } from '../lib/airbnb-email-parser';
+import { _internals, cancelBooking, upsertBookingFromEmail } from '../lib/repositories/bookings';
 
 // Test del repository bookings con DB mockato. Verifica:
 //  - INSERT su nuova booking (row creato + returning id)
@@ -11,7 +11,9 @@ import type { ParsedAirbnbEmail } from '../lib/airbnb-email-parser';
 //
 // Test integration veri (con Postgres testcontainer) sono nell'orchestrator.
 
-function buildConfirmation(overrides: Partial<Extract<ParsedAirbnbEmail, { email_type: 'confirmation' }>> = {}): Extract<ParsedAirbnbEmail, { email_type: 'confirmation' }> {
+function buildConfirmation(
+  overrides: Partial<Extract<ParsedAirbnbEmail, { email_type: 'confirmation' }>> = {},
+): Extract<ParsedAirbnbEmail, { email_type: 'confirmation' }> {
   return {
     email_type: 'confirmation',
     guest_full_name: 'Stephen Smith',
@@ -235,32 +237,41 @@ describe('parseIsoDate', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// findByHostId — cutoff temporale -2gg
+// findByHostId — soglia operativa (confrontata col CHECKOUT)
 // ─────────────────────────────────────────────────────────────
 //
-// Verifica indiretta dell'esclusione dell'archivio: testiamo l'helper
-// computeOperativeCutoff usato dal WHERE in findByHostId. Una volta
-// aperto un Postgres testcontainer (vedi gmail-sync-orchestrator) si
-// potrà testare l'esclusione end-to-end con righe inserite e contate.
+// Il cutoff era (now - 2 giorni) confrontato col CHECK-IN, con l'idea
+// che il margine coprisse gli ospiti ancora in casa. Non reggeva: un
+// soggiorno di una settimana spariva dalla lista al terzo giorno con
+// l'ospite ancora dentro, e chi faceva checkout oggi non compariva —
+// proprio il caso in cui l'host deve scrivergli.
+//
+// Ora la soglia è mezzanotte di oggi e il confronto è sul CHECKOUT: una
+// prenotazione resta operativa finché non è conclusa, qualunque sia la
+// durata del soggiorno. Il comportamento è coperto in
+// apps/web/tests/bookings-operative-window.test.ts.
+//
+// Una volta aperto un Postgres testcontainer (vedi
+// gmail-sync-orchestrator) si potrà testare l'esclusione end-to-end.
 
 describe('findByHostId — computeOperativeCutoff', () => {
-  it('cutoff = now - 2 giorni a mezzanotte locale', () => {
+  it('cutoff = mezzanotte locale di oggi', () => {
     const now = new Date(2026, 3, 30, 15, 30, 45, 123); // 30 aprile 2026 15:30:45.123
     const cutoff = _internals.computeOperativeCutoff(now);
     expect(cutoff.getFullYear()).toBe(2026);
     expect(cutoff.getMonth()).toBe(3); // aprile (0-indexed)
-    expect(cutoff.getDate()).toBe(28);
+    expect(cutoff.getDate()).toBe(30);
     expect(cutoff.getHours()).toBe(0);
     expect(cutoff.getMinutes()).toBe(0);
     expect(cutoff.getSeconds()).toBe(0);
     expect(cutoff.getMilliseconds()).toBe(0);
   });
 
-  it('cutoff attraversa il mese precedente', () => {
+  it('resta nel giorno corrente anche a inizio mese', () => {
     const now = new Date(2026, 4, 1, 10, 0, 0); // 1 maggio 2026
     const cutoff = _internals.computeOperativeCutoff(now);
-    expect(cutoff.getMonth()).toBe(3); // aprile
-    expect(cutoff.getDate()).toBe(29);
+    expect(cutoff.getMonth()).toBe(4); // maggio
+    expect(cutoff.getDate()).toBe(1);
   });
 
   it('non muta il Date passato come argomento', () => {

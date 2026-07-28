@@ -200,7 +200,10 @@ export async function findByHostId(args: {
   const filter = and(
     eq(properties.hostId, hostId),
     ne(bookings.status, 'cancelled'),
-    gte(bookings.checkinAt, cutoff),
+    // Operativa = non ancora conclusa. Sul CHECKOUT, non sul check-in:
+    // include chi e' in casa adesso e chi esce oggi, esclude chi e'
+    // gia' andato via. Vedi computeOperativeCutoff in fondo al file.
+    gte(bookings.checkoutAt, cutoff),
     propertyId ? eq(bookings.propertyId, propertyId) : undefined,
   );
 
@@ -291,12 +294,22 @@ function parseIsoDate(yyyymmdd: string): Date {
   return new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d)));
 }
 
-// Soglia "prenotazione operativa": (now - 2 giorni) a mezzanotte locale.
-// Il -2 copre ospiti ancora in casa con check-in di ieri o l'altro ieri.
+// Soglia "prenotazione operativa": mezzanotte locale di oggi, confrontata
+// con il CHECKOUT.
+//
+// Prima si filtrava su (checkin >= oggi - 2 giorni), con l'idea che il -2
+// coprisse gli ospiti ancora in casa. Non funziona: un soggiorno di una
+// settimana entrato lunedi' sparisce dalla lista il mercoledi', mentre
+// l'ospite e' ancora dentro. Il caso peggiore e' proprio quello che serve
+// di piu' — chi fa checkout oggi e a cui bisogna scrivere adesso.
+//
+// La domanda giusta non e' "quando e' entrato" ma "e' gia' uscito":
+// una prenotazione e' operativa finche' il checkout non e' passato,
+// qualunque sia la durata del soggiorno.
+//
 // Iniettabile via parametro per i test (default new Date()).
 function computeOperativeCutoff(now: Date = new Date()): Date {
   const c = new Date(now);
-  c.setDate(c.getDate() - 2);
   c.setHours(0, 0, 0, 0);
   return c;
 }
