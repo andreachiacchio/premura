@@ -120,6 +120,12 @@ export default async function DashboardPage() {
   // Slice A: counter prossimi check-in da configurare (senza guest_phone).
   const upcomingTotal = upcoming.length;
   const upcomingMissingPhone = upcoming.filter((b) => !b.guestPhone).length;
+  // Numero presente ma invio comunque impossibile: finestra WhatsApp
+  // chiusa e nessun template approvato. Senza questo conteggio la card
+  // direbbe "tutto pronto" per ospiti a cui non possiamo scrivere.
+  const upcomingBlockedByWindow = upcoming.filter(
+    (b) => b.guestPhone && b.sendability.blocker === 'window_closed_no_template',
+  ).length;
 
   // Slice C: counter kit in attesa di approvazione founder.
   const pendingKitsCount = (kitStatusCounts.proposed ?? 0) + (kitStatusCounts.modified ?? 0);
@@ -130,7 +136,11 @@ export default async function DashboardPage() {
 
       {/* Slice A: card "Prossimi check-in" — gateway per attivare booking. */}
       {upcomingTotal > 0 ? (
-        <UpcomingCheckinsCard total={upcomingTotal} missing={upcomingMissingPhone} />
+        <UpcomingCheckinsCard
+          total={upcomingTotal}
+          missing={upcomingMissingPhone}
+          blockedByWindow={upcomingBlockedByWindow}
+        />
       ) : null}
 
       {/* Slice C: card "Kit pronti per approvazione" — gateway approval flow. */}

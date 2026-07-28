@@ -9,15 +9,37 @@ import Link from 'next/link';
 export function UpcomingCheckinsCard({
   total,
   missing,
+  blockedByWindow = 0,
 }: {
   total: number;
   missing: number;
+  /**
+   * Check-in col numero già inserito ma per cui un invio verrebbe
+   * comunque rifiutato da WhatsApp: l'ospite non ha mai scritto (o ha
+   * scritto più di 24h fa) e non esistono template approvati.
+   *
+   * Serve a non promettere l'attivazione dell'agente quando il sistema
+   * non può mantenerla: col solo numero l'host crede che parta tutto,
+   * poi l'invio fallisce con errore 131047 e lo scopre dall'ospite.
+   */
+  blockedByWindow?: number;
 }): React.JSX.Element {
-  const allReady = missing === 0;
+  // "Pronto" richiede due cose: il numero E la possibilità concreta di
+  // scrivere. Il numero da solo non basta.
+  const allReady = missing === 0 && blockedByWindow === 0;
   const containerCls = allReady
     ? 'border-ok/30 bg-line-soft text-ok'
     : 'border-terracotta-soft bg-gradient-to-br from-peach to-peach-deep text-terracotta-2';
   const dotCls = allReady ? 'bg-ok' : 'bg-terracotta';
+
+  const sottotitolo = (): string => {
+    if (allReady) return 'Premura puo lavorare in autonomia.';
+    if (missing > 0) return "Inserisci il numero WhatsApp per attivare l'agente.";
+    // Numero presente ma finestra chiusa: qui la frase vecchia mentiva.
+    return blockedByWindow === 1
+      ? '1 ospite non ha ancora scritto su WhatsApp: finche non lo fa non possiamo iniziare noi.'
+      : `${blockedByWindow} ospiti non hanno ancora scritto su WhatsApp: finche non lo fanno non possiamo iniziare noi.`;
+  };
 
   return (
     <Link
@@ -31,11 +53,7 @@ export function UpcomingCheckinsCard({
             ? `Tutto pronto per i prossimi ${total} check-in`
             : `${total} ${total === 1 ? 'check-in' : 'check-in'} in arrivo · ${missing} ${missing === 1 ? 'da configurare' : 'da configurare'}`}
         </div>
-        <div className="mt-0.5 text-body-sm opacity-80">
-          {allReady
-            ? 'Premura puo lavorare in autonomia.'
-            : "Inserisci il numero WhatsApp per attivare l'agente."}
-        </div>
+        <div className="mt-0.5 text-body-sm opacity-80">{sottotitolo()}</div>
       </div>
       <ChevronRight
         aria-hidden
