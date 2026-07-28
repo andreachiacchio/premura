@@ -1,5 +1,6 @@
-import { type Database, bookings, guestQuizzes, properties } from '@premura/db';
-import { and, asc, eq, gte, lte, ne } from 'drizzle-orm';
+import { type Database, bookings, guestQuizzes, messages, properties } from '@premura/db';
+import { type Sendability, computeSendability } from '@premura/shared';
+import { and, asc, eq, gte, lte, ne, sql } from 'drizzle-orm';
 
 // Slice A — Repository helpers per la dashboard "Prossimi check-in".
 //
@@ -25,6 +26,10 @@ export type UpcomingCheckinRow = {
   guestPhoneSource: string | null;
   // Slice B: stato survey pre-arrival.
   surveyStatus: SurveyStatus;
+  // Finestra WhatsApp 24h: cosa può davvero partire per questo ospite.
+  // Il numero da solo non basta — se l'ospite non ha mai scritto e non
+  // ci sono template approvati, un invio verrebbe rifiutato da Meta.
+  sendability: Sendability;
 };
 
 const WINDOW_DAYS = 14;
@@ -57,6 +62,16 @@ export async function listUpcomingCheckins(
       surveySentAt: guestQuizzes.sentAt,
       surveyCompletedAt: guestQuizzes.completedAt,
       surveySkippedAt: guestQuizzes.skippedAt,
+      // Ultimo messaggio IN INGRESSO dell'ospite su WhatsApp: è ciò che
+      // apre (e riapre) la finestra 24h di Meta. Sottoquery invece di
+      // join per non moltiplicare le righe sui messaggi.
+      lastInboundAt: sql<Date | null>`(
+        SELECT MAX(COALESCE(m.sent_at, m.created_at))
+        FROM ${messages} m
+        WHERE m.booking_id = ${bookings.id}
+          AND m.direction = 'inbound'
+          AND m.channel = 'whatsapp'
+      )`.as('last_inbound_at'),
     })
     .from(bookings)
     .innerJoin(properties, eq(properties.id, bookings.propertyId))
@@ -85,6 +100,16 @@ export async function listUpcomingCheckins(
     premuraActiveAt: r.premuraActiveAt,
     guestPhoneSource: r.guestPhoneSource,
     surveyStatus: deriveSurveyStatus(r.surveySentAt, r.surveyCompletedAt, r.surveySkippedAt),
+    sendability: computeSendability({
+      hasPhone: Boolean(r.guestPhone),
+      lastInboundAt: r.lastInboundAt,
+      // Nessun template Meta esiste ancora: sendTemplate() è
+      // implementato ma non chiamato, e nessun nome è definito nel
+      // progetto. Finché è così, fuori finestra non si può inviare.
+      // Vedi META_TEMPLATE_REGISTRY in @premura/shared.
+      hasApprovedTemplate: false,
+      now,
+    }),
   }));
 }
 
