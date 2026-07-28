@@ -196,6 +196,74 @@ export const payoutValidationMethodEnum = pgEnum('payout_validation_method', [
 ]);
 
 // ─────────────────────────────────────────────────────────────
+// SERVIZI EXTRA (catalogo ospite + upsell)
+// ─────────────────────────────────────────────────────────────
+
+// Famiglia di servizio venduto all'ospite. Guida il raggruppamento nel
+// catalogo e il matching per parola chiave delle risposte automatiche.
+export const serviceCategoryEnum = pgEnum('service_category', [
+  'boat_tour',
+  'transfer',
+  'chef',
+  'cleaning',
+  'wellness',
+  'rental',
+  'food_delivery',
+  'other',
+]);
+
+// Da dove arriva la manifestazione di interesse per un servizio.
+export const serviceInquirySourceEnum = pgEnum('service_inquiry_source', [
+  'catalog_cta', // tap sul pulsante WhatsApp nel catalogo
+  'whatsapp_inbound', // intent riconosciuto in chat
+  'manual', // registrato a mano dall'host
+]);
+
+// ─────────────────────────────────────────────────────────────
+// CONSENSO WHATSAPP (prova GDPR)
+// ─────────────────────────────────────────────────────────────
+
+// Evento del registro consensi. Append-only: 'grant' e 'revoke' si
+// alternano, lo stato corrente è l'ultimo evento in ordine di tempo.
+export const consentActionEnum = pgEnum('consent_action', ['grant', 'revoke']);
+
+// Canale attraverso cui il consenso è stato raccolto o revocato.
+export const consentSourceEnum = pgEnum('consent_source', [
+  'guest_form', // form pubblico nell'app ospite
+  'admin_panel', // inserimento/spunta manuale dell'host
+  'whatsapp_reply', // ospite scrive STOP / conferma in chat
+  'import_csv', // import da export Chekin
+]);
+
+// ─────────────────────────────────────────────────────────────
+// INVII AUTOMATICI (scheduler + paracadute)
+// ─────────────────────────────────────────────────────────────
+
+// I tre momenti del soggiorno in cui parte un messaggio automatico.
+// Fuso di riferimento Europe/Rome.
+//
+// Consenso richiesto per trigger (policy applicata nel send guard):
+//  - welcome  → NO  (comunicazione di servizio sulla prenotazione)
+//  - midstay  → SÌ  (contenuto commerciale: link ai servizi)
+//  - checkout → NO  (ringraziamento + richiesta recensione)
+//
+// Mappatura verso messageStageEnum, per l'audit trail in messages:
+//  welcome → pre_arrival_welcome, midstay → mid_stay_checkin,
+//  checkout → post_stay_review_nudge.
+export const outboundTriggerEnum = pgEnum('outbound_trigger', ['welcome', 'midstay', 'checkout']);
+
+// Ciclo di vita di uno slot di invio.
+//  reserved → lo slot è stato preso, l'invio non è ancora partito
+//  skipped  → condizione di guardia non soddisfatta (no consenso,
+//             numero non su WhatsApp, kill switch, tetto giornaliero)
+export const outboundSendStatusEnum = pgEnum('outbound_send_status', [
+  'reserved',
+  'sent',
+  'failed',
+  'skipped',
+]);
+
+// ─────────────────────────────────────────────────────────────
 // LOCAL PARTNERS / AGENT ACTIONS
 // ─────────────────────────────────────────────────────────────
 

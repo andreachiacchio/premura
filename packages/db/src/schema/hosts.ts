@@ -1,4 +1,13 @@
-import { boolean, decimal, index, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  decimal,
+  index,
+  jsonb,
+  pgTable,
+  timestamp,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 
 // Host = utente pagante di Premura.
 // 1 host → N properties, N cleaners, 1 voice profile, N autopilot rules.
@@ -36,6 +45,18 @@ export const hosts = pgTable(
     // Slice E: auto-send welcome message check-in.
     welcomeAutoSend: boolean('welcome_auto_send').notNull().default(true),
     welcomeTimeSlot: varchar('welcome_time_slot', { length: 5 }).notNull().default('08:00'),
+
+    // Disclosure AI (AI Act art. 50, applicabile dal 2 agosto 2026).
+    // Testo personalizzato per lingua: { "it": "…", "en": "…" }.
+    // Oggetto vuoto = si usano i testi predefiniti.
+    //
+    // Non esiste un flag per disattivarla: l'host personalizza le
+    // parole, non può ottenere il silenzio. Un testo custom vuoto
+    // ricade sul default — vedi packages/shared/src/ai-disclosure.ts.
+    aiDisclosureCustom: jsonb('ai_disclosure_custom')
+      .$type<Partial<Record<'it' | 'en', string | null>>>()
+      .notNull()
+      .default({}),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

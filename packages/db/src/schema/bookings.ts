@@ -60,7 +60,18 @@ export const bookings = pgTable(
 
     // Opt-in ospite per contatto via WhatsApp (canale primario).
     // Se null → non ancora chiesto; se false → fallback obbligato su inbox piattaforma.
+    //
+    // ATTENZIONE: questo flag è una CACHE per le query dello scheduler.
+    // La prova legale del consenso vive in guest_consent_events (registro
+    // append-only). Ogni scrittura qui deve avvenire nella stessa
+    // transazione dell'INSERT dell'evento corrispondente, mai da sola.
     whatsappOptIn: boolean('whatsapp_opt_in'),
+
+    // Momento del consenso attualmente valido e della sua eventuale
+    // revoca. Denormalizzati dall'ultimo evento del registro per evitare
+    // una subquery a ogni tick del cron.
+    whatsappOptInAt: timestamp('whatsapp_opt_in_at', { withTimezone: true }),
+    whatsappOptInRevokedAt: timestamp('whatsapp_opt_in_revoked_at', { withTimezone: true }),
 
     numGuests: integer('num_guests').notNull().default(1),
     numAdults: integer('num_adults').notNull().default(1),

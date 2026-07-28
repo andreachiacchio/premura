@@ -7,3 +7,18 @@
 // compatibili con tutti i runtime del repo.
 export * from './claude';
 export * from './booking-data-richness';
+export * from './ai-disclosure';
+export * from './outbound-guard';
+
+// ATTENZIONE — non esportare qui i moduli che importano built-in Node.
+//
+// Questo barrel finisce nel bundle browser: apps/web/lib/types.ts lo
+// importa, ed e' a sua volta importato da client component come
+// dashboard/_components/BookingRow.tsx. Un `node:crypto` raggiunto per
+// questa catena fa fallire il build di Next con UnhandledSchemeError,
+// anche se la funzione non viene mai chiamata lato client.
+//
+// I moduli server-only si importano dal loro percorso diretto:
+//   import { fingerprintIp } from '@premura/shared/src/consent-ip';
+//
+// Riguarda oggi: ./consent-ip (node:crypto).

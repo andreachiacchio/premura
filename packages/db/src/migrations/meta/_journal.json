@@ -169,6 +169,20 @@
       "when": 1779400000000,
       "tag": "0023_welcome_message",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1779600000000,
+      "tag": "0025_services_consent_outbound",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1779700000000,
+      "tag": "0026_ai_act_disclosure",
+      "breakpoints": true
     }
   ]
 }
