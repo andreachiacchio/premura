@@ -1,5 +1,7 @@
 import 'dotenv/config';
+import { createServerClient } from '@premura/db';
 import Fastify from 'fastify';
+import { wahaWebhookRoutes } from './api/webhooks/waha';
 // Import top-level: ogni modulo worker costruisce la propria istanza BullMQ
 // Worker a module load e inizia subito ad ascoltare la coda. Stesso pattern
 // che questi worker avevano quando vivevano dentro index.ts.
@@ -44,6 +46,20 @@ const app = Fastify({
         : undefined,
   },
 });
+
+// Client Drizzle long-lived per il webhook WAHA. Il worker e' sempre
+// acceso, quindi la pool resta aperta a vita processo (chiusa nello
+// shutdown), come fa index.ts per le sue route.
+const apiClient = createServerClient();
+
+// Webhook inbound WAHA SUL WORKER, non sul processo app: l'app fa
+// scale-to-zero e il primo messaggio dell'ospite dopo un periodo idle
+// pagherebbe 3-5s di cold start. Il worker e' sempre acceso — il
+// messaggio inbound arriva senza attese. Esposto su porta pubblica
+// dedicata (8443, vedi fly.toml [[services]]): la 443 appartiene al
+// process group app. La stessa route resta registrata anche su app come
+// URL di riserva.
+await app.register(wahaWebhookRoutes, { db: apiClient.db });
 
 const icalCron = startIcalCron();
 const surveyCron = startSurveyCron();
@@ -96,6 +112,7 @@ const shutdown = async (signal: string): Promise<void> => {
     welcomeWorker.close(),
   ]);
   await app.close();
+  await apiClient.close();
   process.exit(0);
 };
 process.on('SIGTERM', () => void shutdown('SIGTERM'));

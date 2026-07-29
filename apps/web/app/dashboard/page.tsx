@@ -170,12 +170,19 @@ export default async function DashboardPage() {
       {/* Blocco 1 — metriche */}
       <HomeMetricsStrip metrics={summary.metrics} />
 
-      {/* Blocco 2 — decisioni in attesa (nascosto se vuoto) */}
+      {/* Blocco 2 — decisioni in attesa (nascosto se vuoto). Le bozze
+          sono voci di questo blocco, in cima, con la card completa
+          (anteprima + approva/modifica inline) e il tempo di attesa:
+          venerdi' e' la schermata dove vive l'host. */}
       <DecisionsBlock
         data={{
+          draftItems: replyDrafts.map((d) => ({
+            key: d.id,
+            waitingLabel: waitingSince(d.createdAt),
+            card: <ReplyDraftCard draft={d} />,
+          })),
           missingPhoneSoon,
           incompleteCount: incompleteToCompleteCount,
-          pendingDraftsCount: replyDrafts.length,
           pendingKitsCount,
         }}
       />
@@ -190,19 +197,6 @@ export default async function DashboardPage() {
         }))}
       />
 
-      {replyDrafts.length > 0 ? (
-        <section id="risposte" className="mx-5 mt-8 flex scroll-mt-6 flex-col gap-3">
-          <h2 className="text-eyebrow uppercase tracking-wider text-ink-mute">
-            Risposte da approvare ({replyDrafts.length})
-          </h2>
-          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-start xl:grid-cols-3">
-            {replyDrafts.map((d) => (
-              <ReplyDraftCard key={d.id} draft={d} />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
       <div id="prenotazioni" className="scroll-mt-6">
         <BookingsList
           bookings={bookings}
@@ -214,4 +208,16 @@ export default async function DashboardPage() {
       <div className="h-12" aria-hidden />
     </main>
   );
+}
+
+// "in attesa da 12 min" — il tempo di attesa di una bozza e' l'informazione
+// che decide la priorita': ogni minuto e' silenzio verso l'ospite.
+function waitingSince(createdAt: Date): string {
+  const mins = Math.max(0, Math.round((Date.now() - createdAt.getTime()) / 60_000));
+  if (mins < 1) return 'in attesa da ora';
+  if (mins < 60) return `in attesa da ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `in attesa da ${hours} ${hours === 1 ? 'ora' : 'ore'}`;
+  const days = Math.floor(hours / 24);
+  return `in attesa da ${days} ${days === 1 ? 'giorno' : 'giorni'}`;
 }

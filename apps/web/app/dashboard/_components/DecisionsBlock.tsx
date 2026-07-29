@@ -15,22 +15,39 @@ import { InlinePhoneFix } from './InlinePhoneFix';
 
 const ARRIVO_FMT = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric' });
 
+/**
+ * Bozza in attesa, resa come voce del blocco. La card (ReplyDraftCard,
+ * client component con anteprima + approva/modifica/scarta inline) arriva
+ * come ReactNode gia' costruito dalla pagina: questo componente resta
+ * server-side e non importa niente di client.
+ */
+export type DecisionDraftItem = {
+  key: string;
+  /** "in attesa da 12 min" — calcolato server-side al render. */
+  waitingLabel: string;
+  card: React.ReactNode;
+};
+
 export type DecisionsData = {
+  /**
+   * Bozze dell'agente in attesa di ok. PRIME nella lista: in modalita'
+   * bozza sono l'unica cosa tra un ospite che ha scritto e la risposta,
+   * quindi ogni minuto di attesa e' un minuto di silenzio verso l'ospite.
+   */
+  draftItems: DecisionDraftItem[];
   /** Ospiti senza numero con arrivo entro 3 giorni — fix inline. */
   missingPhoneSoon: GuestMissingPhoneSoon[];
   /** Prenotazioni con dati incompleti (form nella lista sotto). */
   incompleteCount: number;
-  /** Risposte generate dall'agente in attesa di approvazione. */
-  pendingDraftsCount: number;
   /** Kit proposti in attesa di approvazione. */
   pendingKitsCount: number;
 };
 
 export function decisionsCount(d: DecisionsData): number {
   return (
+    d.draftItems.length +
     d.missingPhoneSoon.length +
     (d.incompleteCount > 0 ? 1 : 0) +
-    (d.pendingDraftsCount > 0 ? 1 : 0) +
     (d.pendingKitsCount > 0 ? 1 : 0)
   );
 }
@@ -73,6 +90,15 @@ export function DecisionsBlock({
           </h2>
         </header>
         <ul>
+          {data.draftItems.map((d) => (
+            <li key={d.key} className="border-t border-line-soft px-4 py-3 first:border-t-0">
+              <p className="mb-2 text-body-sm font-medium text-terracotta-2">
+                Risposta pronta · {d.waitingLabel}
+              </p>
+              {d.card}
+            </li>
+          ))}
+
           {data.missingPhoneSoon.map((g) => (
             <Item key={g.bookingId}>
               <p className="text-body text-ink">
@@ -85,25 +111,6 @@ export function DecisionsBlock({
               />
             </Item>
           ))}
-
-          {data.pendingDraftsCount > 0 ? (
-            <Item>
-              <p className="text-body text-ink">
-                <span className="font-medium">
-                  {data.pendingDraftsCount}{' '}
-                  {data.pendingDraftsCount === 1 ? 'risposta pronta' : 'risposte pronte'}
-                </span>{' '}
-                — l'agente aspetta il tuo ok prima di inviare
-              </p>
-              <a
-                href="#risposte"
-                className="inline-flex items-center gap-1 text-body-sm font-medium text-terracotta-2 hover:underline"
-              >
-                Leggi e approva qui sotto
-                <ChevronRight aria-hidden className="size-4" />
-              </a>
-            </Item>
-          ) : null}
 
           {data.pendingKitsCount > 0 ? (
             <Item>

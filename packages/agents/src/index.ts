@@ -18,6 +18,7 @@ export * from './survey-token';
 export * from './kit-generator';
 export * from './kit-composer';
 export * from './message-writer';
+export * from './outbound';
 export * from './voice-profile-merger';
 export * from './voice-profiler';
 export * from './welcome-message';
