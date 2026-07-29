@@ -34,8 +34,8 @@ export default async function CleanersPage(): Promise<React.JSX.Element> {
         <div className="rounded-lg border border-line bg-bg-soft p-8 text-center">
           <h2 className="text-base font-medium text-ink">Nessun cleaner ancora</h2>
           <p className="mt-2 text-sm text-ink-mute">
-            Aggiungi la prima persona che si occupa delle pulizie e Premura
-            potrà coordinare i kit di benvenuto.
+            Aggiungi la prima persona che si occupa delle pulizie e Premura potrà coordinare i kit
+            di benvenuto.
           </p>
           <Link
             href="/dashboard/cleaners/new"

@@ -1,6 +1,10 @@
 import Link from 'next/link';
 
-const DATE_FMT = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
+const DATE_FMT = new Intl.DateTimeFormat('it-IT', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
 
 export type CleanersListRow = {
   id: string;
@@ -47,8 +51,7 @@ export function CleanersList({ rows }: { rows: CleanersListRow[] }): React.JSX.E
                 </div>
                 <p className="mt-1 text-sm text-ink-mute">
                   {row.whatsappNumber}
-                  {row.email ? ` · ${row.email}` : ''} ·{' '}
-                  {row.assignedPropertyCount}{' '}
+                  {row.email ? ` · ${row.email}` : ''} · {row.assignedPropertyCount}{' '}
                   {row.assignedPropertyCount === 1 ? 'property' : 'properties'}
                 </p>
                 <p className="text-xs text-ink-mute">

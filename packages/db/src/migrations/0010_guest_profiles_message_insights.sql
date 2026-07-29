@@ -19,16 +19,16 @@
 -- restano coerenti.
 
 ALTER TABLE "guest_profiles"
-  ADD COLUMN "message_insights" JSONB NOT NULL DEFAULT '{}'::jsonb;
+  ADD COLUMN IF NOT EXISTS "message_insights" JSONB NOT NULL DEFAULT '{}'::jsonb;
 --> statement-breakpoint
 ALTER TABLE "guest_profiles"
-  ADD COLUMN "first_message_at" TIMESTAMP WITH TIME ZONE;
+  ADD COLUMN IF NOT EXISTS "first_message_at" TIMESTAMP WITH TIME ZONE;
 --> statement-breakpoint
 ALTER TABLE "guest_profiles"
-  ADD COLUMN "last_message_at" TIMESTAMP WITH TIME ZONE;
+  ADD COLUMN IF NOT EXISTS "last_message_at" TIMESTAMP WITH TIME ZONE;
 --> statement-breakpoint
 ALTER TABLE "guest_profiles"
-  ADD COLUMN "message_count" INTEGER NOT NULL DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS "message_count" INTEGER NOT NULL DEFAULT 0;
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "guest_profiles_last_message_at_idx"
   ON "guest_profiles" ("last_message_at" DESC NULLS LAST);

@@ -9,31 +9,31 @@
 -- Tutti additive, nullable o default safe. Niente breaking change.
 
 ALTER TABLE "host_voice_profiles"
-  ADD COLUMN "avg_sentence_length" NUMERIC(6, 2);
+  ADD COLUMN IF NOT EXISTS "avg_sentence_length" NUMERIC(6, 2);
 --> statement-breakpoint
 ALTER TABLE "host_voice_profiles"
-  ADD COLUMN "formality_score" NUMERIC(3, 2);
+  ADD COLUMN IF NOT EXISTS "formality_score" NUMERIC(3, 2);
 --> statement-breakpoint
 ALTER TABLE "host_voice_profiles"
-  ADD COLUMN "emoji_usage_rate" NUMERIC(4, 3);
+  ADD COLUMN IF NOT EXISTS "emoji_usage_rate" NUMERIC(4, 3);
 --> statement-breakpoint
 ALTER TABLE "host_voice_profiles"
-  ADD COLUMN "common_phrases" JSONB NOT NULL DEFAULT '[]'::jsonb;
+  ADD COLUMN IF NOT EXISTS "common_phrases" JSONB NOT NULL DEFAULT '[]'::jsonb;
 --> statement-breakpoint
 ALTER TABLE "host_voice_profiles"
-  ADD COLUMN "greeting_patterns" JSONB NOT NULL DEFAULT '[]'::jsonb;
+  ADD COLUMN IF NOT EXISTS "greeting_patterns" JSONB NOT NULL DEFAULT '[]'::jsonb;
 --> statement-breakpoint
 ALTER TABLE "host_voice_profiles"
-  ADD COLUMN "closing_patterns" JSONB NOT NULL DEFAULT '[]'::jsonb;
+  ADD COLUMN IF NOT EXISTS "closing_patterns" JSONB NOT NULL DEFAULT '[]'::jsonb;
 --> statement-breakpoint
 ALTER TABLE "host_voice_profiles"
-  ADD COLUMN "language_distribution" JSONB NOT NULL DEFAULT '{}'::jsonb;
+  ADD COLUMN IF NOT EXISTS "language_distribution" JSONB NOT NULL DEFAULT '{}'::jsonb;
 --> statement-breakpoint
 ALTER TABLE "host_voice_profiles"
-  ADD COLUMN "messages_analyzed" INTEGER NOT NULL DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS "messages_analyzed" INTEGER NOT NULL DEFAULT 0;
 --> statement-breakpoint
 ALTER TABLE "host_voice_profiles"
-  ADD COLUMN "voice_confidence" NUMERIC(4, 3) NOT NULL DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS "voice_confidence" NUMERIC(4, 3) NOT NULL DEFAULT 0;
 --> statement-breakpoint
 ALTER TABLE "host_voice_profiles"
-  ADD COLUMN "processed_message_ids" JSONB NOT NULL DEFAULT '[]'::jsonb;
+  ADD COLUMN IF NOT EXISTS "processed_message_ids" JSONB NOT NULL DEFAULT '[]'::jsonb;

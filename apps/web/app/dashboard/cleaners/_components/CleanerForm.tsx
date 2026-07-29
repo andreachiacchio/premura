@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useState, useTransition } from 'react';
 import { createCleanerAction, updateCleanerAction } from '../actions';
 
 export type CleanerFormInitial = {
@@ -107,11 +107,7 @@ export function CleanerForm({
         />
       </Field>
 
-      <Field
-        label="Numero WhatsApp"
-        required
-        hint="Formato internazionale, es. +39 333 1234567"
-      >
+      <Field label="Numero WhatsApp" required hint="Formato internazionale, es. +39 333 1234567">
         <input
           value={form.whatsappNumber}
           onChange={(e) => set('whatsappNumber', e.target.value)}
@@ -201,7 +197,9 @@ export function CleanerForm({
       <Field label="Lingua preferita">
         <select
           value={form.languagePreferred}
-          onChange={(e) => set('languagePreferred', e.target.value as CleanerFormInitial['languagePreferred'])}
+          onChange={(e) =>
+            set('languagePreferred', e.target.value as CleanerFormInitial['languagePreferred'])
+          }
           className={inputCls}
         >
           <option value="it">Italiano</option>

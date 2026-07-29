@@ -7,6 +7,29 @@
 # Region mxp = Milano. Minimizza latenza con Supabase Frankfurt (~15-25ms).
 # Nota IPv4/IPv6: Fly egress è IPv6-only verso Supabase → app userà
 # Session Pooler (5432 IPv4), vedi docs/KNOWN-LIMITS.md §5.
+#
+# ─── DUE PROCESS GROUP ────────────────────────────────────────────────
+#
+# Fino al 29/07/2026 c'era un solo processo che serviva l'HTTP E ospitava
+# i cron. Girava con auto_stop_machines="stop" + min_machines_running=0,
+# quindi la macchina si spegneva appena l'app restava idle e i timer
+# croner in-process non scattavano più. Risultato: ultima prenotazione
+# ingerita il 29/04, ultimo aggiornamento il 05/05, nessun errore nei log
+# perché non girava niente che potesse fallire.
+#
+#   app    → solo HTTP. Continua a spegnersi quando idle: non ospita più
+#            nulla che debba scattare a orario, e il traffico è a raffiche
+#            (dashboard, webhook).
+#   worker → cron + consumer BullMQ (src/worker.ts). NON ha un servizio
+#            dietro il proxy Fly, e l'autostop agisce solo sulle macchine
+#            che stanno dietro al proxy: questa resta accesa sempre.
+#
+# Costo aggiuntivo: una shared-cpu-1x/512mb sempre accesa.
+#
+# Dopo il primo deploy con questa config serve dire a Fly quante macchine
+# tenere per gruppo (una tantum):
+#
+#   flyctl scale count app=1 worker=1 --config apps/api/fly.toml
 
 app = "premura-api-staging"
 primary_region = "fra"
@@ -18,6 +41,10 @@ primary_region = "fra"
   NODE_ENV = "production"
   PORT = "8080"
 
+[processes]
+  app = "pnpm exec tsx src/index.ts"
+  worker = "pnpm exec tsx src/worker.ts"
+
 [http_service]
   internal_port = 8080
   force_https = true
@@ -26,6 +53,8 @@ primary_region = "fra"
   auto_stop_machines = "stop"
   auto_start_machines = true
   min_machines_running = 0
+  # Solo "app" sta dietro il proxy. "worker" non compare qui: è ciò che lo
+  # tiene fuori dall'autostop.
   processes = ["app"]
 
   [[http_service.checks]]
@@ -35,7 +64,29 @@ primary_region = "fra"
     method = "GET"
     path = "/health"
 
+# Health check del worker. Non passa dal proxy (il gruppo non ha servizi):
+# è un machine check diretto sulla porta interna. /health su src/worker.ts
+# risponde "degraded" se un cron non è più schedulato, che è precisamente
+# il segnale mancato per tre mesi.
+[checks]
+  [checks.worker_crons]
+    type = "http"
+    port = 8080
+    method = "GET"
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "15s"
+    processes = ["worker"]
+
 [[vm]]
   size = "shared-cpu-1x"
   memory = "512mb"
   cpu_kind = "shared"
+  processes = ["app"]
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  cpu_kind = "shared"
+  processes = ["worker"]

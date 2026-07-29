@@ -1,9 +1,6 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +8,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -20,9 +17,12 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as React from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 
 // Form di creazione prima property (M2a.4 slice 6 fase 6).
 // 3 campi: name (required min 2), iCal Booking URL (opzionale, valido
@@ -36,23 +36,18 @@ export const createPropertyFormSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(2, "Il nome deve avere almeno 2 caratteri")
-    .max(255, "Nome troppo lungo"),
+    .min(2, 'Il nome deve avere almeno 2 caratteri')
+    .max(255, 'Nome troppo lungo'),
   // string in input (RHF compatible), accetta vuoto o URL valido.
   // .refine evita il ZodUnion error generico di .or(literal('')) e
   // mantiene tipo input/output uniforme per il typing del Resolver.
   icalBookingUrl: z
     .string()
     .trim()
-    .refine(
-      (v) => v === "" || z.string().url().safeParse(v).success,
-      { message: "URL non valido" },
-    ),
-  city: z
-    .string()
-    .trim()
-    .min(2, "Citta troppo corta")
-    .max(128, "Citta troppo lunga"),
+    .refine((v) => v === '' || z.string().url().safeParse(v).success, {
+      message: 'URL non valido',
+    }),
+  city: z.string().trim().min(2, 'Citta troppo corta').max(128, 'Citta troppo lunga'),
 });
 
 export type CreatePropertyFormValues = z.infer<typeof createPropertyFormSchema>;
@@ -71,9 +66,9 @@ export function AddPropertyDialog({
   const form = useForm<CreatePropertyFormValues>({
     resolver: zodResolver(createPropertyFormSchema),
     defaultValues: {
-      name: "",
-      icalBookingUrl: "",
-      city: "Napoli",
+      name: '',
+      icalBookingUrl: '',
+      city: 'Napoli',
     },
   });
 
@@ -82,7 +77,7 @@ export function AddPropertyDialog({
 
   React.useEffect(() => {
     if (open) {
-      form.reset({ name: "", icalBookingUrl: "", city: "Napoli" });
+      form.reset({ name: '', icalBookingUrl: '', city: 'Napoli' });
       setSubmitError(null);
     }
   }, [open, form]);
@@ -92,17 +87,15 @@ export function AddPropertyDialog({
     setSubmitError(null);
     try {
       const fd = new FormData();
-      fd.set("name", values.name);
-      fd.set("city", values.city);
+      fd.set('name', values.name);
+      fd.set('city', values.city);
       if (values.icalBookingUrl) {
-        fd.set("icalBookingUrl", values.icalBookingUrl);
+        fd.set('icalBookingUrl', values.icalBookingUrl);
       }
       await createAction(fd);
       onOpenChange(false);
     } catch (err) {
-      setSubmitError(
-        err instanceof Error ? err.message : "Errore imprevisto, riprova.",
-      );
+      setSubmitError(err instanceof Error ? err.message : 'Errore imprevisto, riprova.');
     } finally {
       setSubmitting(false);
     }
@@ -114,17 +107,13 @@ export function AddPropertyDialog({
         <DialogHeader>
           <DialogTitle>Aggiungi la tua struttura</DialogTitle>
           <DialogDescription>
-            Bastano nome e citta&apos;. Il link iCal Booking lo puoi aggiungere
-            ora o dopo dalle impostazioni.
+            Bastano nome e citta&apos;. Il link iCal Booking lo puoi aggiungere ora o dopo dalle
+            impostazioni.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form
-            noValidate
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="flex flex-col gap-4"
-          >
+          <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
             <FormField
               control={form.control}
               name="name"
@@ -132,11 +121,7 @@ export function AddPropertyDialog({
                 <FormItem>
                   <FormLabel>Nome struttura</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="Es. La Goccia"
-                      autoComplete="off"
-                      {...field}
-                    />
+                    <Input placeholder="Es. La Goccia" autoComplete="off" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -150,11 +135,7 @@ export function AddPropertyDialog({
                 <FormItem>
                   <FormLabel>Citta&apos;</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="Napoli"
-                      autoComplete="address-level2"
-                      {...field}
-                    />
+                    <Input placeholder="Napoli" autoComplete="address-level2" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -176,8 +157,8 @@ export function AddPropertyDialog({
                     />
                   </FormControl>
                   <FormDescription>
-                    Lo trovi su Booking nelle impostazioni della struttura,
-                    sezione Calendari sincronizzati.
+                    Lo trovi su Booking nelle impostazioni della struttura, sezione Calendari
+                    sincronizzati.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -185,22 +166,14 @@ export function AddPropertyDialog({
             />
 
             {submitError ? (
-              <p
-                role="alert"
-                className="text-body-sm font-medium text-alert"
-              >
+              <p role="alert" className="text-body-sm font-medium text-alert">
                 {submitError}
               </p>
             ) : null}
 
             <DialogFooter className="mt-2">
-              <Button
-                type="submit"
-                variant="accent"
-                size="md"
-                disabled={submitting}
-              >
-                {submitting ? "Salvo..." : "Salva e inizia"}
+              <Button type="submit" variant="accent" size="md" disabled={submitting}>
+                {submitting ? 'Salvo...' : 'Salva e inizia'}
               </Button>
             </DialogFooter>
           </form>

@@ -12,7 +12,8 @@ import { signCleanerToken } from './cleaner-token';
 //  4. Invio via Meta Cloud API outbound al numero cleaner.
 
 export type SendMagicLinkResult =
-  | { status: 'sent'; messageId: string; url: string }
+  // messageId null = invio simulato (WHATSAPP_DRY_RUN) o kill switch.
+  | { status: 'sent'; messageId: string | null; url: string }
   | { status: 'skipped_no_cleaner' }
   | { status: 'send_error'; error: string };
 
@@ -45,7 +46,8 @@ export async function sendCleanerMagicLink(
   });
 
   try {
-    const res = await sendText(cleaner.whatsappNumber, message);
+    // immediate: destinatario e' la cleaner, non un ospite.
+    const res = await sendText(cleaner.whatsappNumber, message, { immediate: true });
     return { status: 'sent', messageId: res.messageId, url };
   } catch (err) {
     return {

@@ -18,7 +18,7 @@
 DROP TABLE IF EXISTS "property_knowledge_base" CASCADE;
 --> statement-breakpoint
 
-CREATE TABLE "property_knowledge" (
+CREATE TABLE IF NOT EXISTS "property_knowledge" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "property_id" UUID NOT NULL UNIQUE
     REFERENCES "properties"("id") ON DELETE CASCADE,
@@ -45,12 +45,13 @@ CREATE TABLE "property_knowledge" (
 );
 --> statement-breakpoint
 
-CREATE INDEX "property_knowledge_property_idx" ON "property_knowledge" ("property_id");
+CREATE INDEX IF NOT EXISTS "property_knowledge_property_idx" ON "property_knowledge" ("property_id");
 --> statement-breakpoint
 
 ALTER TABLE "property_knowledge" ENABLE ROW LEVEL SECURITY;
 --> statement-breakpoint
 
+DROP POLICY IF EXISTS "property_knowledge_select_own" ON "property_knowledge";
 CREATE POLICY "property_knowledge_select_own" ON "property_knowledge"
   FOR SELECT
   USING (
@@ -62,6 +63,7 @@ CREATE POLICY "property_knowledge_select_own" ON "property_knowledge"
   );
 --> statement-breakpoint
 
+DROP POLICY IF EXISTS "property_knowledge_insert_own" ON "property_knowledge";
 CREATE POLICY "property_knowledge_insert_own" ON "property_knowledge"
   FOR INSERT
   WITH CHECK (
@@ -73,6 +75,7 @@ CREATE POLICY "property_knowledge_insert_own" ON "property_knowledge"
   );
 --> statement-breakpoint
 
+DROP POLICY IF EXISTS "property_knowledge_update_own" ON "property_knowledge";
 CREATE POLICY "property_knowledge_update_own" ON "property_knowledge"
   FOR UPDATE
   USING (
@@ -84,6 +87,7 @@ CREATE POLICY "property_knowledge_update_own" ON "property_knowledge"
   );
 --> statement-breakpoint
 
+DROP POLICY IF EXISTS "property_knowledge_delete_own" ON "property_knowledge";
 CREATE POLICY "property_knowledge_delete_own" ON "property_knowledge"
   FOR DELETE
   USING (

@@ -1,12 +1,6 @@
-import {
-  isIncompleteDataSource,
-  type BookingForDashboard,
-} from "@/lib/types";
-import { BookingRow } from "./BookingRow";
-import type {
-  CompleteBookingActionFn,
-  SkipBookingActionFn,
-} from "./CompleteBookingDialog";
+import { type BookingForDashboard, isIncompleteDataSource } from '@/lib/types';
+import { BookingRow } from './BookingRow';
+import type { CompleteBookingActionFn, SkipBookingActionFn } from './CompleteBookingDialog';
 
 // Lista verticale di prenotazioni operative (in corso o future con
 // check-in da oggi - 2gg in avanti, filtro applicato in
@@ -43,16 +37,12 @@ export function BookingsList({
         <section id="incomplete" className="mb-6 scroll-mt-6">
           <SectionHeader
             title="Da completare"
-            eyebrow={`${toComplete.length} ${toComplete.length === 1 ? "prenotazione" : "prenotazioni"}`}
+            eyebrow={`${toComplete.length} ${toComplete.length === 1 ? 'prenotazione' : 'prenotazioni'}`}
           />
-          <ul className="mt-3 flex flex-col gap-2.5">
+          <ul className="mt-3 flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:items-start xl:grid-cols-3">
             {toComplete.map((b) => (
               <li key={b.id}>
-                <BookingRow
-                  booking={b}
-                  completeAction={completeAction}
-                  skipAction={skipAction}
-                />
+                <BookingRow booking={b} completeAction={completeAction} skipAction={skipAction} />
               </li>
             ))}
           </ul>
@@ -63,16 +53,12 @@ export function BookingsList({
         <section>
           <SectionHeader
             title="Prossimi ospiti"
-            eyebrow={`${others.length} ${others.length === 1 ? "prenotazione" : "prenotazioni"}`}
+            eyebrow={`${others.length} ${others.length === 1 ? 'prenotazione' : 'prenotazioni'}`}
           />
-          <ul className="mt-3 flex flex-col gap-2.5">
+          <ul className="mt-3 flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:items-start xl:grid-cols-3">
             {others.map((b) => (
               <li key={b.id}>
-                <BookingRow
-                  booking={b}
-                  completeAction={completeAction}
-                  skipAction={skipAction}
-                />
+                <BookingRow booking={b} completeAction={completeAction} skipAction={skipAction} />
               </li>
             ))}
           </ul>
@@ -92,9 +78,7 @@ function SectionHeader({
   return (
     <div className="flex items-baseline justify-between">
       <h2 className="font-serif text-[22px] leading-tight text-ink">{title}</h2>
-      <span className="text-eyebrow font-medium uppercase text-ink-mute">
-        {eyebrow}
-      </span>
+      <span className="text-eyebrow font-medium uppercase text-ink-mute">{eyebrow}</span>
     </div>
   );
 }

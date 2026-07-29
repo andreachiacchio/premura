@@ -15,15 +15,15 @@
 -- "azioni sul profilo X".
 
 ALTER TABLE "agent_actions"
-  ADD COLUMN "guest_profile_id" UUID
+  ADD COLUMN IF NOT EXISTS "guest_profile_id" UUID
   REFERENCES "guest_profiles"("id") ON DELETE SET NULL;
 --> statement-breakpoint
 ALTER TABLE "agent_actions"
-  ADD COLUMN "message_id" UUID
+  ADD COLUMN IF NOT EXISTS "message_id" UUID
   REFERENCES "messages"("id") ON DELETE SET NULL;
 --> statement-breakpoint
 ALTER TABLE "agent_actions"
-  ADD COLUMN "human_override" BOOLEAN NOT NULL DEFAULT FALSE;
+  ADD COLUMN IF NOT EXISTS "human_override" BOOLEAN NOT NULL DEFAULT FALSE;
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "agent_actions_guest_profile_idx"
   ON "agent_actions" ("guest_profile_id");

@@ -5,23 +5,15 @@ import { createServerClient } from '@premura/db';
 import Fastify from 'fastify';
 import { bookingsRoutes } from './api/bookings';
 import { propertiesRoutes } from './api/properties';
+import { wahaWebhookRoutes } from './api/webhooks/waha';
 import { whatsappWebhookRoutes } from './api/webhooks/whatsapp';
+// Solo i produttori di coda: questo processo enqueue (webhook -> draft
+// generation) e legge i contatori per /health/jobs. I consumer BullMQ e i
+// cron vivono in src/worker.ts, su un process group Fly che non si spegne
+// mai — vedi il commento in testa a quel file.
 import { draftGenerationQueue } from './jobs/draft-generation-queue';
-// Slice 7a.4: worker BullMQ draft-generation. Top-level import: l'istanza
-// Worker viene creata e inizia subito ad ascoltare la coda. Stesso
-// pattern del worker iCal.
-import { draftGenerationWorker } from './jobs/draft-generation-worker';
-import { startIcalCron } from './jobs/ical-cron';
-// Import top-level: l'istanza Worker viene creata nel modulo importato e
-// inizia subito ad ascoltare la queue 'ical-poll'. Niente lazy load.
-import { icalPollWorker } from './jobs/ical-poll-worker';
 import { icalPollQueue } from './jobs/queues';
-import { startSurveyCron } from './jobs/survey-cron';
 import { surveyQueue } from './jobs/survey-queue';
-// Slice B: worker BullMQ pre-arrival-survey. Top-level import.
-import { surveyWorker } from './jobs/survey-worker';
-import { startWelcomeMessageCron } from './jobs/welcome-message-cron';
-import { welcomeWorker } from './jobs/welcome-message-worker';
 import { attachJwtAuth } from './plugins/jwt-auth';
 
 const app = Fastify({
@@ -83,34 +75,20 @@ await app.register(propertiesRoutes, { prefix: '/api/properties', db: apiClient.
 // Fastify lo isola dal resto dell'app.
 await app.register(whatsappWebhookRoutes, { db: apiClient.db });
 
-// TODO: register dashboard API, cleaner endpoints
+// Webhook inbound WAHA. Registrato in un plugin separato perche' ha il
+// suo content-type parser (rawBody per l'HMAC) e l'encapsulation Fastify
+// non permette di condividerlo con quello di Meta senza che uno dei due
+// vinca sull'altro.
+await app.register(wahaWebhookRoutes, { db: apiClient.db });
 
-// Cron iCal avviato dopo il worker (worker gia' importato top-level) e prima
-// di app.listen, cosi' eventuali tick che partono mentre l'app sta per andare
-// online trovano la pipeline di processing pronta.
-const icalCron = startIcalCron();
-const surveyCron = startSurveyCron();
-const welcomeCron = startWelcomeMessageCron();
+// TODO: register dashboard API, cleaner endpoints
 
 const port = Number(process.env.PORT ?? 3000);
 await app.listen({ port, host: '0.0.0.0' });
 app.log.info(`Premura listening on :${port}`);
-app.log.info('ical poll worker started');
-app.log.info('draft generation worker started');
-app.log.info('pre-arrival survey worker started');
-app.log.info('welcome message worker started');
 
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, 'shutdown requested');
-  icalCron.stop();
-  surveyCron.stop();
-  welcomeCron.stop();
-  await Promise.all([
-    icalPollWorker.close(),
-    draftGenerationWorker.close(),
-    surveyWorker.close(),
-    welcomeWorker.close(),
-  ]);
   await app.close();
   await apiClient.close();
   process.exit(0);

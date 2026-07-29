@@ -1,17 +1,10 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import {
-  isIncompleteDataSource,
-  isRichDataSource,
-  type BookingForDashboard,
-} from "@/lib/types";
-import { Badge } from "@/components/ui/badge";
-import { CompleteBookingDialog } from "./CompleteBookingDialog";
-import type {
-  CompleteBookingActionFn,
-  SkipBookingActionFn,
-} from "./CompleteBookingDialog";
+import { Badge } from '@/components/ui/badge';
+import { type BookingForDashboard, isIncompleteDataSource, isRichDataSource } from '@/lib/types';
+import { useState } from 'react';
+import { CompleteBookingDialog } from './CompleteBookingDialog';
+import type { CompleteBookingActionFn, SkipBookingActionFn } from './CompleteBookingDialog';
 
 // Riga della lista prenotazioni dashboard. Calata sulla .guest-card del
 // prototipo (riga 544 sgg.): card paper con border line-soft, avatar
@@ -29,56 +22,56 @@ import type {
 // completamento manuale. Altrimenti la card e' inerte (slice 5 non
 // implementa il dettaglio ospite, arrivera in M3).
 
-const DATE_FORMATTER = new Intl.DateTimeFormat("it-IT", {
-  day: "numeric",
-  month: "short",
+const DATE_FORMATTER = new Intl.DateTimeFormat('it-IT', {
+  day: 'numeric',
+  month: 'short',
 });
 
-type DotKind = "alert" | "warn" | "ok" | "muted";
+type DotKind = 'alert' | 'warn' | 'ok' | 'muted';
 
 function dotClass(kind: DotKind): string {
   switch (kind) {
-    case "alert":
-      return "bg-terracotta shadow-[0_0_0_3px_rgba(198,93,58,0.18)]";
-    case "warn":
-      return "bg-warn";
-    case "ok":
-      return "bg-ok";
-    case "muted":
-      return "bg-ink-ghost";
+    case 'alert':
+      return 'bg-terracotta shadow-[0_0_0_3px_rgba(198,93,58,0.18)]';
+    case 'warn':
+      return 'bg-warn';
+    case 'ok':
+      return 'bg-ok';
+    case 'muted':
+      return 'bg-ink-ghost';
   }
 }
 
 function pickDot(b: BookingForDashboard): DotKind {
   if (isIncompleteDataSource(b.dataSource)) {
-    return b.hostSkippedCompletion ? "warn" : "alert";
+    return b.hostSkippedCompletion ? 'warn' : 'alert';
   }
-  if (isRichDataSource(b.dataSource)) return "ok";
-  return "muted";
+  if (isRichDataSource(b.dataSource)) return 'ok';
+  return 'muted';
 }
 
-type BadgeVariant = "neutral" | "warn" | "gold" | "ok" | "ink";
+type BadgeVariant = 'neutral' | 'warn' | 'gold' | 'ok' | 'ink';
 
 function badgeFor(b: BookingForDashboard): {
   label: string;
   variant: BadgeVariant;
 } {
-  if (b.hostSkippedCompletion) return { label: "Saltata", variant: "warn" };
+  if (b.hostSkippedCompletion) return { label: 'Saltata', variant: 'warn' };
   switch (b.dataSource) {
-    case "airbnb_email_parsed":
-      return { label: "Airbnb", variant: "gold" };
-    case "booking_manual_filled":
-      return { label: "Booking · completata", variant: "ok" };
-    case "booking_via_channel_manager":
-      return { label: "Channel manager", variant: "ok" };
-    case "booking_ical_only":
-      return { label: "Booking · da completare", variant: "warn" };
-    case "booking_email_only":
-      return { label: "Booking · email", variant: "warn" };
-    case "airbnb_ical_only":
-      return { label: "Airbnb · in attesa", variant: "neutral" };
+    case 'airbnb_email_parsed':
+      return { label: 'Airbnb', variant: 'gold' };
+    case 'booking_manual_filled':
+      return { label: 'Booking · completata', variant: 'ok' };
+    case 'booking_via_channel_manager':
+      return { label: 'Channel manager', variant: 'ok' };
+    case 'booking_ical_only':
+      return { label: 'Booking · da completare', variant: 'warn' };
+    case 'booking_email_only':
+      return { label: 'Booking · email', variant: 'warn' };
+    case 'airbnb_ical_only':
+      return { label: 'Airbnb · in attesa', variant: 'neutral' };
     default:
-      return { label: "In attesa", variant: "neutral" };
+      return { label: 'In attesa', variant: 'neutral' };
   }
 }
 
@@ -88,7 +81,7 @@ function badgeFor(b: BookingForDashboard): {
 function flagEmoji(cc: string | null): string | null {
   if (!cc || cc.length !== 2) return null;
   const base = 0x1f1e6;
-  const A = "A".charCodeAt(0);
+  const A = 'A'.charCodeAt(0);
   const upper = cc.toUpperCase();
   return (
     String.fromCodePoint(base + (upper.charCodeAt(0) - A)) +
@@ -99,14 +92,14 @@ function flagEmoji(cc: string | null): string | null {
 function avatarLetter(b: BookingForDashboard): string {
   const name = b.guestFirstName ?? b.guestFullName;
   const ch = name.trim().charAt(0).toUpperCase();
-  return ch || "?";
+  return ch || '?';
 }
 
 function displayName(b: BookingForDashboard): string {
   if (isIncompleteDataSource(b.dataSource) && !b.hostSkippedCompletion) {
-    return "Ospite";
+    return 'Ospite';
   }
-  return b.guestFullName?.trim() || "Ospite";
+  return b.guestFullName?.trim() || 'Ospite';
 }
 
 export function BookingRow({
@@ -120,9 +113,7 @@ export function BookingRow({
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const isIncomplete =
-    isIncompleteDataSource(booking.dataSource) &&
-    !booking.hostSkippedCompletion;
+  const isIncomplete = isIncompleteDataSource(booking.dataSource) && !booking.hostSkippedCompletion;
   const dotKind = pickDot(booking);
   const badge = badgeFor(booking);
   const flag = flagEmoji(booking.guestCountryCode);

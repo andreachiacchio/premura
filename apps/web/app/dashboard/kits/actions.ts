@@ -254,7 +254,9 @@ export async function toggleItemExecutedAction(
 
 // ─── 6. Mark cleaner briefed (= "Tutto ordinato → notifica Karen") ─
 export type MarkBriefedActionResult =
-  | { ok: true; messageId: string }
+  // messageId null = invio simulato (WHATSAPP_DRY_RUN) o bloccato dal kill
+  // switch: il brief e' stato composto ma non consegnato a Karen.
+  | { ok: true; messageId: string | null }
   | {
       ok: false;
       reason:

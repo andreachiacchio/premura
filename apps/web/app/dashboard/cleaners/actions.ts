@@ -202,7 +202,10 @@ export async function assignCleanerToPropertyAction(
 // ─── Slice D — Magic link via WhatsApp ────────────────────────────
 
 export type SendWelcomeWaResult =
-  | { ok: true; messageId: string; url: string }
+  // messageId null = invio simulato (WHATSAPP_DRY_RUN) o bloccato dal kill
+  // switch. Il magic link e' stato generato e vale comunque: l'url resta
+  // utilizzabile, semplicemente non e' stato spedito a nessuno.
+  | { ok: true; messageId: string | null; url: string }
   | { ok: false; reason: 'not_found' | 'send_error'; detail?: string };
 
 export async function sendCleanerWelcomeWaAction(cleanerId: string): Promise<SendWelcomeWaResult> {

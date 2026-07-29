@@ -16,7 +16,7 @@
 -- partono da 'welcome'.
 
 ALTER TABLE "hosts"
-  ADD COLUMN "onboarding_step" VARCHAR(32) NOT NULL DEFAULT 'welcome';
+  ADD COLUMN IF NOT EXISTS "onboarding_step" VARCHAR(32) NOT NULL DEFAULT 'welcome';
 --> statement-breakpoint
 -- Backfill: utenti esistenti hanno gia' completato (Andrea pilot).
 UPDATE "hosts" SET "onboarding_step" = 'completed' WHERE "onboarding_completed" = TRUE;

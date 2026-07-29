@@ -5,21 +5,21 @@
 // Slice 5: il nome e' hardcoded "Andrea" come da spec. Da slice 6 verra'
 // derivato dal profilo Supabase Auth.
 
-const DATE_FORMATTER = new Intl.DateTimeFormat("it-IT", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
+const DATE_FORMATTER = new Intl.DateTimeFormat('it-IT', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
 });
 
 function getGreeting(date: Date): string {
   const h = date.getHours();
-  if (h < 12) return "Buongiorno";
-  if (h < 18) return "Buon pomeriggio";
-  return "Buonasera";
+  if (h < 12) return 'Buongiorno';
+  if (h < 18) return 'Buon pomeriggio';
+  return 'Buonasera';
 }
 
 export function DashboardHeader({
-  hostFirstName = "Andrea",
+  hostFirstName = 'Andrea',
   now = new Date(),
 }: {
   hostFirstName?: string;
@@ -32,11 +32,8 @@ export function DashboardHeader({
     <header className="px-5 pt-10 pb-6">
       <div className="flex items-start justify-between gap-3">
         <h1 className="font-serif text-[clamp(34px,7vw,52px)] leading-[1.05] tracking-[-0.025em] text-ink">
-          {greeting},{" "}
-          <em
-            className="not-italic text-terracotta"
-            style={{ fontVariationSettings: '"SOFT" 80' }}
-          >
+          {greeting},{' '}
+          <em className="not-italic text-terracotta" style={{ fontVariationSettings: '"SOFT" 80' }}>
             {hostFirstName}
           </em>
         </h1>

@@ -1,9 +1,6 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +8,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -20,10 +17,13 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import type { BookingForDashboard } from "@/lib/types";
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import type { BookingForDashboard } from '@/lib/types';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as React from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 
 // Form di completamento manuale prenotazioni Booking incomplete (M2a.4
 // slice 5). 3 campi obbligatori (nome, telefono, lingua) + 1 opzionale
@@ -31,30 +31,22 @@ import type { BookingForDashboard } from "@/lib/types";
 // Fastify (apps/api/src/api/bookings.ts riga 31 sgg.) per evitare drift.
 
 export const completeBookingFormSchema = z.object({
-  guestFullName: z
-    .string()
-    .trim()
-    .min(2, "Il nome deve avere almeno 2 caratteri"),
-  guestPhone: z
-    .string()
-    .trim()
-    .min(8, "Il telefono deve avere almeno 8 caratteri"),
+  guestFullName: z.string().trim().min(2, 'Il nome deve avere almeno 2 caratteri'),
+  guestPhone: z.string().trim().min(8, 'Il telefono deve avere almeno 8 caratteri'),
   guestLanguage: z
     .string()
     .trim()
-    .min(2, "Codice lingua troppo corto")
-    .max(8, "Codice lingua troppo lungo"),
+    .min(2, 'Codice lingua troppo corto')
+    .max(8, 'Codice lingua troppo lungo'),
   numGuests: z.coerce
     .number()
-    .int("Il numero ospiti deve essere intero")
-    .min(1, "Almeno 1 ospite")
-    .max(20, "Troppo")
+    .int('Il numero ospiti deve essere intero')
+    .min(1, 'Almeno 1 ospite')
+    .max(20, 'Troppo')
     .optional(),
 });
 
-export type CompleteBookingFormValues = z.infer<
-  typeof completeBookingFormSchema
->;
+export type CompleteBookingFormValues = z.infer<typeof completeBookingFormSchema>;
 
 // Tipi delle server action passate via prop. Le firme rispecchiano cio'
 // che la sezione E implementera' in app/dashboard/actions.ts: la complete
@@ -79,9 +71,9 @@ export function CompleteBookingDialog({
   const form = useForm<CompleteBookingFormValues>({
     resolver: zodResolver(completeBookingFormSchema),
     defaultValues: {
-      guestFullName: "",
-      guestPhone: "",
-      guestLanguage: "it",
+      guestFullName: '',
+      guestPhone: '',
+      guestLanguage: 'it',
       numGuests: undefined,
     },
   });
@@ -94,9 +86,9 @@ export function CompleteBookingDialog({
   React.useEffect(() => {
     if (open) {
       form.reset({
-        guestFullName: "",
-        guestPhone: "",
-        guestLanguage: "it",
+        guestFullName: '',
+        guestPhone: '',
+        guestLanguage: 'it',
         numGuests: undefined,
       });
       setSubmitError(null);
@@ -108,19 +100,17 @@ export function CompleteBookingDialog({
     setSubmitError(null);
     try {
       const fd = new FormData();
-      fd.set("bookingId", booking.id);
-      fd.set("guestFullName", values.guestFullName);
-      fd.set("guestPhone", values.guestPhone);
-      fd.set("guestLanguage", values.guestLanguage);
+      fd.set('bookingId', booking.id);
+      fd.set('guestFullName', values.guestFullName);
+      fd.set('guestPhone', values.guestPhone);
+      fd.set('guestLanguage', values.guestLanguage);
       if (values.numGuests !== undefined) {
-        fd.set("numGuests", String(values.numGuests));
+        fd.set('numGuests', String(values.numGuests));
       }
       await completeAction(fd);
       onOpenChange(false);
     } catch (err) {
-      setSubmitError(
-        err instanceof Error ? err.message : "Errore imprevisto, riprova.",
-      );
+      setSubmitError(err instanceof Error ? err.message : 'Errore imprevisto, riprova.');
     } finally {
       setSubmitting(false);
     }
@@ -133,17 +123,15 @@ export function CompleteBookingDialog({
       await skipAction(booking.id);
       onOpenChange(false);
     } catch (err) {
-      setSubmitError(
-        err instanceof Error ? err.message : "Errore imprevisto, riprova.",
-      );
+      setSubmitError(err instanceof Error ? err.message : 'Errore imprevisto, riprova.');
     } finally {
       setSkipping(false);
     }
   }
 
-  const dateLabel = new Intl.DateTimeFormat("it-IT", {
-    day: "numeric",
-    month: "long",
+  const dateLabel = new Intl.DateTimeFormat('it-IT', {
+    day: 'numeric',
+    month: 'long',
   }).format(booking.checkinAt);
 
   return (
@@ -157,10 +145,7 @@ export function CompleteBookingDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="flex flex-col gap-4"
-          >
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
             <FormField
               control={form.control}
               name="guestFullName"
@@ -182,12 +167,7 @@ export function CompleteBookingDialog({
                 <FormItem>
                   <FormLabel>Telefono</FormLabel>
                   <FormControl>
-                    <Input
-                      type="tel"
-                      placeholder="+39 333 1234567"
-                      autoComplete="tel"
-                      {...field}
-                    />
+                    <Input type="tel" placeholder="+39 333 1234567" autoComplete="tel" {...field} />
                   </FormControl>
                   <FormDescription>
                     WhatsApp se possibile, e&apos; il canale di Premura.
@@ -206,9 +186,7 @@ export function CompleteBookingDialog({
                   <FormControl>
                     <Input placeholder="it, en, de…" maxLength={8} {...field} />
                   </FormControl>
-                  <FormDescription>
-                    Codice ISO breve. Default it.
-                  </FormDescription>
+                  <FormDescription>Codice ISO breve. Default it.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -226,11 +204,9 @@ export function CompleteBookingDialog({
                       min={1}
                       max={20}
                       placeholder="Es. 2"
-                      value={field.value ?? ""}
+                      value={field.value ?? ''}
                       onChange={(e) =>
-                        field.onChange(
-                          e.target.value === "" ? undefined : e.target.value,
-                        )
+                        field.onChange(e.target.value === '' ? undefined : e.target.value)
                       }
                       onBlur={field.onBlur}
                       name={field.name}
@@ -243,10 +219,7 @@ export function CompleteBookingDialog({
             />
 
             {submitError ? (
-              <p
-                role="alert"
-                className="text-body-sm font-medium text-alert"
-              >
+              <p role="alert" className="text-body-sm font-medium text-alert">
                 {submitError}
               </p>
             ) : null}
@@ -259,15 +232,10 @@ export function CompleteBookingDialog({
                 onClick={onSkip}
                 disabled={submitting || skipping}
               >
-                {skipping ? "Salto…" : "Salta per ora"}
+                {skipping ? 'Salto…' : 'Salta per ora'}
               </Button>
-              <Button
-                type="submit"
-                variant="accent"
-                size="md"
-                disabled={submitting || skipping}
-              >
-                {submitting ? "Salvo…" : "Salva e attiva Premura"}
+              <Button type="submit" variant="accent" size="md" disabled={submitting || skipping}>
+                {submitting ? 'Salvo…' : 'Salva e attiva Premura'}
               </Button>
             </DialogFooter>
           </form>

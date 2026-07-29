@@ -15,8 +15,8 @@ export default function NewCleanerPage(): React.JSX.Element {
         </Link>
         <h1 className="text-2xl font-semibold text-ink">Aggiungi cleaner</h1>
         <p className="mt-1 text-sm text-ink-mute">
-          Le persone che si occupano delle pulizie ricevono i kit a casa loro,
-          li allestiscono e scattano la foto del setup.
+          Le persone che si occupano delle pulizie ricevono i kit a casa loro, li allestiscono e
+          scattano la foto del setup.
         </p>
       </header>
       <CleanerForm />

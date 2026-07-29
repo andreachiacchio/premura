@@ -1,6 +1,6 @@
-import { and, eq, sql } from 'drizzle-orm';
-import { bookings, type Database } from '@premura/db';
+import { type Database, bookings } from '@premura/db';
 import { isRichDataSource } from '@premura/shared';
+import { and, eq, sql } from 'drizzle-orm';
 import type { IcalBookingShell } from './ical-event-mapper';
 
 /**
@@ -52,10 +52,70 @@ export type UpsertBookingShellResult = {
  *  3. data_source non-RICH + date invariate      -> touch updated_at per
  *                                                   tracciare il poll
  */
+/**
+ * Cerca una prenotazione gia' presente sulla STESSA property che copre lo
+ * stesso soggiorno, arrivata da un'altra chiave (altro feed, o inserimento
+ * manuale).
+ *
+ * Perche' serve una seconda chiave oltre a (platform, platform_booking_ref):
+ * quella chiave e' l'UID iCal, ed e' diversa per ogni sorgente. Una property
+ * con due feed (Villa Cristina: Booking + Airbnb) vede lo stesso periodo due
+ * volte con due UID diversi — un canale come prenotazione, l'altro come
+ * blocco calendario — e senza questo controllo diventerebbero due righe.
+ * Stesso problema per le righe inserite a mano prima di collegare il feed:
+ * il loro ref non e' un UID iCal, quindi non collide mai.
+ *
+ * Chiave scelta: (property_id, giorno di check-in, giorno di check-out).
+ * Confronto sul GIORNO e non sul timestamp perche' l'iCal porta date pure
+ * (mezzanotte UTC) mentre le righe manuali hanno l'orario reale di
+ * check-in/out. Un'unita' non puo' ospitare due soggiorni sulle stesse
+ * identiche notti, quindi la chiave non produce falsi positivi; due
+ * soggiorni back-to-back (uno esce il 1 ago, l'altro entra il 1 ago) hanno
+ * coppie di date diverse e restano distinti.
+ */
+async function findSameStayOnProperty(
+  db: Database,
+  shell: IcalBookingShell,
+): Promise<{ id: string; dataSource: string; platformBookingRef: string } | undefined> {
+  const [row] = await db
+    .select({
+      id: bookings.id,
+      dataSource: bookings.dataSource,
+      platformBookingRef: bookings.platformBookingRef,
+    })
+    .from(bookings)
+    .where(
+      and(
+        eq(bookings.propertyId, shell.propertyId),
+        sql`${bookings.checkinAt}::date = ${shell.checkinAt.toISOString()}::timestamptz::date`,
+        sql`${bookings.checkoutAt}::date = ${shell.checkoutAt.toISOString()}::timestamptz::date`,
+        sql`${bookings.status} <> 'cancelled'`,
+      ),
+    )
+    .limit(1);
+
+  return row;
+}
+
 export async function upsertBookingShell(
   db: Database,
   shell: IcalBookingShell,
 ): Promise<UpsertBookingShellResult> {
+  // Guardia anti-doppione cross-feed / manuale. Va PRIMA dell'insert:
+  // l'unique index copre solo (platform, platform_booking_ref) e non
+  // intercetta lo stesso soggiorno arrivato con un UID diverso.
+  const sameStay = await findSameStayOnProperty(db, shell);
+  if (sameStay && sameStay.platformBookingRef !== shell.platformBookingRef) {
+    return {
+      inserted: false,
+      bookingId: sameStay.id,
+      skipped: true,
+      reason: isRichDataSource(sameStay.dataSource)
+        ? 'same stay already present with rich data (other feed or manual entry)'
+        : 'same stay already covered by another feed',
+    };
+  }
+
   const [insertedRow] = await db
     .insert(bookings)
     .values({
@@ -129,10 +189,7 @@ export async function upsertBookingShell(
     };
   }
 
-  await db
-    .update(bookings)
-    .set({ updatedAt: sql`NOW()` })
-    .where(eq(bookings.id, existing.id));
+  await db.update(bookings).set({ updatedAt: sql`NOW()` }).where(eq(bookings.id, existing.id));
 
   return {
     inserted: false,

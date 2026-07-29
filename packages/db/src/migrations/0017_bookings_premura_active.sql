@@ -21,11 +21,22 @@ ALTER TABLE "bookings"
 -- settiamo premura_active_at = updated_at e source = 'platform' come
 -- migrazione conservativa. Source 'platform' indica che il numero veniva
 -- gia' dal channel (Booking/Airbnb form, manual M2a.4, ecc).
+--
+-- Il filtro su created_at e' stato aggiunto il 29/07/2026 (DEBT-1 bis).
+-- Questa migration viene rieseguita per riempire i buchi lasciati da
+-- applicazioni manuali fuori ordine, e senza il filtro il backfill si
+-- rifirerebbe: prenderebbe le righe inserite DOPO, attivandole d'ufficio e
+-- sovrascrivendo guest_phone_source. Un backfill descrive uno stato passato,
+-- quindi va ancorato nel tempo. La data e' quella della migration originale
+-- (journal: 2026-05-14); su un DB vergine non c'e' nulla da backfillare e la
+-- condizione e' ininfluente.
 UPDATE "bookings"
 SET
   "premura_active_at" = COALESCE("manual_completion_at", "updated_at"),
   "guest_phone_source" = 'platform'
-WHERE "guest_phone" IS NOT NULL AND "premura_active_at" IS NULL;
+WHERE "guest_phone" IS NOT NULL
+  AND "premura_active_at" IS NULL
+  AND "created_at" < TIMESTAMPTZ '2026-05-15 00:00:00+00';
 --> statement-breakpoint
 
 -- Index per query "prossimi check-in" (filtro check-in window + ordering).
