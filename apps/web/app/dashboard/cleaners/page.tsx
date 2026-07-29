@@ -14,7 +14,7 @@ export default async function CleanersPage(): Promise<React.JSX.Element> {
   const cleaners = await listCleanersForHost(db, hostId);
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8">
+    <div className="mx-auto max-w-4xl px-6 py-8 lg:max-w-5xl xl:max-w-[1400px]">
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-ink">Cleaner</h1>

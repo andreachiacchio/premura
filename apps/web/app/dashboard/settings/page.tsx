@@ -23,7 +23,7 @@ export default async function SettingsPage() {
   const welcomeTimeSlot = row?.welcomeTimeSlot ?? '08:00';
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-2xl bg-ivory px-5 pt-12 pb-16">
+    <main className="mx-auto min-h-screen w-full max-w-2xl bg-ivory px-5 pt-12 pb-16 lg:max-w-5xl">
       <Link
         href="/dashboard"
         className="mb-3 inline-block text-body-sm text-ink-mute underline-offset-2 hover:underline"

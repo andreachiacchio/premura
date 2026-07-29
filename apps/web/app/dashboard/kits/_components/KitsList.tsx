@@ -36,7 +36,7 @@ export function KitsList({ rows }: { rows: KitsListRowUI[] }): React.JSX.Element
   }
 
   return (
-    <ul className="space-y-3">
+    <ul className="flex flex-col gap-3 xl:grid xl:grid-cols-2 xl:items-start">
       {rows.map((row) => {
         const checkin = new Date(row.checkinAt);
         const checkinFmt = DATE_FMT.format(checkin);
