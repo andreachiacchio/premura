@@ -5,14 +5,14 @@
 //
 // Hidden quando count = 0: il caller decide quando renderizzarla.
 
-import { ChevronRight } from "lucide-react";
+import { ChevronRight } from 'lucide-react';
 
 export function IncompleteAlert({ count }: { count: number }) {
   if (count === 0) return null;
 
   const label =
     count === 1
-      ? "1 prenotazione Booking da completare"
+      ? '1 prenotazione Booking da completare'
       : `${count} prenotazioni Booking da completare`;
 
   return (
@@ -26,9 +26,7 @@ export function IncompleteAlert({ count }: { count: number }) {
       />
       <div className="flex-1">
         <div className="text-[14px] font-semibold leading-tight">{label}</div>
-        <div className="mt-0.5 text-body-sm opacity-80">
-          Servono pochi dati per ognuna
-        </div>
+        <div className="mt-0.5 text-body-sm opacity-80">Servono pochi dati per ognuna</div>
       </div>
       <ChevronRight
         aria-hidden

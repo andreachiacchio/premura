@@ -2,7 +2,9 @@ import type { Database } from '@premura/db';
 import { describe, expect, it } from 'vitest';
 import {
   clearBookingGuestPhone,
+  derivePremuraState,
   setBookingGuestPhone,
+  setBookingPremuraActive,
 } from '../lib/repositories/upcoming-checkins';
 
 // Slice A — Test repository setBookingGuestPhone + clearBookingGuestPhone.
@@ -10,6 +12,7 @@ import {
 
 type MockState = {
   ownerHostId: string | null;
+  currentPhone?: string | null;
   currentPremuraActiveAt: Date | null;
   currentAddedByHostId: string | null;
   updates: Array<Record<string, unknown>>;
@@ -29,6 +32,11 @@ function makeMockDb(state: MockState): Database {
                       {
                         bookingId: 'b1',
                         ownerHostId: state.ownerHostId,
+                        // Il mock serve sia setBookingGuestPhone sia
+                        // setBookingPremuraActive: espone entrambe le viste.
+                        currentPhone: state.currentPhone ?? null,
+                        guestPhone: state.currentPhone ?? null,
+                        premuraActiveAt: state.currentPremuraActiveAt,
                         currentPremuraActiveAt: state.currentPremuraActiveAt,
                         currentAddedByHostId: state.currentAddedByHostId,
                       },
@@ -154,5 +162,94 @@ describe('clearBookingGuestPhone', () => {
     expect(u.premuraActiveAt).toBeNull();
     expect(u.guestPhoneAddedByHostId).toBeUndefined();
     expect(u.guestPhoneSource).toBeUndefined();
+  });
+});
+
+describe('setBookingGuestPhone su riga esclusa', () => {
+  it('correggere il numero NON revoca l esclusione', async () => {
+    // Riga esclusa = numero presente + premura_active_at NULL, per scelta
+    // dell'host. Un fix del typo non deve riattivare l'agente di nascosto.
+    const state: MockState = {
+      ownerHostId: 'host-1',
+      currentPhone: '+48730720125',
+      currentPremuraActiveAt: null,
+      currentAddedByHostId: 'host-1',
+      updates: [],
+    };
+    const r = await setBookingGuestPhone(makeMockDb(state), 'b1', 'host-1', '+48730720126');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.premuraActiveAt).toBeNull();
+    const u = state.updates[0] as Record<string, unknown>;
+    expect(u.guestPhone).toBe('+48730720126');
+    expect(u.premuraActiveAt).toBeNull();
+  });
+});
+
+describe('setBookingPremuraActive', () => {
+  it('esclude una riga attiva mantenendo il numero', async () => {
+    const state: MockState = {
+      ownerHostId: 'host-1',
+      currentPhone: '+4748356805',
+      currentPremuraActiveAt: new Date('2026-07-29T10:00:00Z'),
+      currentAddedByHostId: 'host-1',
+      updates: [],
+    };
+    const r = await setBookingPremuraActive(makeMockDb(state), 'b1', 'host-1', false);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.premuraActiveAt).toBeNull();
+    const u = state.updates[0] as Record<string, unknown>;
+    expect(u.premuraActiveAt).toBeNull();
+    // Il numero non compare nell'update: escludere non e' cancellare.
+    expect(u.guestPhone).toBeUndefined();
+  });
+
+  it('riattiva una riga esclusa', async () => {
+    const state: MockState = {
+      ownerHostId: 'host-1',
+      currentPhone: '+4748356805',
+      currentPremuraActiveAt: null,
+      currentAddedByHostId: 'host-1',
+      updates: [],
+    };
+    const r = await setBookingPremuraActive(makeMockDb(state), 'b1', 'host-1', true);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.premuraActiveAt).toBeInstanceOf(Date);
+  });
+
+  it('riattivare una riga gia attiva conserva il timestamp originale', async () => {
+    const original = new Date('2026-07-01T08:00:00Z');
+    const state: MockState = {
+      ownerHostId: 'host-1',
+      currentPhone: '+4748356805',
+      currentPremuraActiveAt: original,
+      currentAddedByHostId: 'host-1',
+      updates: [],
+    };
+    const r = await setBookingPremuraActive(makeMockDb(state), 'b1', 'host-1', true);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.premuraActiveAt).toBe(original);
+  });
+
+  it('rifiuta di attivare senza numero', async () => {
+    const state: MockState = {
+      ownerHostId: 'host-1',
+      currentPhone: null,
+      currentPremuraActiveAt: null,
+      currentAddedByHostId: null,
+      updates: [],
+    };
+    const r = await setBookingPremuraActive(makeMockDb(state), 'b1', 'host-1', true);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('no_phone');
+    expect(state.updates).toHaveLength(0);
+  });
+});
+
+describe('derivePremuraState', () => {
+  it('mappa le tre combinazioni', () => {
+    expect(derivePremuraState(null, null)).toBe('missing_phone');
+    expect(derivePremuraState(null, new Date())).toBe('missing_phone');
+    expect(derivePremuraState('+39333', new Date())).toBe('active');
+    expect(derivePremuraState('+39333', null)).toBe('excluded');
   });
 });

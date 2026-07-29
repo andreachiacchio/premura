@@ -11,7 +11,10 @@ export function CleanersCard({ activeCount }: { activeCount: number }): React.JS
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-ink">
-            🧹 {activeCount === 0 ? 'Nessun cleaner ancora' : `${activeCount} cleaner ${activeCount === 1 ? 'attiva' : 'attive'}`}
+            🧹{' '}
+            {activeCount === 0
+              ? 'Nessun cleaner ancora'
+              : `${activeCount} cleaner ${activeCount === 1 ? 'attiva' : 'attive'}`}
           </p>
           <p className="mt-0.5 text-xs text-ink-mute">
             {activeCount === 0

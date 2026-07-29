@@ -1,14 +1,49 @@
-import { type Database, bookings, guestQuizzes, properties } from '@premura/db';
-import { and, asc, eq, gte, lte, ne } from 'drizzle-orm';
+import {
+  type Database,
+  bookings,
+  guestQuizzes,
+  hosts,
+  kits,
+  outboundSends,
+  properties,
+} from '@premura/db';
+import { and, asc, eq, gte, inArray, lte, ne } from 'drizzle-orm';
 
 // Slice A — Repository helpers per la dashboard "Prossimi check-in".
 //
-// Window 14gg: showing solo booking con check-in fra oggi (start of
-// day, locale) e +14gg. Soglia inferiore = oggi (no booking gia'
-// iniziati / scaduti). Soglia superiore = +14gg (oltre il quale
-// l'host non ha senso pre-configurare il numero).
+// Finestra: dal soggiorno IN CORSO fino a check-in a +14gg.
+// Il limite inferiore e' il checkout (>= oggi), non il check-in: un
+// soggiorno iniziato ieri e' ancora materia dell'host (stato "in corso"),
+// e serve per mostrare gli ospiti esclusi di proposito mentre sono in
+// casa. Oltre +14gg l'host non ha senso pre-configurare il numero.
 
 export type SurveyStatus = 'not_yet' | 'sent' | 'completed' | 'skipped';
+
+/**
+ * Stato Premura della prenotazione, derivato da due campi:
+ *
+ *  active        -> numero presente + premura_active_at valorizzato
+ *  missing_phone -> nessun numero (l'agente non puo' fare nulla)
+ *  excluded      -> numero presente ma premura_active_at NULL: scelta
+ *                   deliberata dell'host di tenere l'agente fuori da
+ *                   questa prenotazione (es. ospite gia' gestito a mano)
+ */
+export type PremuraState = 'active' | 'missing_phone' | 'excluded';
+
+export function derivePremuraState(
+  guestPhone: string | null,
+  premuraActiveAt: Date | null,
+): PremuraState {
+  if (!guestPhone) return 'missing_phone';
+  return premuraActiveAt ? 'active' : 'excluded';
+}
+
+export type OutboundTimelineEntry = {
+  trigger: 'welcome' | 'midstay' | 'checkout';
+  status: 'reserved' | 'sent' | 'failed' | 'skipped';
+  sentAt: Date | null;
+  dryRun: boolean;
+};
 
 export type UpcomingCheckinRow = {
   id: string;
@@ -23,8 +58,23 @@ export type UpcomingCheckinRow = {
   guestPhone: string | null;
   premuraActiveAt: Date | null;
   guestPhoneSource: string | null;
-  // Slice B: stato survey pre-arrival.
+  premuraState: PremuraState;
+  // Slice B: stato survey pre-arrival + timestamp per la timeline.
   surveyStatus: SurveyStatus;
+  surveySentAt: Date | null;
+  surveyCompletedAt: Date | null;
+  // Slice E: welcome message (via kit) gia' inviato?
+  welcomeSentAt: Date | null;
+  // Slot outbound (welcome/midstay/checkout) gia' prenotati o inviati.
+  outbound: OutboundTimelineEntry[];
+};
+
+export type UpcomingCheckinsData = {
+  rows: UpcomingCheckinRow[];
+  /** Tutte le property dell'host, per il filtro in testa alla pagina. */
+  properties: Array<{ id: string; name: string }>;
+  /** hosts.welcome_time_slot (HH:MM) — orario previsto del benvenuto. */
+  welcomeTimeSlot: string;
 };
 
 const WINDOW_DAYS = 14;
@@ -33,11 +83,23 @@ export async function listUpcomingCheckins(
   db: Database,
   hostId: string,
   now: Date = new Date(),
-): Promise<UpcomingCheckinRow[]> {
+): Promise<UpcomingCheckinsData> {
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
   const windowEnd = new Date(startOfToday);
   windowEnd.setDate(windowEnd.getDate() + WINDOW_DAYS);
+
+  const [hostRow] = await db
+    .select({ welcomeTimeSlot: hosts.welcomeTimeSlot })
+    .from(hosts)
+    .where(eq(hosts.id, hostId))
+    .limit(1);
+
+  const propertyRows = await db
+    .select({ id: properties.id, name: properties.name })
+    .from(properties)
+    .where(and(eq(properties.hostId, hostId), eq(properties.isActive, true)))
+    .orderBy(asc(properties.name));
 
   const rows = await db
     .select({
@@ -65,27 +127,71 @@ export async function listUpcomingCheckins(
       and(
         eq(properties.hostId, hostId),
         ne(bookings.status, 'cancelled'),
-        gte(bookings.checkinAt, startOfToday),
+        // Soggiorni in corso inclusi: e' il checkout a dover essere futuro.
+        gte(bookings.checkoutAt, startOfToday),
         lte(bookings.checkinAt, windowEnd),
       ),
     )
     .orderBy(asc(bookings.checkinAt));
 
-  return rows.map((r) => ({
-    id: r.id,
-    guestFullName: r.guestFullName,
-    guestFirstName: r.guestFirstName,
-    propertyId: r.propertyId,
-    propertyName: r.propertyName,
-    checkinAt: r.checkinAt,
-    checkoutAt: r.checkoutAt,
-    numGuests: r.numGuests,
-    platform: r.platform,
-    guestPhone: r.guestPhone,
-    premuraActiveAt: r.premuraActiveAt,
-    guestPhoneSource: r.guestPhoneSource,
-    surveyStatus: deriveSurveyStatus(r.surveySentAt, r.surveyCompletedAt, r.surveySkippedAt),
-  }));
+  const bookingIds = rows.map((r) => r.id);
+
+  // Timeline: due query separate invece di altri leftJoin sulla
+  // principale — outbound_sends ha fino a 3 righe per prenotazione e
+  // moltiplicherebbe le righe del listato.
+  const kitRows = bookingIds.length
+    ? await db
+        .select({ bookingId: kits.bookingId, welcomeMessageSentAt: kits.welcomeMessageSentAt })
+        .from(kits)
+        .where(inArray(kits.bookingId, bookingIds))
+    : [];
+  const welcomeByBooking = new Map(
+    kitRows.filter((k) => k.welcomeMessageSentAt).map((k) => [k.bookingId, k.welcomeMessageSentAt]),
+  );
+
+  const sendRows = bookingIds.length
+    ? await db
+        .select({
+          bookingId: outboundSends.bookingId,
+          trigger: outboundSends.trigger,
+          status: outboundSends.status,
+          sentAt: outboundSends.sentAt,
+          dryRun: outboundSends.dryRun,
+        })
+        .from(outboundSends)
+        .where(inArray(outboundSends.bookingId, bookingIds))
+    : [];
+  const outboundByBooking = new Map<string, OutboundTimelineEntry[]>();
+  for (const s of sendRows) {
+    const list = outboundByBooking.get(s.bookingId) ?? [];
+    list.push({ trigger: s.trigger, status: s.status, sentAt: s.sentAt, dryRun: s.dryRun });
+    outboundByBooking.set(s.bookingId, list);
+  }
+
+  return {
+    rows: rows.map((r) => ({
+      id: r.id,
+      guestFullName: r.guestFullName,
+      guestFirstName: r.guestFirstName,
+      propertyId: r.propertyId,
+      propertyName: r.propertyName,
+      checkinAt: r.checkinAt,
+      checkoutAt: r.checkoutAt,
+      numGuests: r.numGuests,
+      platform: r.platform,
+      guestPhone: r.guestPhone,
+      premuraActiveAt: r.premuraActiveAt,
+      guestPhoneSource: r.guestPhoneSource,
+      premuraState: derivePremuraState(r.guestPhone, r.premuraActiveAt),
+      surveyStatus: deriveSurveyStatus(r.surveySentAt, r.surveyCompletedAt, r.surveySkippedAt),
+      surveySentAt: r.surveySentAt,
+      surveyCompletedAt: r.surveyCompletedAt,
+      welcomeSentAt: welcomeByBooking.get(r.id) ?? null,
+      outbound: outboundByBooking.get(r.id) ?? [],
+    })),
+    properties: propertyRows,
+    welcomeTimeSlot: hostRow?.welcomeTimeSlot ?? '08:00',
+  };
 }
 
 function deriveSurveyStatus(
@@ -104,10 +210,14 @@ function deriveSurveyStatus(
 //    (un secondo update conserva la timestamp prima attivazione).
 //  - se l'host cambia il numero (refattora typo), guest_phone si
 //    aggiorna ma premura_active_at resta.
+//  - CASO ESCLUSO: se la prenotazione era esclusa di proposito
+//    (numero presente, premura_active_at NULL), correggere il numero
+//    NON la riattiva — l'esclusione e' una scelta dell'host e si
+//    revoca solo con l'azione esplicita (setBookingPremuraActive).
 //  - guest_phone_source = 'manual' (slice A path).
 //  - guest_phone_added_by_host_id viene update solo se prima era null.
 export type SetPhoneResult =
-  | { ok: true; bookingId: string; premuraActiveAt: Date }
+  | { ok: true; bookingId: string; premuraActiveAt: Date | null }
   | { ok: false; reason: 'not_found' | 'wrong_host' };
 
 export async function setBookingGuestPhone(
@@ -121,6 +231,7 @@ export async function setBookingGuestPhone(
     .select({
       bookingId: bookings.id,
       ownerHostId: properties.hostId,
+      currentPhone: bookings.guestPhone,
       currentPremuraActiveAt: bookings.premuraActiveAt,
       currentAddedByHostId: bookings.guestPhoneAddedByHostId,
     })
@@ -132,7 +243,11 @@ export async function setBookingGuestPhone(
   if (row.ownerHostId !== hostId) return { ok: false, reason: 'wrong_host' };
 
   const now = new Date();
-  const finalPremuraActiveAt = row.currentPremuraActiveAt ?? now;
+  // Riga esclusa (numero presente + attivazione NULL): il numero si
+  // aggiorna ma l'esclusione resta. Riga mai attivata SENZA numero:
+  // inserire il numero attiva, com'e' sempre stato in slice A.
+  const wasExcluded = Boolean(row.currentPhone) && row.currentPremuraActiveAt === null;
+  const finalPremuraActiveAt = row.currentPremuraActiveAt ?? (wasExcluded ? null : now);
 
   await db
     .update(bookings)
@@ -178,4 +293,46 @@ export async function clearBookingGuestPhone(
     .where(eq(bookings.id, bookingId));
 
   return { ok: true };
+}
+
+// Toggle Escluso <-> Attivo, a numero invariato.
+//
+// active=false: l'agente non tocca piu' questa prenotazione (i finder
+// delle pipeline filtrano su premura_active_at NOT NULL). Il numero
+// resta: e' un'esclusione, non una cancellazione.
+// active=true: richiede un numero presente — attivare una prenotazione
+// che l'agente non puo' contattare sarebbe uno stato bugiardo.
+export type SetPremuraActiveResult =
+  | { ok: true; premuraActiveAt: Date | null }
+  | { ok: false; reason: 'not_found' | 'wrong_host' | 'no_phone' };
+
+export async function setBookingPremuraActive(
+  db: Database,
+  bookingId: string,
+  hostId: string,
+  active: boolean,
+): Promise<SetPremuraActiveResult> {
+  const [row] = await db
+    .select({
+      ownerHostId: properties.hostId,
+      guestPhone: bookings.guestPhone,
+      premuraActiveAt: bookings.premuraActiveAt,
+    })
+    .from(bookings)
+    .innerJoin(properties, eq(properties.id, bookings.propertyId))
+    .where(eq(bookings.id, bookingId))
+    .limit(1);
+  if (!row) return { ok: false, reason: 'not_found' };
+  if (row.ownerHostId !== hostId) return { ok: false, reason: 'wrong_host' };
+  if (active && !row.guestPhone) return { ok: false, reason: 'no_phone' };
+
+  // Idempotente: riattivare un attivo conserva il timestamp originale.
+  const premuraActiveAt = active ? (row.premuraActiveAt ?? new Date()) : null;
+
+  await db
+    .update(bookings)
+    .set({ premuraActiveAt, updatedAt: new Date() })
+    .where(eq(bookings.id, bookingId));
+
+  return { ok: true, premuraActiveAt };
 }

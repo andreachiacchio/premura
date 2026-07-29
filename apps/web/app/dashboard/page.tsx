@@ -98,7 +98,9 @@ export default async function DashboardPage() {
       safeQuery<Awaited<ReturnType<typeof listUpcomingCheckins>>>(
         'listUpcomingCheckins',
         () => listUpcomingCheckins(db, hostId),
-        [],
+        // Fallback a forma piena: il repo ora ritorna anche properties e
+        // welcome slot per il filtro della pagina dedicata.
+        { rows: [], properties: [], welcomeTimeSlot: '08:00' },
       ),
       safeQuery<Record<string, number>>(
         'countKitsByStatusForHost',
@@ -118,26 +120,31 @@ export default async function DashboardPage() {
   ).length;
 
   // Slice A: counter prossimi check-in da configurare (senza guest_phone).
-  const upcomingTotal = upcoming.length;
-  const upcomingMissingPhone = upcoming.filter((b) => !b.guestPhone).length;
+  const upcomingTotal = upcoming.rows.length;
+  const upcomingMissingPhone = upcoming.rows.filter((b) => !b.guestPhone).length;
 
   // Slice C: counter kit in attesa di approvazione founder.
   const pendingKitsCount = (kitStatusCounts.proposed ?? 0) + (kitStatusCounts.modified ?? 0);
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md bg-ivory">
+    // Mobile-first invariato (colonna singola sotto lg). Su desktop la
+    // dashboard smette di essere una colonna stretta al centro: le card
+    // di accesso rapido vanno in griglia e il contenuto usa lo schermo.
+    <main className="mx-auto min-h-screen w-full max-w-md bg-ivory lg:max-w-5xl xl:max-w-[1400px] xl:px-6">
       <DashboardHeader hostFirstName="Andrea" />
 
-      {/* Slice A: card "Prossimi check-in" — gateway per attivare booking. */}
-      {upcomingTotal > 0 ? (
-        <UpcomingCheckinsCard total={upcomingTotal} missing={upcomingMissingPhone} />
-      ) : null}
+      <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-5 xl:grid-cols-3">
+        {/* Slice A: card "Prossimi check-in" — gateway per attivare booking. */}
+        {upcomingTotal > 0 ? (
+          <UpcomingCheckinsCard total={upcomingTotal} missing={upcomingMissingPhone} />
+        ) : null}
 
-      {/* Slice C: card "Kit pronti per approvazione" — gateway approval flow. */}
-      {pendingKitsCount > 0 ? <KitsApprovalCard pendingCount={pendingKitsCount} /> : null}
+        {/* Slice C: card "Kit pronti per approvazione" — gateway approval flow. */}
+        {pendingKitsCount > 0 ? <KitsApprovalCard pendingCount={pendingKitsCount} /> : null}
 
-      {/* Slice F: card cleaner — sempre presente per accesso veloce. */}
-      <CleanersCard activeCount={activeCleanersCount} />
+        {/* Slice F: card cleaner — sempre presente per accesso veloce. */}
+        <CleanersCard activeCount={activeCleanersCount} />
+      </div>
 
       {incompleteToCompleteCount > 0 ? (
         <IncompleteAlert count={incompleteToCompleteCount} />
@@ -150,9 +157,11 @@ export default async function DashboardPage() {
           <h2 className="text-eyebrow uppercase tracking-wider text-ink-mute">
             Draft da approvare ({replyDrafts.length})
           </h2>
-          {replyDrafts.map((d) => (
-            <ReplyDraftCard key={d.id} draft={d} />
-          ))}
+          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-start xl:grid-cols-3">
+            {replyDrafts.map((d) => (
+              <ReplyDraftCard key={d.id} draft={d} />
+            ))}
+          </div>
         </section>
       ) : null}
 

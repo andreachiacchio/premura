@@ -3,7 +3,11 @@
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { normalizePhone } from '@/lib/phone-normalize';
-import { clearBookingGuestPhone, setBookingGuestPhone } from '@/lib/repositories/upcoming-checkins';
+import {
+  clearBookingGuestPhone,
+  setBookingGuestPhone,
+  setBookingPremuraActive,
+} from '@/lib/repositories/upcoming-checkins';
 import { logAgentAction } from '@premura/agents';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -20,7 +24,9 @@ const idSchema = z.string().uuid();
 const phoneRawSchema = z.string().trim().min(1).max(64);
 
 export type SetPhoneActionResult =
-  | { ok: true; bookingId: string; premuraActiveAt: string }
+  // premuraActiveAt null = la riga era esclusa e resta esclusa: correggere
+  // il numero non revoca l'esclusione (serve il toggle esplicito).
+  | { ok: true; bookingId: string; premuraActiveAt: string | null }
   | { ok: false; reason: 'invalid_phone' | 'not_found' | 'wrong_host'; detail?: string };
 
 export async function setBookingGuestPhoneAction(
@@ -63,7 +69,7 @@ export async function setBookingGuestPhoneAction(
   return {
     ok: true,
     bookingId: id,
-    premuraActiveAt: result.premuraActiveAt.toISOString(),
+    premuraActiveAt: result.premuraActiveAt ? result.premuraActiveAt.toISOString() : null,
   };
 }
 
@@ -94,4 +100,44 @@ export async function clearBookingGuestPhoneAction(
   revalidatePath('/dashboard/upcoming-checkins');
 
   return { ok: true };
+}
+
+// ─── Toggle Escluso <-> Attivo ──────────────────────────────────────
+//
+// "Escluso" = numero presente ma premura_active_at NULL: l'host tiene
+// l'agente fuori da questa prenotazione di proposito (ospite gestito a
+// mano, VIP, caso delicato). Distinto da "manca numero": li' l'agente
+// non PUO' fare nulla, qui non DEVE.
+
+export type TogglePremuraActionResult =
+  | { ok: true; premuraActiveAt: string | null }
+  | { ok: false; reason: 'not_found' | 'wrong_host' | 'no_phone' };
+
+export async function setBookingPremuraActiveAction(
+  bookingId: string,
+  active: boolean,
+): Promise<TogglePremuraActionResult> {
+  const id = idSchema.parse(bookingId);
+  const hostId = await getCurrentHostId();
+  const { db } = await getDb();
+  const result = await setBookingPremuraActive(db, id, hostId, active);
+  if (!result.ok) return { ok: false, reason: result.reason };
+
+  logAgentAction(db, {
+    hostId,
+    agent: 'system',
+    actionType: active ? 'premura_activated' : 'premura_excluded',
+    bookingId: id,
+    fn: async () => ({ output: { active } as Record<string, unknown> }),
+  }).catch((err) => {
+    console.warn('[upcoming-checkins] log agent_action failed', err);
+  });
+
+  revalidatePath('/dashboard');
+  revalidatePath('/dashboard/upcoming-checkins');
+
+  return {
+    ok: true,
+    premuraActiveAt: result.premuraActiveAt ? result.premuraActiveAt.toISOString() : null,
+  };
 }

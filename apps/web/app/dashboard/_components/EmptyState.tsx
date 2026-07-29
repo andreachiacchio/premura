@@ -11,9 +11,7 @@ export function EmptyState() {
       <p className="font-serif text-h3 leading-tight text-ink">
         Tutte le prenotazioni sono complete.
       </p>
-      <p className="mt-2 text-body text-ink-soft">
-        Premura puo lavorare in autonomia.
-      </p>
+      <p className="mt-2 text-body text-ink-soft">Premura puo lavorare in autonomia.</p>
     </div>
   );
 }
