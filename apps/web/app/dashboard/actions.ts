@@ -197,7 +197,11 @@ const rejectionReasonSchema = z.string().trim().max(500).optional();
 // leakare dettagli implementativi (Meta error body, ecc.). Lato client
 // si fa switch per mostrare toast giusto.
 export type ApproveActionResult =
-  | { ok: true; metaMessageId: string }
+  // metaMessageId null = invio simulato (WHATSAPP_DRY_RUN) o bloccato dal
+  // kill switch: la bozza risulta inviata nel nostro stato ma nessun
+  // provider l'ha accettata, quindi non c'e' un id a cui agganciare gli
+  // ack. L'UI deve poter distinguere "inviato" da "inviato davvero".
+  | { ok: true; metaMessageId: string | null }
   | {
       ok: false;
       reason: 'not_found' | 'no_guest_phone' | 'channel_not_supported' | 'send_failed';
