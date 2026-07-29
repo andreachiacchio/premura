@@ -2,22 +2,20 @@ import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getOnboardingState, urlForStep } from '@/lib/onboarding';
 import { findByHostId } from '@/lib/repositories/bookings';
-import { countActiveCleanersForHost } from '@/lib/repositories/cleaners';
+import { getHomeSummary, listGuestsMissingPhoneSoon } from '@/lib/repositories/home-summary';
 import { countKitsByStatusForHost } from '@/lib/repositories/kits';
 import { findByHostId as findPropertiesByHostId } from '@/lib/repositories/properties';
 import { listPendingReplyDraftsForHost } from '@/lib/repositories/reply-drafts';
-import { listUpcomingCheckins } from '@/lib/repositories/upcoming-checkins';
 import { isIncompleteDataSource } from '@/lib/types';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { AgentFeed } from './_components/AgentFeed';
 import { BookingsList } from './_components/BookingsList';
-import { CleanersCard } from './_components/CleanersCard';
 import { DashboardHeader } from './_components/DashboardHeader';
+import { DecisionsBlock } from './_components/DecisionsBlock';
 import { EmptyOnboardingState } from './_components/EmptyOnboardingState';
-import { EmptyState } from './_components/EmptyState';
-import { IncompleteAlert } from './_components/IncompleteAlert';
-import { KitsApprovalCard } from './_components/KitsApprovalCard';
+import { HomeMetricsStrip } from './_components/HomeMetricsStrip';
 import { ReplyDraftCard } from './_components/ReplyDraftCard';
-import { UpcomingCheckinsCard } from './_components/UpcomingCheckinsCard';
 import { completeBookingAction, createPropertyAction, skipBookingAction } from './actions';
 
 // Server component: render server-side, fetch via repository drizzle
@@ -83,79 +81,119 @@ export default async function DashboardPage() {
 
   // HOTFIX: ogni query e' isolata. Una fail non rompe le altre.
   // Defaults garantiscono empty-state UI graziosa.
-  const [bookings, replyDrafts, upcoming, kitStatusCounts, activeCleanersCount] = await Promise.all(
-    [
-      safeQuery<Awaited<ReturnType<typeof findByHostId>>>(
-        'findByHostId',
-        () => findByHostId({ db, hostId }),
-        [],
-      ),
-      safeQuery<Awaited<ReturnType<typeof listPendingReplyDraftsForHost>>>(
-        'listPendingReplyDraftsForHost',
-        () => listPendingReplyDraftsForHost(db, hostId),
-        [],
-      ),
-      safeQuery<Awaited<ReturnType<typeof listUpcomingCheckins>>>(
-        'listUpcomingCheckins',
-        () => listUpcomingCheckins(db, hostId),
-        // Fallback a forma piena: il repo ora ritorna anche properties e
-        // welcome slot per il filtro della pagina dedicata.
-        { rows: [], properties: [], welcomeTimeSlot: '08:00' },
-      ),
-      safeQuery<Record<string, number>>(
-        'countKitsByStatusForHost',
-        () => countKitsByStatusForHost(db, hostId),
-        {},
-      ),
-      safeQuery<number>(
-        'countActiveCleanersForHost',
-        () => countActiveCleanersForHost(db, hostId),
-        0,
-      ),
-    ],
-  );
+  const [bookings, replyDrafts, kitStatusCounts, summary, missingPhoneSoon] = await Promise.all([
+    safeQuery<Awaited<ReturnType<typeof findByHostId>>>(
+      'findByHostId',
+      () => findByHostId({ db, hostId }),
+      [],
+    ),
+    safeQuery<Awaited<ReturnType<typeof listPendingReplyDraftsForHost>>>(
+      'listPendingReplyDraftsForHost',
+      () => listPendingReplyDraftsForHost(db, hostId),
+      [],
+    ),
+    safeQuery<Record<string, number>>(
+      'countKitsByStatusForHost',
+      () => countKitsByStatusForHost(db, hostId),
+      {},
+    ),
+    safeQuery<Awaited<ReturnType<typeof getHomeSummary>>>(
+      'getHomeSummary',
+      () => getHomeSummary(db, hostId),
+      {
+        metrics: {
+          guestsInHouse: 0,
+          guestsArriving: 0,
+          extrasMonthEur: 0,
+          extrasMonthCount: 0,
+          extrasByCategory: [],
+          agentMessagesMonth: 0,
+          totalMessagesMonth: 0,
+        },
+        feed: [],
+      },
+    ),
+    safeQuery<Awaited<ReturnType<typeof listGuestsMissingPhoneSoon>>>(
+      'listGuestsMissingPhoneSoon',
+      () => listGuestsMissingPhoneSoon(db, hostId),
+      [],
+    ),
+  ]);
 
   const incompleteToCompleteCount = bookings.filter(
     (b) => isIncompleteDataSource(b.dataSource) && !b.hostSkippedCompletion,
   ).length;
 
-  // Slice A: counter prossimi check-in da configurare (senza guest_phone).
-  const upcomingTotal = upcoming.rows.length;
-  const upcomingMissingPhone = upcoming.rows.filter((b) => !b.guestPhone).length;
-
   // Slice C: counter kit in attesa di approvazione founder.
   const pendingKitsCount = (kitStatusCounts.proposed ?? 0) + (kitStatusCounts.modified ?? 0);
 
   return (
-    // Mobile-first invariato (colonna singola sotto lg). Su desktop la
-    // dashboard smette di essere una colonna stretta al centro: le card
-    // di accesso rapido vanno in griglia e il contenuto usa lo schermo.
+    // HOME = RIEPILOGO, tre blocchi (Andrea, 29/07):
+    //   1. metriche — striscia compatta: e' cio' che va bene, non ruba
+    //      spazio a cio' che e' fermo (principio "10 secondi")
+    //   2. "Serve una tua decisione" — solo cio' che aspetta l'host,
+    //      con l'azione inline; vuoto = nascosto
+    //   3. "Fatto dall'agente — oggi" — feed, ieri dietro un click
+    // Sotto i blocchi restano le sezioni operative (risposte da
+    // approvare, prenotazioni) a cui le voci del blocco 2 si ancorano.
     <main className="mx-auto min-h-screen w-full max-w-md bg-ivory lg:max-w-5xl xl:max-w-[1400px] xl:px-6">
       <DashboardHeader hostFirstName="Andrea" />
 
-      <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-5 xl:grid-cols-3">
-        {/* Slice A: card "Prossimi check-in" — gateway per attivare booking. */}
-        {upcomingTotal > 0 ? (
-          <UpcomingCheckinsCard total={upcomingTotal} missing={upcomingMissingPhone} />
-        ) : null}
+      {/* Navigazione secondaria: tutto il resto sta dietro un click. */}
+      <nav aria-label="Sezioni" className="mx-5 mb-4 flex flex-wrap gap-x-4 gap-y-1">
+        <Link
+          href="/dashboard/upcoming-checkins"
+          className="text-body-sm font-medium text-ink-soft underline-offset-2 hover:text-ink hover:underline"
+        >
+          Prossimi check-in
+        </Link>
+        <Link
+          href="/dashboard/kits"
+          className="text-body-sm font-medium text-ink-soft underline-offset-2 hover:text-ink hover:underline"
+        >
+          Kit
+        </Link>
+        <Link
+          href="/dashboard/cleaners"
+          className="text-body-sm font-medium text-ink-soft underline-offset-2 hover:text-ink hover:underline"
+        >
+          Squadra
+        </Link>
+        <Link
+          href="/properties"
+          className="text-body-sm font-medium text-ink-soft underline-offset-2 hover:text-ink hover:underline"
+        >
+          Strutture
+        </Link>
+      </nav>
 
-        {/* Slice C: card "Kit pronti per approvazione" — gateway approval flow. */}
-        {pendingKitsCount > 0 ? <KitsApprovalCard pendingCount={pendingKitsCount} /> : null}
+      {/* Blocco 1 — metriche */}
+      <HomeMetricsStrip metrics={summary.metrics} />
 
-        {/* Slice F: card cleaner — sempre presente per accesso veloce. */}
-        <CleanersCard activeCount={activeCleanersCount} />
-      </div>
+      {/* Blocco 2 — decisioni in attesa (nascosto se vuoto) */}
+      <DecisionsBlock
+        data={{
+          missingPhoneSoon,
+          incompleteCount: incompleteToCompleteCount,
+          pendingDraftsCount: replyDrafts.length,
+          pendingKitsCount,
+        }}
+      />
 
-      {incompleteToCompleteCount > 0 ? (
-        <IncompleteAlert count={incompleteToCompleteCount} />
-      ) : (
-        <EmptyState />
-      )}
+      {/* Blocco 3 — fatto dall'agente */}
+      <AgentFeed
+        items={summary.feed.map((f) => ({
+          at: f.at.toISOString(),
+          line: f.line,
+          kind: f.kind,
+          simulated: f.simulated,
+        }))}
+      />
 
       {replyDrafts.length > 0 ? (
-        <section className="mx-5 mt-3 flex flex-col gap-3">
+        <section id="risposte" className="mx-5 mt-8 flex scroll-mt-6 flex-col gap-3">
           <h2 className="text-eyebrow uppercase tracking-wider text-ink-mute">
-            Draft da approvare ({replyDrafts.length})
+            Risposte da approvare ({replyDrafts.length})
           </h2>
           <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-start xl:grid-cols-3">
             {replyDrafts.map((d) => (
@@ -165,11 +203,13 @@ export default async function DashboardPage() {
         </section>
       ) : null}
 
-      <BookingsList
-        bookings={bookings}
-        completeAction={completeBookingAction}
-        skipAction={skipBookingAction}
-      />
+      <div id="prenotazioni" className="scroll-mt-6">
+        <BookingsList
+          bookings={bookings}
+          completeAction={completeBookingAction}
+          skipAction={skipBookingAction}
+        />
+      </div>
 
       <div className="h-12" aria-hidden />
     </main>

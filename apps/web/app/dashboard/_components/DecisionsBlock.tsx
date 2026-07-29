@@ -1,0 +1,149 @@
+import type { GuestMissingPhoneSoon } from '@/lib/repositories/home-summary';
+import { ChevronRight } from 'lucide-react';
+import Link from 'next/link';
+import { InlinePhoneFix } from './InlinePhoneFix';
+
+// Blocco 2 della home — "Serve una tua decisione".
+//
+// SOLO cio' che e' fermo in attesa dell'host, ogni voce con l'azione che
+// la risolve. Vuoto = il blocco non si renderizza affatto (il silenzio
+// e' l'informazione: non c'e' niente che aspetta te).
+//
+// Le vecchie card "check-in da configurare" e "prenotazioni da
+// completare" confluiscono qui: erano decisioni in attesa travestite da
+// categorie.
+
+const ARRIVO_FMT = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric' });
+
+export type DecisionsData = {
+  /** Ospiti senza numero con arrivo entro 3 giorni — fix inline. */
+  missingPhoneSoon: GuestMissingPhoneSoon[];
+  /** Prenotazioni con dati incompleti (form nella lista sotto). */
+  incompleteCount: number;
+  /** Risposte generate dall'agente in attesa di approvazione. */
+  pendingDraftsCount: number;
+  /** Kit proposti in attesa di approvazione. */
+  pendingKitsCount: number;
+};
+
+export function decisionsCount(d: DecisionsData): number {
+  return (
+    d.missingPhoneSoon.length +
+    (d.incompleteCount > 0 ? 1 : 0) +
+    (d.pendingDraftsCount > 0 ? 1 : 0) +
+    (d.pendingKitsCount > 0 ? 1 : 0)
+  );
+}
+
+function arrivalPhrase(checkinAt: Date, now: Date): string {
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const day = new Date(checkinAt);
+  day.setHours(0, 0, 0, 0);
+  const diff = Math.round((day.getTime() - startOfToday.getTime()) / 86_400_000);
+  if (diff <= 0) return 'arriva oggi';
+  if (diff === 1) return 'arriva domani';
+  return `arriva ${ARRIVO_FMT.format(checkinAt)}`;
+}
+
+function Item({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <li className="flex flex-col gap-2 border-t border-line-soft px-4 py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between">
+      {children}
+    </li>
+  );
+}
+
+export function DecisionsBlock({
+  data,
+  now = new Date(),
+}: {
+  data: DecisionsData;
+  now?: Date;
+}): React.JSX.Element | null {
+  const total = decisionsCount(data);
+  if (total === 0) return null;
+
+  return (
+    <section aria-label="Serve una tua decisione" className="mx-5 mt-5">
+      <div className="overflow-hidden rounded-card border border-terracotta-soft bg-paper shadow-sm">
+        <header className="bg-gradient-to-br from-peach to-peach-deep px-4 py-3">
+          <h2 className="font-serif text-h4 leading-tight text-terracotta-2">
+            Serve una tua decisione
+          </h2>
+        </header>
+        <ul>
+          {data.missingPhoneSoon.map((g) => (
+            <Item key={g.bookingId}>
+              <p className="text-body text-ink">
+                <span className="font-medium">{g.guestFirstName ?? g.guestFullName}</span>{' '}
+                {arrivalPhrase(g.checkinAt, now)} a {g.propertyName} e non ha un numero WhatsApp
+              </p>
+              <InlinePhoneFix
+                bookingId={g.bookingId}
+                guestName={g.guestFirstName ?? g.guestFullName}
+              />
+            </Item>
+          ))}
+
+          {data.pendingDraftsCount > 0 ? (
+            <Item>
+              <p className="text-body text-ink">
+                <span className="font-medium">
+                  {data.pendingDraftsCount}{' '}
+                  {data.pendingDraftsCount === 1 ? 'risposta pronta' : 'risposte pronte'}
+                </span>{' '}
+                — l'agente aspetta il tuo ok prima di inviare
+              </p>
+              <a
+                href="#risposte"
+                className="inline-flex items-center gap-1 text-body-sm font-medium text-terracotta-2 hover:underline"
+              >
+                Leggi e approva qui sotto
+                <ChevronRight aria-hidden className="size-4" />
+              </a>
+            </Item>
+          ) : null}
+
+          {data.pendingKitsCount > 0 ? (
+            <Item>
+              <p className="text-body text-ink">
+                <span className="font-medium">
+                  {data.pendingKitsCount} kit{' '}
+                  {data.pendingKitsCount === 1 ? 'proposto' : 'proposti'}
+                </span>{' '}
+                — da approvare prima dell'ordine
+              </p>
+              <Link
+                href="/dashboard/kits"
+                className="inline-flex items-center gap-1 text-body-sm font-medium text-terracotta-2 hover:underline"
+              >
+                Guarda le proposte
+                <ChevronRight aria-hidden className="size-4" />
+              </Link>
+            </Item>
+          ) : null}
+
+          {data.incompleteCount > 0 ? (
+            <Item>
+              <p className="text-body text-ink">
+                <span className="font-medium">
+                  {data.incompleteCount}{' '}
+                  {data.incompleteCount === 1 ? 'prenotazione' : 'prenotazioni'} da completare
+                </span>{' '}
+                — Booking non ci ha dato nome o contatti dell'ospite
+              </p>
+              <a
+                href="#prenotazioni"
+                className="inline-flex items-center gap-1 text-body-sm font-medium text-terracotta-2 hover:underline"
+              >
+                Completa qui sotto
+                <ChevronRight aria-hidden className="size-4" />
+              </a>
+            </Item>
+          ) : null}
+        </ul>
+      </div>
+    </section>
+  );
+}
