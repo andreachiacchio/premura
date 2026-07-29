@@ -152,6 +152,84 @@ Decidere A o B in DEBT-2 dedicato.
   che migra i dati altrove. Drizzle non gestisce data migration:
   scrivi DML manuale prima del DDL.
 - **Mai modificare una migration gia' mergiata in main**. Nuove
-  modifiche = nuova migration.
+  modifiche = nuova migration. Unica eccezione registrata: la
+  riparazione del 29/07/2026 descritta sotto, dove la regola era
+  inapplicabile per costruzione.
 - **Mai applicare a prod senza staging prima**. Eccezione: hotfix
   schema con downtime annunciato.
+
+## Incidente 29/07/2026 — tracking corrotto e catena rieseguibile
+
+### Sintomo
+
+`pnpm db:migrate` falliva. Il DB di produzione era disallineato dal
+codice: PR #53 era su main ma `outbound_sends` non esisteva.
+
+### Causa
+
+Nel tracking `drizzle.__drizzle_migrations` c'era una riga inserita a
+mano il 12/05 con hash `manual_0023_welcome_message_1778572831.348648`
+e `created_at = 1778572831349`, cioe' **l'orario reale di inserimento**
+invece del `when` della 0023 nel journal (`1779400000000`).
+
+Drizzle non confronta i nomi: prende `max(created_at)` e riapplica tutto
+cio' che ha `folderMillis` maggiore. Con quel timestamp fuori scala il
+cursore ripartiva dalla **0015** — gia' applicata e senza
+`IF NOT EXISTS` — che moriva su "column already exists".
+
+### Cosa era davvero applicato
+
+Verifica oggetto per oggetto (colonne, tabelle, indici, valori enum):
+
+| stato | migration |
+|---|---|
+| applicate | 0009-0015, 0017, 0020, 0021, 0023 |
+| **non applicate** | 0016, 0018, 0022, 0024, 0025, 0026 |
+| **parziale** | 0019: le colonne `kits` c'erano, **gli 11 valori enum no** |
+
+Due conseguenze che il tracking non mostrava:
+
+- `kit_status` aveva 9 valori su 20. Mancava `set_up`, che e' lo stato
+  cercato da `findKitsForWelcomeMessage`: il welcome non poteva partire
+  nemmeno con tutto il resto a posto.
+- `0024_waitlist_beta_access.sql` esisteva su disco ma **non era nel
+  journal**, quindi non sarebbe mai stata applicata da nessuna parte.
+
+### Perche' non si poteva "registrare solo quelle applicate"
+
+Il cursore di Drizzle e' lineare: un solo `max(created_at)`, nessun
+concetto di insieme applicato. Con i buchi sotto la 0023 (0016, 0018,
+0019-enum, 0022), registrare fino alla 0023 li avrebbe congelati per
+sempre. L'unico modo di riempirli e' far ripartire il cursore da sotto
+il buco piu' basso — il che richiede che ogni migration attraversata sia
+**rieseguibile**.
+
+### Riparazione
+
+1. Backup: schema `backup_20260729` con copia di `__drizzle_migrations`
+   e di tutte le tabelle con dati.
+2. Ogni migration 0009-0022 resa rieseguibile:
+   `ADD COLUMN IF NOT EXISTS`, `CREATE TABLE IF NOT EXISTS`,
+   `DROP POLICY IF EXISTS` prima di ogni `CREATE POLICY`
+   (Postgres non ha `CREATE POLICY IF NOT EXISTS`).
+3. `0017`: il backfill `UPDATE bookings ... WHERE premura_active_at IS
+   NULL` e' stato ancorato a `created_at < 2026-05-15`. Senza,
+   rieseguirlo avrebbe attivato d'ufficio le prenotazioni inserite dopo.
+   **Un backfill descrive uno stato passato: va ancorato nel tempo.**
+4. `0022`: ogni statement su `storage.*` avvolto in un `DO` che cattura
+   `insufficient_privilege`. Sta in mezzo alla catena, e un errore di
+   permessi sui bucket non deve impedire a 0025/0026 di applicarsi.
+5. Voce `0024_waitlist_beta_access` aggiunta al journal.
+6. Riga fasulla rimossa dal tracking; registrate tutte le 18 migration
+   0009-0026 con `sha256` del file e `created_at` = `when` del journal.
+
+### Regola che ne esce
+
+**Ogni migration deve poter essere rieseguita senza esplodere.** Non e'
+una precauzione teorica: e' l'unica cosa che rende riparabile un DB
+divergente. Un `ADD COLUMN` senza `IF NOT EXISTS` trasforma una
+divergenza recuperabile in un blocco.
+
+Corollario sul tracking: se una migration viene applicata a mano, la riga
+in `__drizzle_migrations` va scritta con l'hash sha256 del file e il
+`when` del journal, **mai** con l'orario corrente.

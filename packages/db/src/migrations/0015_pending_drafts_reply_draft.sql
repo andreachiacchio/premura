@@ -13,7 +13,7 @@
 -- questo messaggio?" idempotency check pre-insert.
 
 ALTER TABLE "pending_drafts"
-  ADD COLUMN "reply_to_message_id" UUID
+  ADD COLUMN IF NOT EXISTS "reply_to_message_id" UUID
   REFERENCES "messages"("id") ON DELETE SET NULL;
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "pending_drafts_reply_to_message_idx"
