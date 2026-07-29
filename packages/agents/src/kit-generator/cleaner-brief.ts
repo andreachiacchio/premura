@@ -124,7 +124,9 @@ function formatEta(d: Date): string {
 // ─────────────────────────────────────────────────────────────
 
 export type SendBriefResult =
-  | { status: 'sent'; messageId: string }
+  // messageId null = invio simulato (WHATSAPP_DRY_RUN) o kill switch:
+  // il brief e' stato composto ma nessuna chiamata e' partita.
+  | { status: 'sent'; messageId: string | null }
   | { status: 'skipped_already_briefed' }
   | { status: 'skipped_no_kit' }
   | { status: 'skipped_no_cleaner' }
@@ -194,9 +196,12 @@ export async function sendCleanerBrief(
     defaultPlacement: knowledgeRow?.kitDefaultPlacement ?? null,
   });
 
-  let messageId: string;
+  let messageId: string | null;
   try {
-    const res = await sendText(cleanerRow.whatsappNumber, brief);
+    // immediate: il brief va a Karen, non a un ospite. Il jitter
+    // 30-60s serve a non sembrare un bot verso WhatsApp sui numeri
+    // degli ospiti; verso il nostro operatore e' solo ritardo.
+    const res = await sendText(cleanerRow.whatsappNumber, brief, { immediate: true });
     messageId = res.messageId;
   } catch (err) {
     return {

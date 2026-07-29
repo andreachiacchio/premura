@@ -5,6 +5,7 @@ import { createServerClient } from '@premura/db';
 import Fastify from 'fastify';
 import { bookingsRoutes } from './api/bookings';
 import { propertiesRoutes } from './api/properties';
+import { wahaWebhookRoutes } from './api/webhooks/waha';
 import { whatsappWebhookRoutes } from './api/webhooks/whatsapp';
 // Solo i produttori di coda: questo processo enqueue (webhook -> draft
 // generation) e legge i contatori per /health/jobs. I consumer BullMQ e i
@@ -73,6 +74,12 @@ await app.register(propertiesRoutes, { prefix: '/api/properties', db: apiClient.
 // custom per esporre rawBody (necessario per HMAC) — l'encapsulation
 // Fastify lo isola dal resto dell'app.
 await app.register(whatsappWebhookRoutes, { db: apiClient.db });
+
+// Webhook inbound WAHA. Registrato in un plugin separato perche' ha il
+// suo content-type parser (rawBody per l'HMAC) e l'encapsulation Fastify
+// non permette di condividerlo con quello di Meta senza che uno dei due
+// vinca sull'altro.
+await app.register(wahaWebhookRoutes, { db: apiClient.db });
 
 // TODO: register dashboard API, cleaner endpoints
 

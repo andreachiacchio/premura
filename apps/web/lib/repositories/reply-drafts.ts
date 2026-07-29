@@ -99,7 +99,10 @@ export async function listPendingReplyDraftsForHost(
 }
 
 export type ApproveResult =
-  | { status: 'sent'; messageId: string; metaMessageId: string }
+  // metaMessageId null = invio simulato (WHATSAPP_DRY_RUN) o kill switch:
+  // la bozza risulta inviata nel nostro stato ma nessun provider l'ha
+  // accettata, quindi non esiste un id a cui agganciare gli ack.
+  | { status: 'sent'; messageId: string; metaMessageId: string | null }
   | { status: 'already_sent'; metaMessageId: string | null }
   | { status: 'not_found' }
   | { status: 'no_guest_phone' }
@@ -197,7 +200,9 @@ export async function approveAndSendReplyDraft(
   }
 
   // Send via Meta. Retry 1x su 5xx/429.
-  let wamid: string;
+  // null quando l'invio e' simulato: pendingDrafts.metaMessageId e
+  // messages.platformMessageId sono gia' nullable a schema.
+  let wamid: string | null;
   let lastError: string | null = null;
   let retried = false;
   while (true) {
