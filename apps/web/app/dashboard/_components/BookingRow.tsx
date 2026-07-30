@@ -22,10 +22,9 @@ import type { CompleteBookingActionFn, SkipBookingActionFn } from './CompleteBoo
 // completamento manuale. Altrimenti la card e' inerte (slice 5 non
 // implementa il dettaglio ospite, arrivera in M3).
 
-const DATE_FORMATTER = new Intl.DateTimeFormat('it-IT', {
-  day: 'numeric',
-  month: 'short',
-});
+// Regola data condivisa con la pagina check-in: anno visibile quando
+// non e' l'anno corrente (una prenotazione 2027 senza anno sembra passata).
+import { formatDayMonth } from '@/lib/format-date';
 
 type DotKind = 'alert' | 'warn' | 'ok' | 'muted';
 
@@ -117,7 +116,7 @@ export function BookingRow({
   const dotKind = pickDot(booking);
   const badge = badgeFor(booking);
   const flag = flagEmoji(booking.guestCountryCode);
-  const dateRange = `${DATE_FORMATTER.format(booking.checkinAt)} – ${DATE_FORMATTER.format(booking.checkoutAt)}`;
+  const dateRange = `${formatDayMonth(booking.checkinAt)} – ${formatDayMonth(booking.checkoutAt)}`;
 
   const inner = (
     <>
