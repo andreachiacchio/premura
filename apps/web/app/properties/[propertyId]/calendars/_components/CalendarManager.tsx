@@ -17,6 +17,18 @@ const SOURCE_LABELS: Record<IcalSource['source'], string> = {
 const INPUT_CLS =
   'h-12 rounded-card border border-line bg-paper px-4 text-body text-ink placeholder:text-ink-mute focus:border-terracotta-soft focus:outline-none focus:ring-2 focus:ring-terracotta-soft/40';
 
+// L0 del principio di onboarding (CONTEXT.md §5): l'iCal e' la strada
+// universale, e il wizard spiega DOVE trovarlo. Testo per ora,
+// screenshot quando li avremo.
+const ICAL_HINTS: Record<IcalSource['source'], string> = {
+  booking:
+    'Dove trovarlo: extranet Booking → Calendario → Sincronizzazione calendari → Esporta calendario → copia il link.',
+  airbnb:
+    'Dove trovarlo: Airbnb → Calendario → Disponibilità → Collega un altro calendario → copia il link di esportazione.',
+  channel_manager:
+    'Nel tuo channel manager cerca "Esporta iCal" o "Calendar sync" per ogni appartamento.',
+};
+
 function probeLabel(result: IcalProbeResult): string {
   if (result.ok) {
     if (result.eventsFound === 0) return 'Feed valido, 0 eventi (calendario vuoto o token nuovo)';
@@ -160,6 +172,7 @@ export function CalendarManager(props: { propertyId: string; feeds: IcalSource[]
             placeholder="https://ical.booking.com/v1/export?t=…"
             className={INPUT_CLS}
           />
+          <p className="text-[12px] text-ink-mute">{ICAL_HINTS[source]}</p>
           <div className="flex items-center gap-4">
             <button
               type="button"

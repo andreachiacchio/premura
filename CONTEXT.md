@@ -239,6 +239,29 @@ Mai notifiche su 🟢.
   **Conversazione INBOUND** attiva su tutti i canali (WhatsApp, Booking
   inbox se integrato, Airbnb via email parsing).
 
+### Onboarding (principio, 30/07/2026)
+Premura deve funzionare per un host che ha SOLO Booking e Airbnb.
+Il channel manager è un di più, mai un requisito. Nessun vicolo cieco:
+se l'host non ha X, il wizard propone la strada alternativa, mai un
+errore. Quattro livelli, in ordine di sforzo per l'host:
+
+- **L0 — iCal (universale).** Ogni piattaforma lo dà. Il wizard spiega
+  dove trovarlo (screenshot per Booking e Airbnb). Dà date e blocchi,
+  non l'ospite.
+- **L1 — L'ospite si registra da solo** ← il pezzo che rende Premura
+  usabile da chiunque. Il wizard genera un messaggio pronto da copiare
+  nell'inbox Booking/Airbnb col link della guest app; l'ospite, per
+  vedere i CODICI D'ACCESSO, lascia nome, telefono e consenso. Da lì:
+  finestra WhatsApp aperta, agente operativo. I codici sono
+  l'incentivo: l'ospite li vuole comunque.
+- **L2 — Channel manager (opzionale).** Smoobu per primo, altri solo
+  su richiesta di clienti veri. Niente integrazioni in anticipo.
+- **L3 — Inserimento manuale.** Sempre disponibile come fallback.
+
+Nel wizard: MAI chiedere "hai un channel manager?" come prima domanda.
+Chiedere "dove ricevi le prenotazioni?" e proporre la strada più
+semplice che copre il caso. Chi ha Smoobu lo dice da sé.
+
 ### Automazione
 - **L'host NON configura template messaggi.** Premura scrive tutto sempre
   diverso basandosi su Guest DNA + profilo struttura + voice profile host.
