@@ -1,0 +1,50 @@
+# Diagnostica SOLA LETTURA dell'app Fly: secrets (solo nomi e digest,
+# mai valori), stato macchine, health del worker e log recenti.
+#
+# Serve quando dal di fuori (Vercel, DB) un cron del worker risulta muto
+# e bisogna capire da che lato e' il problema senza accesso flyctl
+# diretto. Nessun comando muta stato: niente deploy, niente restart,
+# niente secrets set.
+#
+# Si lancia in due modi (stesso pattern di fly-ping):
+#  - workflow_dispatch (bottone per Andrea)
+#  - push su main che tocca .github/fly-diag-request.txt (la via della
+#    sessione Claude: bump del file in un PR, il merge fa partire il run)
+
+name: Fly diagnostica
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/fly-diag-request.txt']
+
+concurrency:
+  group: fly-diag
+  cancel-in-progress: false
+
+jobs:
+  diag:
+    name: stato worker (sola lettura)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Secrets configurate (nomi e digest, mai valori)
+        run: flyctl secrets list --app premura-api-staging || true
+
+      - name: Stato macchine (process group e ultimo aggiornamento)
+        run: flyctl machine list --app premura-api-staging || true
+
+      # UN tentativo, mai retry (lezione fly-ping 30/07): flyctl ssh puo'
+      # uscire con codice != 0 anche a comando riuscito.
+      - name: Health del worker (cron schedulati)
+        run: |
+          out=$(flyctl ssh console --app premura-api-staging --process-group worker -C "wget -qO- http://localhost:8080/health" 2>&1) || true
+          echo "$out"
+
+      - name: Log recenti (cercare gmail-sync-cron)
+        run: flyctl logs --app premura-api-staging --no-tail || true

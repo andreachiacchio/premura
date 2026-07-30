@@ -59,6 +59,12 @@ export type UpcomingCheckinRow = {
   premuraActiveAt: Date | null;
   guestPhoneSource: string | null;
   premuraState: PremuraState;
+  /**
+   * Fascia iCal Booking senza ospite noto (data_source booking_ical_only):
+   * il feed dice solo "occupato", chi arriva si scopre sull'extranet.
+   * In UI ha una sezione propria, mai mescolata alle prenotazioni vere.
+   */
+  unknownOccupied: boolean;
   // Slice B: stato survey pre-arrival + timestamp per la timeline.
   surveyStatus: SurveyStatus;
   surveySentAt: Date | null;
@@ -115,6 +121,7 @@ export async function listUpcomingCheckins(
       guestPhone: bookings.guestPhone,
       premuraActiveAt: bookings.premuraActiveAt,
       guestPhoneSource: bookings.guestPhoneSource,
+      dataSource: bookings.dataSource,
       // Slice B: LEFT JOIN guest_quizzes per stato survey.
       surveySentAt: guestQuizzes.sentAt,
       surveyCompletedAt: guestQuizzes.completedAt,
@@ -185,6 +192,9 @@ export async function listUpcomingCheckins(
       premuraActiveAt: r.premuraActiveAt,
       guestPhoneSource: r.guestPhoneSource,
       premuraState: derivePremuraState(r.guestPhone, r.premuraActiveAt),
+      // Fascia iCal Booking senza ospite noto: sezione propria in UI,
+      // mai mescolata alle prenotazioni vere (decisione 30/07).
+      unknownOccupied: r.dataSource === 'booking_ical_only',
       surveyStatus: deriveSurveyStatus(r.surveySentAt, r.surveyCompletedAt, r.surveySkippedAt),
       surveySentAt: r.surveySentAt,
       surveyCompletedAt: r.surveyCompletedAt,

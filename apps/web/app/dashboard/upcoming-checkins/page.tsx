@@ -38,6 +38,7 @@ export default async function UpcomingCheckinsPage(): Promise<React.JSX.Element>
     surveySentAt: r.surveySentAt ? r.surveySentAt.toISOString() : null,
     surveyCompletedAt: r.surveyCompletedAt ? r.surveyCompletedAt.toISOString() : null,
     welcomeSentAt: r.welcomeSentAt ? r.welcomeSentAt.toISOString() : null,
+    unknownOccupied: r.unknownOccupied,
     outbound: r.outbound.map((o) => ({
       trigger: o.trigger,
       status: o.status,
@@ -46,9 +47,14 @@ export default async function UpcomingCheckinsPage(): Promise<React.JSX.Element>
     })),
   }));
 
-  const total = data.length;
-  const missing = data.filter((b) => b.premuraState === 'missing_phone').length;
-  const excluded = data.filter((b) => b.premuraState === 'excluded').length;
+  // Conteggi solo sulle prenotazioni vere: le fasce "occupato sorgente
+  // ignota" (iCal Booking senza ospite) hanno il loro numero a parte e
+  // non contano mai come "senza numero" (decisione 30/07).
+  const realBookings = data.filter((b) => !b.unknownOccupied);
+  const total = realBookings.length;
+  const missing = realBookings.filter((b) => b.premuraState === 'missing_phone').length;
+  const excluded = realBookings.filter((b) => b.premuraState === 'excluded').length;
+  const occupiedUnknown = data.length - realBookings.length;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl bg-ivory px-5 pt-12 pb-16 xl:max-w-[1400px] xl:px-10">
@@ -68,7 +74,7 @@ export default async function UpcomingCheckinsPage(): Promise<React.JSX.Element>
         </p>
       </header>
 
-      {total === 0 ? (
+      {total === 0 && occupiedUnknown === 0 ? (
         <div className="rounded-card border border-line-soft bg-paper px-6 py-10 text-center shadow-sm">
           <p className="font-serif text-h3 leading-tight text-ink">Tutto tranquillo qui.</p>
           <p className="mt-2 text-body text-ink-soft">
@@ -87,8 +93,15 @@ export default async function UpcomingCheckinsPage(): Promise<React.JSX.Element>
           >
             <p className="font-serif text-h4 leading-tight">
               {total} {total === 1 ? 'prenotazione' : 'prenotazioni'}
-              {missing > 0 ? ` · ${missing} senza numero` : ' · tutti i numeri inseriti ✓'}
+              {total > 0
+                ? missing > 0
+                  ? ` · ${missing} senza numero`
+                  : ' · tutti i numeri inseriti ✓'
+                : ''}
               {excluded > 0 ? ` · ${excluded} ${excluded === 1 ? 'esclusa' : 'escluse'}` : ''}
+              {occupiedUnknown > 0
+                ? ` · ${occupiedUnknown} ${occupiedUnknown === 1 ? 'fascia occupata' : 'fasce occupate'} da verificare`
+                : ''}
             </p>
             {missing > 0 ? (
               <p className="mt-1 text-body-sm opacity-80">

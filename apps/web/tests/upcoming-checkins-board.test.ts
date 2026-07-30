@@ -61,6 +61,7 @@ function baseRow(patch: Partial<UpcomingCheckinCardData>): UpcomingCheckinCardDa
     surveyCompletedAt: null,
     welcomeSentAt: null,
     outbound: [],
+    unknownOccupied: false,
     ...patch,
   };
 }
