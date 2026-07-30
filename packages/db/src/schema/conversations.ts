@@ -15,8 +15,10 @@ export const conversations = pgTable(
   'conversations',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    // Nullable (Fase 2, 30/07): un inbound da numero sconosciuto crea
+    // comunque una conversation NON ATTRIBUITA (booking_id null) — mai
+    // scartare un messaggio di un ospite potenziale.
     bookingId: uuid('booking_id')
-      .notNull()
       .references(() => bookings.id, { onDelete: 'cascade' }),
 
     channel: conversationChannelEnum('channel').notNull(),

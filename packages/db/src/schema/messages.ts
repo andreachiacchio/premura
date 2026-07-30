@@ -42,6 +42,11 @@ export const messages = pgTable(
 
     channel: messageChannelEnum('channel').notNull(),
     direction: messageDirectionEnum('direction').notNull(),
+
+    // Stato esplicito del messaggio (Fase 2, 30/07): 'received' per gli
+    // inbound; gli outbound useranno queued/sent/failed/blocked. Varchar
+    // libero come data_source: nessuna migration per uno stato nuovo.
+    status: varchar('status', { length: 16 }).notNull().default('received'),
     fromEntity: messageEntityEnum('from_entity').notNull(),
     toEntity: messageEntityEnum('to_entity').notNull(),
 
