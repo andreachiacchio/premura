@@ -1,6 +1,7 @@
 'use client';
 
 import { OccupiedRangesSection } from '@/app/dashboard/_components/OccupiedRangesSection';
+import { propertyColorOrFallback } from '@/lib/property-color';
 import { Check, Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import {
@@ -43,6 +44,7 @@ export type UpcomingCheckinCardData = {
   guestFirstName: string | null;
   propertyId: string;
   propertyName: string;
+  propertyColor: string | null;
   checkinAt: string; // ISO string (server -> client)
   checkoutAt: string;
   numGuests: number;
@@ -62,7 +64,7 @@ export type UpcomingCheckinCardData = {
 
 export type BoardProps = {
   rows: UpcomingCheckinCardData[];
-  properties: Array<{ id: string; name: string }>;
+  properties: Array<{ id: string; name: string; color: string | null }>;
   /** hosts.welcome_time_slot, es. '08:00' — orario previsto del benvenuto. */
   welcomeTimeSlot: string;
 };
@@ -414,9 +416,15 @@ export function UpcomingCheckinsBoard({
         <p className="truncate font-medium text-body text-ink">
           {r.guestFirstName ?? r.guestFullName}
         </p>
-        <p className="text-[12px] text-ink-mute">
-          {r.propertyName} · {PLATFORM_LABELS[r.platform]} ·{' '}
-          {formatDayMonth(new Date(r.checkinAt))} – {formatDayMonth(new Date(r.checkoutAt))}
+        <p className="truncate text-[12px] text-ink-mute">
+          <span
+            className="font-medium"
+            style={{ color: propertyColorOrFallback(r.propertyColor, r.propertyName) }}
+          >
+            {r.propertyName}
+          </span>{' '}
+          · {PLATFORM_LABELS[r.platform]} · {formatDayMonth(new Date(r.checkinAt))} –{' '}
+          {formatDayMonth(new Date(r.checkoutAt))}
         </p>
         <p className="mt-0.5 text-body-sm text-ink-soft">{statePhrase(r, now)}</p>
       </div>
@@ -643,9 +651,11 @@ export function UpcomingCheckinsBoard({
               id: r.id,
               propertyId: r.propertyId,
               propertyName: r.propertyName,
+              propertyColor: r.propertyColor,
               checkinAtIso: r.checkinAt,
               checkoutAtIso: r.checkoutAt,
             }))}
+            properties={properties}
           />
         </section>
       ) : null}

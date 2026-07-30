@@ -267,6 +267,7 @@ export default async function DashboardPage() {
           <div id="prenotazioni" className="scroll-mt-6">
             <BookingsList
               bookings={bookings}
+              properties={hostProperties}
               completeAction={completeBookingAction}
               skipAction={skipBookingAction}
             />

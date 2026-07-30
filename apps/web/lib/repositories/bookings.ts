@@ -212,6 +212,7 @@ export async function findByHostId(args: {
       id: bookings.id,
       propertyId: bookings.propertyId,
       propertyName: properties.name,
+      propertyColor: properties.color,
       dataSource: bookings.dataSource,
       hostSkippedCompletion: bookings.hostSkippedCompletion,
       guestFullName: bookings.guestFullName,

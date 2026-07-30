@@ -52,6 +52,7 @@ export type UpcomingCheckinRow = {
   guestFirstName: string | null;
   propertyId: string;
   propertyName: string;
+  propertyColor: string | null;
   checkinAt: Date;
   checkoutAt: Date;
   numGuests: number;
@@ -79,7 +80,7 @@ export type UpcomingCheckinRow = {
 export type UpcomingCheckinsData = {
   rows: UpcomingCheckinRow[];
   /** Tutte le property dell'host, per il filtro in testa alla pagina. */
-  properties: Array<{ id: string; name: string }>;
+  properties: Array<{ id: string; name: string; color: string | null }>;
   /** hosts.welcome_time_slot (HH:MM) — orario previsto del benvenuto. */
   welcomeTimeSlot: string;
 };
@@ -103,7 +104,7 @@ export async function listUpcomingCheckins(
     .limit(1);
 
   const propertyRows = await db
-    .select({ id: properties.id, name: properties.name })
+    .select({ id: properties.id, name: properties.name, color: properties.color })
     .from(properties)
     .where(and(eq(properties.hostId, hostId), eq(properties.isActive, true)))
     .orderBy(asc(properties.name));
@@ -115,6 +116,7 @@ export async function listUpcomingCheckins(
       guestFirstName: bookings.guestFirstName,
       propertyId: bookings.propertyId,
       propertyName: properties.name,
+      propertyColor: properties.color,
       checkinAt: bookings.checkinAt,
       checkoutAt: bookings.checkoutAt,
       numGuests: bookings.numGuests,
@@ -228,6 +230,7 @@ export async function listUpcomingCheckins(
       guestFirstName: r.guestFirstName,
       propertyId: r.propertyId,
       propertyName: r.propertyName,
+      propertyColor: r.propertyColor,
       checkinAt: r.checkinAt,
       checkoutAt: r.checkoutAt,
       numGuests: r.numGuests,
