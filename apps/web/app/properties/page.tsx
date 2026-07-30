@@ -22,6 +22,18 @@ const SOURCE_LABELS: Record<string, string> = {
   channel_manager: 'Channel manager',
 };
 
+// Resilienza per sezione (regola della home, incidente produzione 30/07
+// digest 3483798615): una query che fallisce — pool esaurito, RLS,
+// schema drift — degrada la SUA sezione, non butta giu' la pagina.
+async function safeQuery<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    console.error(`[properties] ${label} failed`, err);
+    return fallback;
+  }
+}
+
 export default async function PropertiesPage() {
   const hostId = await getCurrentHostId();
   const { db } = await getDb();
@@ -31,35 +43,47 @@ export default async function PropertiesPage() {
   // ${properties.id} reso NON qualificato — "id" — che dentro la subquery
   // si risolveva su bookings, quindi b.property_id = b.id: 0 ovunque).
   const [rows, counts] = await Promise.all([
-    db
-      .select({
-        id: properties.id,
-        name: properties.name,
-        city: properties.city,
-        icalSources: properties.icalSources,
-        isActive: properties.isActive,
-      })
-      .from(properties)
-      .where(eq(properties.hostId, hostId))
-      .orderBy(properties.createdAt),
-    db
-      .select({
-        propertyId: bookings.propertyId,
-        total: sql<number>`count(*)::int`,
-        upcoming: sql<number>`(count(*) filter (where ${bookings.checkoutAt} >= now()))::int`,
-      })
-      .from(bookings)
-      .innerJoin(properties, eq(properties.id, bookings.propertyId))
-      .where(
-        and(
-          eq(properties.hostId, hostId),
-          ne(bookings.status, 'cancelled'),
-          eq(bookings.isCalendarBlock, false),
-        ),
-      )
-      .groupBy(bookings.propertyId),
+    safeQuery(
+      'listProperties',
+      () =>
+        db
+          .select({
+            id: properties.id,
+            name: properties.name,
+            city: properties.city,
+            icalSources: properties.icalSources,
+            isActive: properties.isActive,
+          })
+          .from(properties)
+          .where(eq(properties.hostId, hostId))
+          .orderBy(properties.createdAt),
+      null,
+    ),
+    safeQuery(
+      'bookingCounts',
+      () =>
+        db
+          .select({
+            propertyId: bookings.propertyId,
+            total: sql<number>`count(*)::int`,
+            upcoming: sql<number>`(count(*) filter (where ${bookings.checkoutAt} >= now()))::int`,
+          })
+          .from(bookings)
+          .innerJoin(properties, eq(properties.id, bookings.propertyId))
+          .where(
+            and(
+              eq(properties.hostId, hostId),
+              ne(bookings.status, 'cancelled'),
+              eq(bookings.isCalendarBlock, false),
+            ),
+          )
+          .groupBy(bookings.propertyId),
+      null,
+    ),
   ]);
-  const countsByProperty = new Map(counts.map((c) => [c.propertyId, c]));
+  // counts null = conteggi non disponibili: si dice, non si mostra uno
+  // 0 finto ("mai due verita'").
+  const countsByProperty = counts ? new Map(counts.map((c) => [c.propertyId, c])) : null;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-ivory px-5 pt-10 pb-16 lg:max-w-5xl xl:max-w-[1400px]">
@@ -85,10 +109,17 @@ export default async function PropertiesPage() {
         + Aggiungi struttura
       </Link>
 
+      {rows === null ? (
+        <div className="rounded-card border border-line-soft bg-paper px-6 py-8 text-center text-body text-ink-soft shadow-sm">
+          Le strutture non sono raggiungibili in questo momento. Ricarica la pagina fra qualche
+          secondo.
+        </div>
+      ) : null}
+
       <ul className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-start xl:grid-cols-3">
-        {rows.map((p) => {
-          const totalBookings = countsByProperty.get(p.id)?.total ?? 0;
-          const upcomingBookings = countsByProperty.get(p.id)?.upcoming ?? 0;
+        {(rows ?? []).map((p) => {
+          const totalBookings = countsByProperty?.get(p.id)?.total ?? 0;
+          const upcomingBookings = countsByProperty?.get(p.id)?.upcoming ?? 0;
           return (
             <li key={p.id} className="rounded-card border border-line bg-paper p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
@@ -120,8 +151,9 @@ export default async function PropertiesPage() {
 
               <div className="mt-3 flex items-center justify-between border-t border-line-soft pt-3">
                 <p className="text-body-sm text-ink-mute">
-                  {upcomingBookings} {upcomingBookings === 1 ? 'soggiorno' : 'soggiorni'} in arrivo
-                  · {totalBookings} totali
+                  {countsByProperty === null
+                    ? 'conteggi non disponibili al momento'
+                    : `${upcomingBookings} ${upcomingBookings === 1 ? 'soggiorno' : 'soggiorni'} in arrivo · ${totalBookings} totali`}
                 </p>
                 <span className="flex items-center gap-3">
                   <Link
