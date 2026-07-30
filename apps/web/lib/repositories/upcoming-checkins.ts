@@ -7,7 +7,8 @@ import {
   outboundSends,
   properties,
 } from '@premura/db';
-import { and, asc, eq, gte, inArray, lte, ne } from 'drizzle-orm';
+import { and, asc, eq, gt, gte, inArray, lt, lte, ne } from 'drizzle-orm';
+import { isRangeCoveredByBookings } from '../booking-coverage';
 
 // Slice A — Repository helpers per la dashboard "Prossimi check-in".
 //
@@ -59,6 +60,12 @@ export type UpcomingCheckinRow = {
   premuraActiveAt: Date | null;
   guestPhoneSource: string | null;
   premuraState: PremuraState;
+  /**
+   * Fascia iCal Booking senza ospite noto (data_source booking_ical_only):
+   * il feed dice solo "occupato", chi arriva si scopre sull'extranet.
+   * In UI ha una sezione propria, mai mescolata alle prenotazioni vere.
+   */
+  unknownOccupied: boolean;
   // Slice B: stato survey pre-arrival + timestamp per la timeline.
   surveyStatus: SurveyStatus;
   surveySentAt: Date | null;
@@ -115,6 +122,7 @@ export async function listUpcomingCheckins(
       guestPhone: bookings.guestPhone,
       premuraActiveAt: bookings.premuraActiveAt,
       guestPhoneSource: bookings.guestPhoneSource,
+      dataSource: bookings.dataSource,
       // Slice B: LEFT JOIN guest_quizzes per stato survey.
       surveySentAt: guestQuizzes.sentAt,
       surveyCompletedAt: guestQuizzes.completedAt,
@@ -136,7 +144,50 @@ export async function listUpcomingCheckins(
     )
     .orderBy(asc(bookings.checkinAt));
 
-  const bookingIds = rows.map((r) => r.id);
+  // Doppioni iCal Booking (30/07, stessa regola della home): una fascia
+  // "occupato, sorgente ignota" interamente coperta da prenotazioni note
+  // della stessa property e' rumore — l'iCal Booking unisce soggiorni
+  // contigui (es. "30 lug - 8 ago" = Krzysztof + Julian). Le prenotazioni
+  // note si cercano SENZA la finestra dei 14 giorni: la copertura puo'
+  // arrivare da soggiorni fuori finestra.
+  const unknown = rows.filter((r) => r.dataSource === 'booking_ical_only');
+  let visibleRows = rows;
+  if (unknown.length > 0) {
+    const minStart = new Date(Math.min(...unknown.map((u) => u.checkinAt.getTime())));
+    const maxEnd = new Date(Math.max(...unknown.map((u) => u.checkoutAt.getTime())));
+    const known = await db
+      .select({
+        propertyId: bookings.propertyId,
+        checkinAt: bookings.checkinAt,
+        checkoutAt: bookings.checkoutAt,
+      })
+      .from(bookings)
+      .innerJoin(properties, eq(properties.id, bookings.propertyId))
+      .where(
+        and(
+          eq(properties.hostId, hostId),
+          ne(bookings.status, 'cancelled'),
+          eq(bookings.isCalendarBlock, false),
+          ne(bookings.dataSource, 'booking_ical_only'),
+          lt(bookings.checkinAt, maxEnd),
+          gt(bookings.checkoutAt, minStart),
+        ),
+      );
+    const knownByProperty = new Map<string, { checkinAt: Date; checkoutAt: Date }[]>();
+    for (const k of known) {
+      const list = knownByProperty.get(k.propertyId) ?? [];
+      list.push(k);
+      knownByProperty.set(k.propertyId, list);
+    }
+    const coveredIds = new Set(
+      unknown
+        .filter((u) => isRangeCoveredByBookings(u, knownByProperty.get(u.propertyId) ?? []))
+        .map((u) => u.id),
+    );
+    visibleRows = rows.filter((r) => !coveredIds.has(r.id));
+  }
+
+  const bookingIds = visibleRows.map((r) => r.id);
 
   // Timeline: due query separate invece di altri leftJoin sulla
   // principale — outbound_sends ha fino a 3 righe per prenotazione e
@@ -171,7 +222,7 @@ export async function listUpcomingCheckins(
   }
 
   return {
-    rows: rows.map((r) => ({
+    rows: visibleRows.map((r) => ({
       id: r.id,
       guestFullName: r.guestFullName,
       guestFirstName: r.guestFirstName,
@@ -185,6 +236,9 @@ export async function listUpcomingCheckins(
       premuraActiveAt: r.premuraActiveAt,
       guestPhoneSource: r.guestPhoneSource,
       premuraState: derivePremuraState(r.guestPhone, r.premuraActiveAt),
+      // Fascia iCal Booking senza ospite noto: sezione propria in UI,
+      // mai mescolata alle prenotazioni vere (decisione 30/07).
+      unknownOccupied: r.dataSource === 'booking_ical_only',
       surveyStatus: deriveSurveyStatus(r.surveySentAt, r.surveyCompletedAt, r.surveySkippedAt),
       surveySentAt: r.surveySentAt,
       surveyCompletedAt: r.surveyCompletedAt,

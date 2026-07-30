@@ -61,6 +61,7 @@ function baseRow(patch: Partial<UpcomingCheckinCardData>): UpcomingCheckinCardDa
     surveyCompletedAt: null,
     welcomeSentAt: null,
     outbound: [],
+    unknownOccupied: false,
     ...patch,
   };
 }
@@ -77,6 +78,21 @@ describe('buildTimeline', () => {
     expect(byLabel.Survey?.done).toBe(false);
     expect(byLabel.Survey?.detail).toContain('in coda');
     expect(byLabel['Mid-stay']?.done).toBe(false);
+    expect(byLabel['Mid-stay']?.detail).toBe("a metà soggiorno, se c'è consenso");
+  });
+
+  it('benvenuto con orario gia passato e nulla inviato: "non inviato", mai "previsto"', () => {
+    // Krzysztof: check-in 27 lug, oggi 29 lug. Dire "previsto 27 lug
+    // ore 08:00" e' una promessa al passato (bug 30/07).
+    const items = buildTimeline(
+      baseRow({ checkinAt: '2026-07-27T15:00:00+02:00', checkoutAt: '2026-08-01T10:00:00+02:00' }),
+      '08:00',
+      NOW,
+    );
+    const welcome = items.find((i) => i.label === 'Benvenuto');
+    expect(welcome?.done).toBe(false);
+    expect(welcome?.detail).toBe('non inviato');
+    expect(welcome?.detail).not.toContain('previsto');
   });
 
   it('survey futura: mostra la data prevista (T-7 alle 09:00)', () => {

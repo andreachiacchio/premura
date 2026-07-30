@@ -87,6 +87,75 @@ Per il sistema sono moduli diversi.
 
 ---
 
+## 2b. Flusso canonico (stella polare — Andrea, 30/07/2026)
+
+Ogni decisione futura si misura contro questo flusso. In caso di dubbio
+su una feature, rileggere qui.
+
+1. **Arriva la prenotazione** → Premura la vede entro 15 minuti, aggiorna
+   calendario e tutte le info che riesce a ricavare.
+2. **Il numero dell'ospite** arriva per una di queste vie, in ordine:
+   a) l'ospite lo lascia da solo aprendo la guest app per avere i
+      **codici d'accesso** (livello L1 — è la strada principale, non il
+      ripiego);
+   b) parser email (nome e contatti dove il canale li dà);
+   c) inserimento manuale dell'host (ultimo ricorso).
+3. **Premura manda la guest app** di quella struttura: casa, foto o
+   video, servizi disponibili, codici, trasporti.
+4. **Da lì Premura fa da tramite per tutto il soggiorno**:
+   - **prevenire la cancellazione**: presenza subito dopo la
+     prenotazione, l'ospite vede che c'è qualcuno;
+   - **preparare l'ospite** e spingere la recensione;
+   - **offrire servizi** in autonomia, e gestire il rapporto con il
+     fornitore. La conferma finale resta all'host;
+   - **gestire il kit** con la cleaner, in autonomia;
+   - **gestire ogni problema**: "da ora puoi scrivere qui per qualsiasi
+     cosa, ti rispondo subito".
+5. **Ogni messaggio automatico è firmato PREMURA.AI** — trasparenza
+   sull'AI e conformità art. 50 AI Act in un colpo solo.
+
+L'host interviene **solo quando c'è una decisione di soldi**.
+
+### 6. Controllo e escalation — tre livelli di autonomia
+
+**L1 — Risponde da solo.** Domande la cui risposta è già nella scheda
+struttura: wifi, orari check-in/out, come arrivare, parcheggio, regole,
+dove mangiare. Nessun impegno preso. → L'host le vede nel riepilogo,
+non le approva.
+
+**L2 — Prepara e aspetta conferma.** Tutto ciò che impegna soldi, date o
+disponibilità: richieste servizi, prezzi, late check-out, prenotazioni
+col fornitore. → Bozza in dashboard con anteprima, pulsanti
+Approva / Modifica / Rifiuta, notifica WhatsApp con link diretto.
+→ NIENTE parte senza il tocco dell'host.
+
+**L3 — Si ferma e chiama.** Ospite arrabbiato o insoddisfatto, guasto o
+emergenza, sicurezza, cancellazione, richiesta fuori schema, o
+semplicemente qualcosa che l'agente non sa gestire.
+→ Il bot SMETTE di rispondere su quella conversazione (riga in
+`conversation_handover`);
+→ WhatsApp immediato all'host con: ospite, struttura, testo del
+messaggio, perché è scattata l'escalation;
+→ il bot resta zitto finché l'host non lo riattiva.
+Meglio un silenzio di dieci minuti che una risposta sbagliata.
+
+**Rodaggio**: le prime due settimane TUTTO in modalità bozza, anche L1.
+Quando le risposte semplici risultano sempre corrette, si sblocca L1 e
+resta il controllo su L2 e L3. Deve esserci un **interruttore in
+dashboard** per farlo, non un deploy.
+
+**Il riepilogo** (nessun messaggio invisibile — se un invio non parte,
+l'host lo deve vedere):
+- in home, "Fatto dall'agente — oggi": una riga per azione, in
+  linguaggio host;
+- una volta al giorno, WhatsApp con il sunto: quante conversazioni,
+  quante gestite da sole, cosa aspetta l'host;
+- nella sezione Conversazioni: thread completo con chi ha detto cosa
+  (ospite / agente / host / fornitore) e lo stato di ogni messaggio,
+  inclusi quelli falliti o bloccati.
+
+---
+
 ## 3. Tre concetti strutturali nuovi (critici)
 
 ### A. Profilo struttura — il "manuale digitale"
@@ -212,6 +281,13 @@ Mai notifiche su 🟢.
 - **Firma messaggi all'ospite:** nome della struttura
   (es. "— La Goccia di S.Gennaro"). L'ospite deve pensare di parlare con
   l'host umano, non con un brand esterno.
+  **Aggiornamento 30/07/2026 (flusso canonico §2b, punto 5):** i messaggi
+  AUTOMATICI portano la firma PREMURA.AI per trasparenza AI (art. 50
+  AI Act). Le due cose convivono: il tono e l'identità restano quelli
+  della struttura, la firma tecnica dichiara l'automazione.
+  ⚠️ Il composer del benvenuto firma ancora col solo nome struttura:
+  cambio da propagare previa conferma di Andrea (tocca il testo già
+  approvato per il go-live dell'1/08).
 
 ### Pricing
 - **Prezzi:**

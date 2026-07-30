@@ -342,6 +342,11 @@ export async function listGuestsMissingPhoneSoon(
       and(
         eq(properties.hostId, hostId),
         ne(bookings.status, 'cancelled'),
+        // Blocchi calendario e fasce iCal Booking senza ospite noto NON
+        // sono ospiti a cui manca il numero: qui solo prenotazioni vere
+        // (le fasce ignote hanno la loro sezione, decisione 30/07).
+        eq(bookings.isCalendarBlock, false),
+        ne(bookings.dataSource, 'booking_ical_only'),
         sql`${bookings.guestPhone} is null`,
         gte(bookings.checkinAt, startOfToday),
         lt(bookings.checkinAt, urgencyEnd),

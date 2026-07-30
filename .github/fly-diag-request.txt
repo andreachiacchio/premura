@@ -1,0 +1,3 @@
+Richiesta diagnostica: 2026-07-30 — sync Gmail muto (0 chiamate a
+/api/gmail/sync su Vercel dalle 12:00Z nonostante deploy #5 e secret
+dichiarata su Fly). Verificare secret, health worker, log cron.

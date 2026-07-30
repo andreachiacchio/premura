@@ -1,7 +1,7 @@
 'use client';
 
 import { Check, Loader2, Pause, Play, Trash2 } from 'lucide-react';
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import {
   type SetPhoneActionResult,
   clearBookingGuestPhoneAction,
@@ -51,6 +51,9 @@ export type UpcomingCheckinCardData = {
   surveyCompletedAt: string | null;
   welcomeSentAt: string | null;
   outbound: OutboundEntryUI[];
+  /** Fascia iCal Booking senza ospite noto: sezione propria, mai
+   *  mescolata alle prenotazioni vere (decisione 30/07). */
+  unknownOccupied: boolean;
 };
 
 export type BoardProps = {
@@ -134,11 +137,21 @@ export function buildTimeline(
   } else if (welcomeSend?.status === 'failed') {
     items.push({ label: 'Benvenuto', detail: 'invio fallito — da sbloccare', done: false });
   } else {
-    items.push({
-      label: 'Benvenuto',
-      detail: `previsto ${formatDayMonth(checkin)} ore ${welcomeTimeSlot}`,
-      done: false,
-    });
+    // Un evento passato non e' mai "previsto" (bug 30/07): se l'orario
+    // del benvenuto e' gia' trascorso e nulla e' partito, la verita' e'
+    // "non inviato".
+    const [slotHours, slotMinutes] = welcomeTimeSlot.split(':').map(Number);
+    const expectedAt = new Date(checkin);
+    expectedAt.setHours(slotHours ?? 8, slotMinutes ?? 0, 0, 0);
+    items.push(
+      expectedAt.getTime() < now.getTime()
+        ? { label: 'Benvenuto', detail: 'non inviato', done: false }
+        : {
+            label: 'Benvenuto',
+            detail: `previsto ${formatDayMonth(checkin)} ore ${welcomeTimeSlot}`,
+            done: false,
+          },
+    );
   }
 
   // Survey pre-arrivo: parte a T-7 giorni (±1) al giro delle 09:00.
@@ -189,7 +202,7 @@ export function buildTimeline(
       done: midstay.status === 'sent',
     });
   } else {
-    items.push({ label: 'Mid-stay', detail: 'a meta soggiorno, se c e consenso', done: false });
+    items.push({ label: 'Mid-stay', detail: "a metà soggiorno, se c'è consenso", done: false });
   }
 
   return items;
@@ -242,13 +255,28 @@ function defaultState(): RowState {
   return { draft: '', editing: false, error: null, flashSuccess: false };
 }
 
+const PROPERTY_FILTER_STORAGE_KEY = 'premura.checkins.propertyFilter';
+
 export function UpcomingCheckinsBoard({
   rows,
   properties,
   welcomeTimeSlot,
 }: BoardProps): React.JSX.Element {
   const [pending, startTransition] = useTransition();
+  // Filtro struttura persistente fra le visite (richiesta 30/07). Letto
+  // da localStorage DOPO il mount — inizializzarlo nel primo render
+  // creerebbe un mismatch di hydration col markup server ('all').
   const [propertyFilter, setPropertyFilter] = useState<string>('all');
+  useEffect(() => {
+    const saved = window.localStorage.getItem(PROPERTY_FILTER_STORAGE_KEY);
+    if (saved && (saved === 'all' || properties.some((p) => p.id === saved))) {
+      setPropertyFilter(saved);
+    }
+  }, [properties]);
+  const changePropertyFilter = (value: string): void => {
+    setPropertyFilter(value);
+    window.localStorage.setItem(PROPERTY_FILTER_STORAGE_KEY, value);
+  };
   const [state, setState] = useState<Record<string, RowState>>(() =>
     Object.fromEntries(
       rows.map((r) => [
@@ -265,20 +293,29 @@ export function UpcomingCheckinsBoard({
     setState((s) => ({ ...s, [id]: { ...(s[id] ?? defaultState()), ...patch } }));
   };
 
-  const groups = useMemo(() => {
+  // Prenotazioni vere e fasce "occupato sorgente ignota" separate alla
+  // radice: mai nello stesso gruppo, mai negli stessi conteggi.
+  const { groups, occupiedGroups } = useMemo(() => {
     const visible =
       propertyFilter === 'all' ? rows : rows.filter((r) => r.propertyId === propertyFilter);
     const byProperty = new Map<string, UpcomingCheckinCardData[]>();
+    const occupiedByProperty = new Map<string, UpcomingCheckinCardData[]>();
     for (const r of visible) {
-      const list = byProperty.get(r.propertyId) ?? [];
+      const target = r.unknownOccupied ? occupiedByProperty : byProperty;
+      const list = target.get(r.propertyId) ?? [];
       list.push(r);
-      byProperty.set(r.propertyId, list);
+      target.set(r.propertyId, list);
     }
     // Ordine gruppi = ordine alfabetico delle property (stesso del select),
     // limitato a quelle che hanno righe visibili.
-    return properties
-      .filter((p) => byProperty.has(p.id))
-      .map((p) => ({ property: p, rows: byProperty.get(p.id) ?? [] }));
+    return {
+      groups: properties
+        .filter((p) => byProperty.has(p.id))
+        .map((p) => ({ property: p, rows: byProperty.get(p.id) ?? [] })),
+      occupiedGroups: properties
+        .filter((p) => occupiedByProperty.has(p.id))
+        .map((p) => ({ property: p, rows: occupiedByProperty.get(p.id) ?? [] })),
+    };
   }, [rows, properties, propertyFilter]);
 
   const handleSave = (id: string, currentPhone: string | null): void => {
@@ -346,7 +383,7 @@ export function UpcomingCheckinsBoard({
         <select
           id="property-filter"
           value={propertyFilter}
-          onChange={(e) => setPropertyFilter(e.target.value)}
+          onChange={(e) => changePropertyFilter(e.target.value)}
           className="h-10 rounded-card-sm border border-line bg-paper px-3 text-body text-ink focus:outline-none focus:ring-2 focus:ring-terracotta-soft/40"
         >
           <option value="all">Tutte le strutture</option>
@@ -358,7 +395,7 @@ export function UpcomingCheckinsBoard({
         </select>
       </div>
 
-      {groups.length === 0 ? (
+      {groups.length === 0 && occupiedGroups.length === 0 ? (
         <div className="rounded-card border border-line-soft bg-paper px-6 py-8 text-center text-body text-ink-soft shadow-sm">
           Nessuna prenotazione per questa struttura nella finestra dei 14 giorni.
         </div>
@@ -532,6 +569,47 @@ export function UpcomingCheckinsBoard({
           </section>
         ))}
       </div>
+
+      {/* Fasce "occupato — sorgente ignota": il feed iCal Booking dice
+          solo che le date sono prese, non chi arriva. Sezione propria,
+          righe semplificate (niente numero, stato o timeline: senza
+          ospite non c'e' nulla da attivare). */}
+      {occupiedGroups.length > 0 ? (
+        <section aria-label="Date occupate" className="mt-10">
+          <h2 className="mb-1 font-serif text-h3 leading-tight text-ink">Date occupate</h2>
+          <p className="mb-3 text-body-sm text-ink-mute">
+            Il calendario Booking dice solo che queste date sono occupate — verifica chi arriva
+            sull'extranet.
+          </p>
+          <div className="space-y-4">
+            {occupiedGroups.map(({ property, rows: groupRows }) => (
+              <div
+                key={property.id}
+                className="overflow-hidden rounded-card border border-line bg-paper shadow-sm"
+              >
+                <p className="border-b border-line-soft bg-ivory px-4 py-2 text-eyebrow uppercase tracking-wider text-ink-mute">
+                  {property.name}
+                </p>
+                {groupRows.map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-line-soft px-4 py-2.5 first:border-t-0"
+                  >
+                    <p className="text-body text-ink">
+                      {formatDayMonth(new Date(r.checkinAt))} –{' '}
+                      {formatDayMonth(new Date(r.checkoutAt))}
+                    </p>
+                    <p className="text-body-sm text-ink-soft">
+                      {arrivalLabel(r.checkinAt, r.checkoutAt, now)}
+                    </p>
+                    <p className="text-[12px] text-ink-mute">da iCal Booking · ospite ignoto</p>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
