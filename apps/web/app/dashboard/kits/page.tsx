@@ -63,7 +63,7 @@ export default async function KitsPage({
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8">
+    <div className="mx-auto max-w-5xl px-6 py-8 xl:max-w-[1400px]">
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-ink">Kit di benvenuto</h1>

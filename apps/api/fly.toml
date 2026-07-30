@@ -64,8 +64,29 @@ primary_region = "fra"
     method = "GET"
     path = "/health"
 
-# Health check del worker. Non passa dal proxy (il gruppo non ha servizi):
-# è un machine check diretto sulla porta interna. /health su src/worker.ts
+# Webhook WAHA sul worker — porta pubblica dedicata.
+#
+# Il webhook inbound deve arrivare a una macchina ACCESA: sul processo app
+# il primo messaggio dell'ospite dopo un idle pagherebbe il cold start.
+# La 443 appartiene al process group app ([http_service] sopra), quindi il
+# worker espone la 8443. auto_stop_machines resta false: e' la ragione di
+# esistere di questo gruppo.
+#
+# URL da configurare su WAHA (config.webhooks[].url):
+#   https://premura-api-staging.fly.dev:8443/webhooks/waha
+[[services]]
+  processes = ["worker"]
+  internal_port = 8080
+  protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = true
+
+  [[services.ports]]
+    port = 8443
+    handlers = ["tls", "http"]
+
+# Health check del worker. Non passa dal proxy verso l'esterno: è un
+# machine check diretto sulla porta interna. /health su src/worker.ts
 # risponde "degraded" se un cron non è più schedulato, che è precisamente
 # il segnale mancato per tre mesi.
 [checks]

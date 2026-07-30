@@ -23,7 +23,7 @@ export type CleanersListRow = {
 
 export function CleanersList({ rows }: { rows: CleanersListRow[] }): React.JSX.Element {
   return (
-    <ul className="space-y-3">
+    <ul className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-start xl:grid-cols-3">
       {rows.map((row) => (
         <li key={row.id}>
           <Link
