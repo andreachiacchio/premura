@@ -13,6 +13,7 @@ import {
 import { bookings } from './bookings';
 import { serviceCategoryEnum, serviceInquirySourceEnum } from './enums';
 import { properties } from './properties';
+import { providers } from './providers';
 
 // Catalogo servizi extra venduti all'ospite durante il soggiorno
 // (boat tour, transfer, chef privato, pulizia extra…).
@@ -70,6 +71,11 @@ export const services = pgTable(
     // Nome del fornitore (Ad Maiora Charter, NCC…). Interno.
     supplierName: varchar('supplier_name', { length: 160 }),
     supplierNotes: text('supplier_notes'),
+
+    // Fornitore collegato (sezione Servizi, 30/07): quando l'ospite
+    // chiede questo servizio, l'agente sa con chi parlare. Interno —
+    // i contatti del fornitore non escono mai verso l'ospite.
+    providerId: uuid('provider_id').references(() => providers.id, { onDelete: 'set null' }),
 
     // Durata/orari indicativi mostrati all'ospite (es. '7h · 9:30–16:30').
     durationLabelEn: varchar('duration_label_en', { length: 120 }),

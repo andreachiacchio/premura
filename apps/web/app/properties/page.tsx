@@ -157,6 +157,12 @@ export default async function PropertiesPage() {
                 </p>
                 <span className="flex items-center gap-3">
                   <Link
+                    href={`/properties/${p.id}/services`}
+                    className="inline-flex items-center gap-1 text-body-sm font-medium text-terracotta-2 hover:underline"
+                  >
+                    Servizi
+                  </Link>
+                  <Link
                     href={`/properties/${p.id}/calendars`}
                     className="inline-flex items-center gap-1 text-body-sm font-medium text-terracotta-2 hover:underline"
                   >
