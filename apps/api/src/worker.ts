@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { createServerClient } from '@premura/db';
 import Fastify from 'fastify';
 import { wahaWebhookRoutes } from './api/webhooks/waha';
+import { startBookingWelcomeCron } from './jobs/booking-welcome-cron';
 // Import top-level: ogni modulo worker costruisce la propria istanza BullMQ
 // Worker a module load e inizia subito ad ascoltare la coda. Stesso pattern
 // che questi worker avevano quando vivevano dentro index.ts.
@@ -64,6 +65,8 @@ await app.register(wahaWebhookRoutes, { db: apiClient.db });
 const icalCron = startIcalCron();
 const surveyCron = startSurveyCron();
 const welcomeCron = startWelcomeMessageCron();
+// Benvenuto per prenotazioni senza kit — il percorso di Julian (1 ago).
+const bookingWelcomeCron = startBookingWelcomeCron();
 
 // Health del worker: non "il processo risponde" ma "i cron sono ancora
 // schedulati". Un croner fermo restituisce nextRun() null, ed e' quello
@@ -73,6 +76,7 @@ app.get('/health', () => {
     ical: icalCron.nextRun()?.toISOString() ?? null,
     survey: surveyCron.nextRun()?.toISOString() ?? null,
     welcome: welcomeCron.nextRun()?.toISOString() ?? null,
+    bookingWelcome: bookingWelcomeCron.nextRun()?.toISOString() ?? null,
   };
   const allScheduled = Object.values(crons).every((next) => next !== null);
   return {
@@ -96,6 +100,7 @@ app.log.info(
     ical: icalCron.nextRun()?.toISOString() ?? null,
     survey: surveyCron.nextRun()?.toISOString() ?? null,
     welcome: welcomeCron.nextRun()?.toISOString() ?? null,
+    bookingWelcome: bookingWelcomeCron.nextRun()?.toISOString() ?? null,
   },
   'cron schedulati',
 );
@@ -105,6 +110,7 @@ const shutdown = async (signal: string): Promise<void> => {
   icalCron.stop();
   surveyCron.stop();
   welcomeCron.stop();
+  bookingWelcomeCron.stop();
   await Promise.all([
     icalPollWorker.close(),
     draftGenerationWorker.close(),
