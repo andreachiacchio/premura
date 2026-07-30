@@ -302,3 +302,7 @@ export const reviewRecoveryOutcomeEnum = pgEnum('review_recovery_outcome', [
   'no_response', // ospite non ha risposto al recovery
   'pending', // in corso
 ]);
+
+// Stato operativo di un fornitore di servizi (providers).
+// 'suspended' = censito ma fuori dal routing (ferie, contratto sospeso).
+export const providerStatusEnum = pgEnum('provider_status', ['active', 'suspended']);
