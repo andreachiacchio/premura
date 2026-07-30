@@ -5,10 +5,9 @@ import { and, eq, ne, sql } from 'drizzle-orm';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
-// Pagina "Strutture" — elenco minimo (bug produzione 30/07: la voce di
-// navigazione portava a un 404). Nome, citta', feed configurati,
-// prenotazioni. Il wizard "aggiungi struttura" arriva la settimana
-// prossima: qui c'e' solo la verita' su cio' che esiste.
+// Pagina "Strutture": nome, citta', feed configurati, prenotazioni.
+// Da qui si entra nel wizard "Aggiungi struttura" (/properties/new)
+// e nei calendari per-property (/properties/[id]/calendars).
 //
 // Sui feed diciamo cio' che SAPPIAMO: "configurato" o "nessun feed".
 // Non "attivo" — lo stato di sincronizzazione (ultimo sync, esito) non
@@ -73,6 +72,13 @@ export default async function PropertiesPage() {
         </Link>
       </header>
 
+      <Link
+        href="/properties/new"
+        className="mb-6 inline-flex h-11 items-center justify-center rounded-full bg-terracotta px-6 text-body-sm font-medium text-paper shadow-md transition-colors hover:bg-terracotta-2"
+      >
+        + Aggiungi struttura
+      </Link>
+
       <ul className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-start xl:grid-cols-3">
         {rows.map((p) => {
           const totalBookings = countsByProperty.get(p.id)?.total ?? 0;
@@ -111,22 +117,26 @@ export default async function PropertiesPage() {
                   {upcomingBookings} {upcomingBookings === 1 ? 'soggiorno' : 'soggiorni'} in arrivo
                   · {totalBookings} totali
                 </p>
-                <Link
-                  href={`/properties/${p.id}/knowledge`}
-                  className="inline-flex items-center gap-1 text-body-sm font-medium text-terracotta-2 hover:underline"
-                >
-                  Info casa
-                  <ChevronRight aria-hidden className="size-4" />
-                </Link>
+                <span className="flex items-center gap-3">
+                  <Link
+                    href={`/properties/${p.id}/calendars`}
+                    className="inline-flex items-center gap-1 text-body-sm font-medium text-terracotta-2 hover:underline"
+                  >
+                    Calendari
+                  </Link>
+                  <Link
+                    href={`/properties/${p.id}/knowledge`}
+                    className="inline-flex items-center gap-1 text-body-sm font-medium text-terracotta-2 hover:underline"
+                  >
+                    Info casa
+                    <ChevronRight aria-hidden className="size-4" />
+                  </Link>
+                </span>
               </div>
             </li>
           );
         })}
       </ul>
-
-      <p className="mt-6 text-body-sm text-ink-mute">
-        Aggiungere una struttura da qui arriva a breve. Nel frattempo si fa dall'onboarding.
-      </p>
     </main>
   );
 }

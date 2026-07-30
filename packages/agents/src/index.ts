@@ -12,6 +12,7 @@ export * from './draft-generator';
 export * from './draft-generator-pipeline';
 export * from './guest-dna';
 export * from './knowledge-parser';
+export * from './onboarding';
 export * from './survey-pipeline';
 export * from './survey-planner';
 export * from './survey-token';
