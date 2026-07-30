@@ -26,6 +26,25 @@ export async function GET(request: Request): Promise<NextResponse> {
     );
   }
 
+  // Controllo esplicito PRIMA di provare (richiesta Andrea 30/07):
+  // "configurazione server incompleta" senza dire cosa manca fa solo
+  // perdere tempo. I NOMI delle variabili non sono segreti; i valori
+  // non escono mai.
+  const REQUIRED_ENV = [
+    'GOOGLE_CLIENT_ID',
+    'GOOGLE_CLIENT_SECRET',
+    'APP_URL',
+    'TOKEN_ENCRYPTION_KEY',
+  ] as const;
+  const missing = REQUIRED_ENV.filter((name) => !process.env[name]?.trim());
+  if (missing.length > 0) {
+    console.error('[google-oauth-start] variabili mancanti', { missing });
+    return NextResponse.json(
+      { error: 'configurazione server incompleta', variabili_mancanti: missing },
+      { status: 500 },
+    );
+  }
+
   try {
     const authUrl = await buildAuthUrl(hostId);
     return NextResponse.redirect(authUrl, 302);
