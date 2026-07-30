@@ -3,6 +3,7 @@
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { geocodeAddress } from '@/lib/geocode';
+import { fetchListingPageText } from '@/lib/listing-page';
 import { upsertPropertyKnowledge } from '@/lib/repositories/property-knowledge';
 import { type ListingImportData, extractListingData } from '@premura/agents';
 import { properties } from '@premura/db';
@@ -18,6 +19,34 @@ import { z } from 'zod';
 // precompila, l'host corregge. Mai inventare: campo assente = vuoto.
 
 export type ImportResult = { ok: true; data: ListingImportData } | { ok: false; error: string };
+
+// Import dal LINK dell'annuncio. 'blocked' NON e' un errore: e' il caso
+// normale (Booking/Airbnb bloccano i datacenter) e la UI risponde con
+// la strada che funziona sempre — copia-incolla del testo.
+export type UrlImportResult =
+  | { ok: true; data: ListingImportData }
+  | { ok: false; blocked: true }
+  | { ok: false; blocked: false; error: string };
+
+export async function importListingFromUrlAction(rawUrl: string): Promise<UrlImportResult> {
+  await getCurrentHostId();
+  const page = await fetchListingPageText(rawUrl);
+  if (!page.ok) {
+    if (page.reason === 'invalid_url') {
+      return { ok: false, blocked: false, error: 'Questo non sembra un link valido.' };
+    }
+    return { ok: false, blocked: true };
+  }
+  try {
+    const result = await extractListingData({ text: page.text });
+    return { ok: true, data: result.data };
+  } catch (err) {
+    console.error('[wizard] estrazione da link fallita', err);
+    // La pagina si apriva ma l'estrazione no: stessa via d'uscita del
+    // blocco, il copia-incolla. Mai un vicolo cieco.
+    return { ok: false, blocked: true };
+  }
+}
 
 const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set([
