@@ -1,7 +1,10 @@
+import { dayPhrase, formatDayMonth } from '@/lib/format-date';
 import type { GuestMissingPhoneSoon } from '@/lib/repositories/home-summary';
+import type { PossibleCancellation } from '@/lib/repositories/possible-cancellations';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { InlinePhoneFix } from './InlinePhoneFix';
+import { PossibleCancellationActions } from './PossibleCancellationActions';
 
 // Blocco 2 della home — "Serve una tua decisione".
 //
@@ -41,6 +44,8 @@ export type DecisionsData = {
   incompleteCount: number;
   /** Kit proposti in attesa di approvazione. */
   pendingKitsCount: number;
+  /** Eventi iCal spariti da 2 poll riusciti: l'host conferma o smentisce. */
+  possibleCancellations: PossibleCancellation[];
 };
 
 export function decisionsCount(d: DecisionsData): number {
@@ -48,7 +53,8 @@ export function decisionsCount(d: DecisionsData): number {
     d.draftItems.length +
     d.missingPhoneSoon.length +
     (d.incompleteCount > 0 ? 1 : 0) +
-    (d.pendingKitsCount > 0 ? 1 : 0)
+    (d.pendingKitsCount > 0 ? 1 : 0) +
+    d.possibleCancellations.length
   );
 }
 
@@ -109,6 +115,25 @@ export function DecisionsBlock({
               </p>
               {d.card}
             </li>
+          ))}
+
+          {/* Possibili cancellazioni PRIMA di tutto il resto tranne le
+              bozze: rischio concreto di preparare kit e pulizie per
+              ospiti che hanno disdetto (30/07). */}
+          {data.possibleCancellations.map((c) => (
+            <Item key={c.bookingId}>
+              <p className="text-body text-ink">
+                <span className="font-medium text-alert">Possibile cancellazione:</span>{' '}
+                <span className="font-medium">{c.guestFirstName ?? c.guestFullName}</span> ·{' '}
+                {c.propertyName} · {formatDayMonth(c.checkinAt)} – {formatDayMonth(c.checkoutAt)} —
+                il calendario {c.platform === 'booking' ? 'Booking' : 'Airbnb'} non la mostra più
+                da 2 controlli (arrivo {dayPhrase(c.checkinAt, now)}). Verifica sull'extranet.
+              </p>
+              <PossibleCancellationActions
+                bookingId={c.bookingId}
+                guestLabel={c.guestFirstName ?? c.guestFullName}
+              />
+            </Item>
           ))}
 
           {groupMissingPhoneByProperty(data.missingPhoneSoon).map(([propertyName, guests]) => (

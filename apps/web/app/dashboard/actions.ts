@@ -3,6 +3,10 @@
 import { completeBookingManual, skipBookingCompletion, triggerIcalPollNow } from '@/lib/api';
 import { getCurrentAccessToken, getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import {
+  confirmCancellation,
+  dismissCancellation,
+} from '@/lib/repositories/possible-cancellations';
 import { getOrCreateDeflectionDraft, markDeflectionSent } from '@/lib/deflection-draft';
 import { composeGuestInvite } from '@/lib/guest-invite';
 import { findOwnership } from '@/lib/repositories/bookings';
@@ -304,4 +308,30 @@ export async function buildGuestInviteAction(bookingId: string): Promise<GuestIn
     console.error('[dashboard] buildGuestInviteAction failed', err);
     return { ok: false, error: 'Non sono riuscito a generare il messaggio, riprova.' };
   }
+}
+
+// ─── Possibili cancellazioni (30/07) ────────────────────────────────
+
+export async function confirmCancellationAction(
+  bookingId: string,
+): Promise<{ ok: boolean }> {
+  const hostId = await getCurrentHostId();
+  const parsed = idSchema.safeParse(bookingId);
+  if (!parsed.success) return { ok: false };
+  const { db } = await getDb();
+  const result = await confirmCancellation(db, hostId, parsed.data);
+  revalidatePath('/dashboard');
+  return { ok: result.ok };
+}
+
+export async function dismissCancellationAction(
+  bookingId: string,
+): Promise<{ ok: boolean }> {
+  const hostId = await getCurrentHostId();
+  const parsed = idSchema.safeParse(bookingId);
+  if (!parsed.success) return { ok: false };
+  const { db } = await getDb();
+  const result = await dismissCancellation(db, hostId, parsed.data);
+  revalidatePath('/dashboard');
+  return { ok: result.ok };
 }
