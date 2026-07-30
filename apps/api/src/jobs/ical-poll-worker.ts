@@ -90,6 +90,28 @@ export const icalPollWorker = new Worker<IcalPollJobData>(
 
         try {
           const result = await upsertBookingShell(client.db, shell);
+          // MAI sopprimere in silenzio (Andrea 30/07): ogni fascia
+          // anonima scartata perche' coperta lascia traccia completa —
+          // e' cio' che permettera' di recuperare eventi scartati per
+          // errore quando i feed incrociati verranno rimappati.
+          if (result.suppressedCoverage) {
+            logger.warn(
+              {
+                propertyId: result.suppressedCoverage.propertyId,
+                uid: result.suppressedCoverage.platformBookingRef,
+                checkinAt: result.suppressedCoverage.checkinAt.toISOString(),
+                checkoutAt: result.suppressedCoverage.checkoutAt.toISOString(),
+                coveredBy: result.suppressedCoverage.coveredBy.map((c) => ({
+                  bookingId: c.id,
+                  guest: c.guestFullName,
+                  checkinAt: c.checkinAt.toISOString(),
+                  checkoutAt: c.checkoutAt.toISOString(),
+                })),
+                reason: result.reason,
+              },
+              'fascia anonima soppressa: coperta da prenotazioni con nome',
+            );
+          }
           if (result.inserted) {
             inserted += 1;
           } else if (result.skipped) {
