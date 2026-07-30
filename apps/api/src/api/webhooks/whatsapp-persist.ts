@@ -1,5 +1,5 @@
 import { type Database, bookings, conversations, messages } from '@premura/db';
-import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import type { FlatInboundMessage } from './whatsapp-payload';
 import { renderMessageBody } from './whatsapp-payload';
 
@@ -7,8 +7,9 @@ import { renderMessageBody } from './whatsapp-payload';
 //
 // Lookup booking: cerca per guest_phone tra le prenotazioni con check-in/out
 // in finestra ragionevole (-2gg dal check-in, +2gg dal check-out). Se non
-// match, persiste come orphan (booking_id = null). L'orphan trigger un alert
-// host che gestiamo in slice 7a.3+.
+// match (Fase 2, 30/07): la conversation si crea COMUNQUE, non attribuita
+// (booking_id null) — mai scartare un messaggio. Due inbound consecutivi
+// dallo stesso numero sconosciuto finiscono nella stessa conversation.
 //
 // Lookup-or-insert conversation: chiave (booking_id, channel='whatsapp',
 // external_thread_id=wa_id ospite). Se non esiste, crea. Vincolo unique
@@ -84,42 +85,44 @@ export async function persistInboundMessage(
 
   const bookingId: string | null = matches[0]?.id ?? null;
 
-  let conversationId: string | null = null;
-  if (bookingId) {
-    const [existingConv] = await db
-      .select({ id: conversations.id })
-      .from(conversations)
-      .where(
-        and(
-          eq(conversations.bookingId, bookingId),
-          eq(conversations.channel, 'whatsapp'),
-          eq(conversations.externalThreadId, message.from),
-        ),
-      )
-      .limit(1);
+  // Fase 2 (30/07): ANCHE un numero sconosciuto ottiene la sua
+  // conversation — non attribuita (booking_id null), mai scartata.
+  // La chiave di riuso e' (booking_id, channel, thread); per le non
+  // attribuite il booking_id e' null, quindi il lookup usa isNull.
+  const [existingConv] = await db
+    .select({ id: conversations.id })
+    .from(conversations)
+    .where(
+      and(
+        bookingId ? eq(conversations.bookingId, bookingId) : isNull(conversations.bookingId),
+        eq(conversations.channel, 'whatsapp'),
+        eq(conversations.externalThreadId, message.from),
+      ),
+    )
+    .limit(1);
 
-    if (existingConv) {
-      conversationId = existingConv.id;
-      await db
-        .update(conversations)
-        .set({ lastMessageAt: now })
-        .where(eq(conversations.id, conversationId));
-    } else {
-      const [insertedConv] = await db
-        .insert(conversations)
-        .values({
-          bookingId,
-          channel: 'whatsapp',
-          externalThreadId: message.from,
-          status: 'active',
-          lastMessageAt: now,
-        })
-        .returning({ id: conversations.id });
-      if (!insertedConv) {
-        throw new Error('[whatsapp-persist] conversation insert returned no row');
-      }
-      conversationId = insertedConv.id;
+  let conversationId: string;
+  if (existingConv) {
+    conversationId = existingConv.id;
+    await db
+      .update(conversations)
+      .set({ lastMessageAt: now })
+      .where(eq(conversations.id, conversationId));
+  } else {
+    const [insertedConv] = await db
+      .insert(conversations)
+      .values({
+        bookingId,
+        channel: 'whatsapp',
+        externalThreadId: message.from,
+        status: 'active',
+        lastMessageAt: now,
+      })
+      .returning({ id: conversations.id });
+    if (!insertedConv) {
+      throw new Error('[whatsapp-persist] conversation insert returned no row');
     }
+    conversationId = insertedConv.id;
   }
 
   const { body, mediaType } = renderMessageBody(message);
@@ -143,6 +146,7 @@ export async function persistInboundMessage(
       fromEntity: 'guest',
       toEntity: 'premura',
       body,
+      status: 'received',
       platformMessageId: message.id,
       recipientExternalId: message.from,
       sentAt,
