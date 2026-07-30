@@ -80,4 +80,15 @@ export type IcalSource = {
   channelManagerName?: string;
   // Etichetta opzionale mostrata all'host in UI
   label?: string;
+
+  // Stato di sincronizzazione, scritto dal poll worker a ogni giro.
+  // Lezione La Goccia (30/07): due feed morti (400 Invalid Token) per
+  // mesi e nessun segnale. Da qui: la pagina Strutture mostra lo stato
+  // REALE e la home alza una decisione dopo 3 fallimenti consecutivi.
+  lastCheckedAt?: string; // ISO — ultimo tentativo, esito qualunque
+  lastOkAt?: string; // ISO — ultimo successo ("non risponde DA...")
+  lastResult?: 'ok' | 'error';
+  lastError?: string;
+  consecutiveFailures?: number;
+  lastEventsCount?: number;
 };
