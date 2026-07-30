@@ -1,5 +1,5 @@
 import { type OutboundTrigger, composeBookingWelcome, reserveAndSend } from '@premura/agents';
-import { bookings, createServerClient, hosts, properties, propertyKnowledge } from '@premura/db';
+import { bookings, createServerClient, hosts, properties } from '@premura/db';
 import { checkOutboundCompliance } from '@premura/shared';
 import { Cron } from 'croner';
 import { and, eq, isNotNull, ne, sql } from 'drizzle-orm';
@@ -62,7 +62,6 @@ export async function runBookingWelcomeTick(now: Date = new Date()): Promise<voi
         guestFullName: bookings.guestFullName,
         guestLanguage: bookings.guestLanguage,
         checkinAt: bookings.checkinAt,
-        propertyId: properties.id,
         propertyName: properties.name,
         welcomeTimeSlot: hosts.welcomeTimeSlot,
         welcomeAutoSend: hosts.welcomeAutoSend,
@@ -88,16 +87,6 @@ export async function runBookingWelcomeTick(now: Date = new Date()): Promise<voi
       if (!c.welcomeAutoSend) continue;
       if (nowMin < slotToMinutes(c.welcomeTimeSlot)) continue;
 
-      // Referente in loco dalla knowledge della property (primo contatto).
-      const [knowledge] = await client.db
-        .select({ emergencyContacts: propertyKnowledge.emergencyContacts })
-        .from(propertyKnowledge)
-        .where(eq(propertyKnowledge.propertyId, c.propertyId))
-        .limit(1);
-      const firstContact = (knowledge?.emergencyContacts ?? [])[0] as
-        | { name?: string; phone?: string }
-        | undefined;
-
       const body = composeBookingWelcome({
         guestFirstName: c.guestFirstName,
         guestFullName: c.guestFullName,
@@ -105,10 +94,6 @@ export async function runBookingWelcomeTick(now: Date = new Date()): Promise<voi
         checkinAt: c.checkinAt,
         language: c.guestLanguage,
         guestAppUrl: process.env.WELCOME_GUEST_APP_URL?.trim() || null,
-        contact:
-          firstContact?.name && firstContact?.phone
-            ? { name: firstContact.name, phone: firstContact.phone }
-            : null,
         aiDisclosureCustom: c.aiDisclosureCustom,
       });
 

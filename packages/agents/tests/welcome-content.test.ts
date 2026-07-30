@@ -3,6 +3,9 @@ import { composeBookingWelcome } from '../src/outbound/welcome-content';
 
 // Il benvenuto e' contenuto FISSO: questi test inchiodano il testo
 // parola per parola. Se qualcuno lo cambia, il test glielo fa dichiarare.
+//
+// La fixture usa l'URL REALE della guest app (deciso da Andrea il 30/07):
+// il primo test e' letteralmente il messaggio che parte a Julian.
 
 const JULIAN = {
   guestFirstName: 'Julian',
@@ -10,8 +13,7 @@ const JULIAN = {
   propertyName: 'Villa Cristina',
   checkinAt: new Date('2026-08-01T13:00:00Z'),
   language: 'en',
-  guestAppUrl: 'https://guest.premura.it/villa-cristina',
-  contact: { name: 'Paolo', phone: '+39 000 000 0000' },
+  guestAppUrl: 'https://andreachiacchio.github.io/villa-cristina-guest-app/',
   aiDisclosureCustom: null,
 };
 
@@ -22,9 +24,7 @@ describe('composeBookingWelcome', () => {
         '\n' +
         "Hi Julian, welcome! We're delighted to host you at Villa Cristina from Saturday 1 August.\n" +
         '\n' +
-        "Here you'll find everything for your stay — house info and our local services (boat tours, transfers, private chef): https://guest.premura.it/villa-cristina\n" +
-        '\n' +
-        'For anything on site, Paolo is your contact: +39 000 000 0000.\n' +
+        "Here you'll find everything for your stay — house info and our local services (boat tours, transfers, private chef): https://andreachiacchio.github.io/villa-cristina-guest-app/\n" +
         '\n' +
         'See you soon,\n' +
         'Villa Cristina',
@@ -58,21 +58,19 @@ describe('composeBookingWelcome', () => {
     expect(text).toContain('Hi Julian, welcome!');
   });
 
-  it('senza referente la riga sparisce, mai numeri inventati', () => {
-    const text = composeBookingWelcome({ ...JULIAN, contact: null });
-    expect(text).not.toContain('Paolo');
-    expect(text).not.toContain('your contact');
+  it('nessun referente umano nel messaggio (decisione 30/07)', () => {
+    // L'accoglienza fisica (chiavi, arrivo) e' gestita fuori dal
+    // benvenuto: qui non devono comparire nomi o numeri di persone.
+    for (const language of ['en', 'it']) {
+      const text = composeBookingWelcome({ ...JULIAN, language });
+      expect(text).not.toContain('Paolo');
+      expect(text).not.toContain('your contact');
+      expect(text).not.toContain('riferimento');
+    }
   });
 
   it('firma = nome della struttura, mai Premura nel testo', () => {
-    // URL neutro: la PROSA non deve mai nominare Premura (decisione
-    // blindata), ma il dominio del link e' una scelta dell'host — se
-    // fosse premura.it rivelerebbe comunque il brand, e la segnalazione
-    // sta nel report, non in questo test.
-    const text = composeBookingWelcome({
-      ...JULIAN,
-      guestAppUrl: 'https://villacristinapraiano.com/guest',
-    });
+    const text = composeBookingWelcome(JULIAN);
     expect(text).not.toMatch(/premura/i);
     expect(text.endsWith('Villa Cristina')).toBe(true);
   });
