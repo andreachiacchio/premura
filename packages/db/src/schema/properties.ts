@@ -47,6 +47,12 @@ export const properties = pgTable(
     // — mai mandare link rotti.
     guestAppUrl: text('guest_app_url'),
 
+    // Colore fisso della struttura (#RRGGBB) — riconoscerla senza
+    // leggere (decisione 30/07). Assegnato automaticamente alla
+    // creazione da una palette definita; usato ovunque compaia la
+    // struttura (bordo riga, chip, avatar, intestazioni di gruppo).
+    color: varchar('color', { length: 7 }),
+
     // Sorgenti iCal come jsonb array.
     // Motivo: supportare channel manager (es. Smoobu, Hostaway) oltre a
     // Booking/Airbnb direct. Un host potrebbe avere un solo URL Smoobu

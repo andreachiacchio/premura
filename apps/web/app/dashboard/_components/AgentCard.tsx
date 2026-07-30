@@ -24,31 +24,31 @@ export function AgentCard({
   return (
     <section
       aria-label="Premura sta lavorando"
-      className="relative mx-5 mt-1 overflow-hidden rounded-[24px] bg-gradient-to-br from-ink to-[#2A4A60] p-6 pb-5 text-paper shadow-lg md:mx-0"
+      className="relative mx-5 mt-1 overflow-hidden rounded-[24px] bg-gradient-to-br from-ink to-[#2A4A60] p-6 pb-5 text-paper shadow-lg md:mx-0 md:flex md:items-center md:gap-6 md:rounded-card md:px-5 md:py-4"
     >
       {/* Archi decorativi come nel prototipo */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-10 -top-16 size-44 rounded-full border border-gold/35"
+        className="pointer-events-none absolute -right-10 -top-16 size-44 rounded-full border border-gold/35 md:hidden"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-5 -top-20 size-56 rounded-full border border-gold/15"
+        className="pointer-events-none absolute -right-5 -top-20 size-56 rounded-full border border-gold/15 md:hidden"
       />
 
-      <p className="flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-gold-soft">
+      <p className="flex shrink-0 items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-gold-soft">
         <span aria-hidden className="relative inline-block size-2 rounded-full bg-gold">
           <span className="absolute -inset-1 animate-ping rounded-full border border-gold opacity-40" />
         </span>
         Premura sta lavorando
       </p>
 
-      <p className="mt-3.5 font-serif text-[24px] font-normal leading-[1.3] tracking-[-0.01em]">
+      <p className="mt-3.5 font-serif text-[24px] font-normal leading-[1.3] tracking-[-0.01em] md:mt-0 md:min-w-0 md:flex-1 md:truncate md:text-[19px]">
         {status.action}
       </p>
-      {status.sub ? <p className="mt-2.5 text-[13px] text-paper/70">{status.sub}</p> : null}
+      {status.sub ? <p className="mt-2.5 text-[13px] text-paper/70 md:hidden">{status.sub}</p> : null}
 
-      <div className="mt-5 flex items-center justify-between border-t border-paper/10 pt-4">
+      <div className="mt-5 flex items-center justify-between border-t border-paper/10 pt-4 md:mt-0 md:shrink-0 md:gap-7 md:border-t-0 md:pt-0">
         {/* "In casa": stessa semantica e stesso numero della metrica
             accanto — mai due verita' (bug 30/07: "9 attivi" vs "20"). */}
         <Stat num={stats.activeGuests} label="In casa" />
