@@ -54,10 +54,11 @@ export type HomeSummary = {
 const FEED_DAYS = 7;
 const ARRIVING_WINDOW_DAYS = 14;
 
-const TRIGGER_LINES: Record<'welcome' | 'midstay' | 'checkout', string> = {
+const TRIGGER_LINES: Record<'welcome' | 'midstay' | 'checkout' | 'guest_app_invite', string> = {
   welcome: 'Benvenuto WhatsApp a',
   midstay: 'Messaggio di meta soggiorno a',
   checkout: 'Messaggio di fine soggiorno a',
+  guest_app_invite: 'Guida della casa inviata a',
 };
 
 export async function getHomeSummary(

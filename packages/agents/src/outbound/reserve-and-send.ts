@@ -31,19 +31,22 @@ import { and, desc, eq, gte, sql } from 'drizzle-orm';
 // a mano. Cosi' un errore transitorio non innesca un ciclo di retry sul
 // numero della villa, che e' il modo piu' rapido per farselo bannare.
 
-export type OutboundTrigger = 'welcome' | 'midstay' | 'checkout';
+export type OutboundTrigger = 'welcome' | 'midstay' | 'checkout' | 'guest_app_invite';
 
 /**
  * Consenso richiesto per trigger (policy dichiarata in schema/enums.ts).
  *
- *  welcome  -> NO: comunicazione di servizio sulla prenotazione in corso
- *  midstay  -> SI: contiene i link ai servizi, quindi e' commerciale
- *  checkout -> NO: ringraziamento + richiesta recensione
+ *  welcome          -> NO: comunicazione di servizio sulla prenotazione
+ *  midstay          -> SI: contiene i link ai servizi, quindi commerciale
+ *  checkout         -> NO: ringraziamento + richiesta recensione
+ *  guest_app_invite -> NO: primo contatto di servizio (guida della casa),
+ *                      stessa natura del welcome che gia' porta il link
  */
 const CONSENT_REQUIRED: Record<OutboundTrigger, boolean> = {
   welcome: false,
   midstay: true,
   checkout: false,
+  guest_app_invite: false,
 };
 
 /** Tetto giornaliero di invii REALI. Conta le righe con dry_run = false. */

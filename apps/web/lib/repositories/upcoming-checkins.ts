@@ -40,7 +40,7 @@ export function derivePremuraState(
 }
 
 export type OutboundTimelineEntry = {
-  trigger: 'welcome' | 'midstay' | 'checkout';
+  trigger: 'welcome' | 'midstay' | 'checkout' | 'guest_app_invite';
   status: 'reserved' | 'sent' | 'failed' | 'skipped';
   sentAt: Date | null;
   dryRun: boolean;
