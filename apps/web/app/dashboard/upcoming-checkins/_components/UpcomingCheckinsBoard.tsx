@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Loader2, Pause, Play, Trash2 } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import {
   type SetPhoneActionResult,
@@ -9,19 +9,23 @@ import {
   setBookingPremuraActiveAction,
 } from '../actions';
 
-// Board "prossimi check-in" — ristrutturazione richiesta da Andrea:
-//  1. filtro struttura in alto (select), righe raggruppate per struttura
-//  2. numero WhatsApp sempre modificabile inline, anche se gia' inserito
-//  3. tre stati: Attivo (verde) / Manca numero (ambra) / Escluso (grigio),
-//     con toggle Escluso<->Attivo dalla riga
-//  4. colonna arrivo relativa ("fra 3 giorni", "oggi", "in corso")
-//  5. desktop a larghezza piena; su mobile le righe diventano schede
-//  6. sotto ogni riga attiva la timeline invii (benvenuto/survey/mid-stay)
+// Board "prossimi check-in" — rifacimento UX (Andrea, 30/07):
+//  1. gruppi per URGENZA, non per struttura: "Serve il tuo numero" e
+//     "Premura se ne occupa"; la struttura e' il sottotitolo della riga
+//  2. via la tabella: nessuna intestazione di colonna, lista di righe
+//  3. campo numero solo dove serve, espanso solo sulla riga attiva;
+//     le altre righe hanno un "+" che apre il campo
+//  4. stato come frase ("in casa, parte domani"), niente badge
+//  5. timeline in UNA riga in linguaggio host, dettaglio al tap
+//  6. azioni secondarie (Escludi/Attiva, rimuovi numero) dietro "⋯"
+// Principio: una gerarchia sola, zero ridondanza, stato in linguaggio
+// umano.
 
 // Regola condivisa (lib/format-date): anno solo quando non e' il corrente.
 import { formatDayMonth } from '@/lib/format-date';
 
 const TIME_FMT = new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit' });
+const WEEKDAY_FMT = new Intl.DateTimeFormat('it-IT', { weekday: 'long' });
 
 export type SurveyStatusUI = 'not_yet' | 'sent' | 'completed' | 'skipped';
 export type PremuraStateUI = 'active' | 'missing_phone' | 'excluded';
@@ -63,7 +67,21 @@ export type BoardProps = {
   welcomeTimeSlot: string;
 };
 
-// ─── Arrivo relativo ───────────────────────────────────────────────
+// ─── Giorni in linguaggio host ─────────────────────────────────────
+
+/** "oggi" / "domani" / "sabato" (entro 6 giorni) / "il 12 ago". */
+export function dayPhrase(dateIso: string, now: Date): string {
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const date = new Date(dateIso);
+  const day = new Date(date);
+  day.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((day.getTime() - startOfToday.getTime()) / 86_400_000);
+  if (diffDays <= 0) return 'oggi';
+  if (diffDays === 1) return 'domani';
+  if (diffDays <= 6) return WEEKDAY_FMT.format(date);
+  return `il ${formatDayMonth(date, now)}`;
+}
 
 export function arrivalLabel(checkinIso: string, checkoutIso: string, now: Date): string {
   const startOfToday = new Date(now);
@@ -83,31 +101,26 @@ export function arrivalLabel(checkinIso: string, checkoutIso: string, now: Date)
   return `fra ${diffDays} giorni`;
 }
 
-// ─── Stato Premura ─────────────────────────────────────────────────
+// ─── Stato come frase (punto 4) ────────────────────────────────────
 
-const STATE_META: Record<PremuraStateUI, { label: string; cls: string; dot: string }> = {
-  active: { label: 'Attivo', cls: 'bg-line-soft text-ok border border-ok/20', dot: 'bg-ok' },
-  missing_phone: {
-    label: 'Manca numero',
-    cls: 'bg-gold-soft text-gold-deep',
-    dot: 'bg-gold-deep',
-  },
-  excluded: { label: 'Escluso', cls: 'bg-line-soft text-ink-mute', dot: 'bg-ink-mute' },
-};
+/** "in casa, parte domani" · "arriva sabato · 6 ospiti". */
+export function statePhrase(
+  row: Pick<UpcomingCheckinCardData, 'checkinAt' | 'checkoutAt' | 'numGuests'>,
+  now: Date,
+): string {
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const checkinDay = new Date(row.checkinAt);
+  checkinDay.setHours(0, 0, 0, 0);
+  const guests = `${row.numGuests} ${row.numGuests === 1 ? 'ospite' : 'ospiti'}`;
 
-function StateBadge({ state }: { state: PremuraStateUI }): React.JSX.Element {
-  const meta = STATE_META[state];
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.cls}`}
-    >
-      <span aria-hidden className={`size-1.5 rounded-full ${meta.dot}`} />
-      {meta.label}
-    </span>
-  );
+  if (checkinDay.getTime() < startOfToday.getTime()) {
+    return `in casa, parte ${dayPhrase(row.checkoutAt, now)}`;
+  }
+  return `arriva ${dayPhrase(row.checkinAt, now)} · ${guests}`;
 }
 
-// ─── Timeline invii ────────────────────────────────────────────────
+// ─── Timeline (dettaglio al tap) ───────────────────────────────────
 
 type TimelineItem = { label: string; detail: string; done: boolean };
 
@@ -208,26 +221,54 @@ export function buildTimeline(
   return items;
 }
 
-function TimelineRow({ items }: { items: TimelineItem[] }): React.JSX.Element {
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-ink-mute">
-      {items.map((it) => (
-        <span key={it.label} className="inline-flex items-center gap-1.5">
-          <span aria-hidden className={`size-1.5 rounded-full ${it.done ? 'bg-ok' : 'bg-line'}`} />
-          <span className={it.done ? 'text-ink-soft' : undefined}>
-            <span className="font-medium">{it.label}</span> · {it.detail}
-          </span>
-        </span>
-      ))}
-    </div>
-  );
+// ─── Timeline in UNA riga (punto 5) ────────────────────────────────
+
+/**
+ * Il prossimo passo dell'agente in linguaggio host: "Benvenuto sabato
+ * alle 08:00", "Benvenuto da sbloccare", "Survey inviata, aspetto la
+ * risposta", "Tutto inviato". Una frase sola — il resto sta nel
+ * dettaglio espandibile.
+ */
+export function nextStepLine(
+  row: UpcomingCheckinCardData,
+  welcomeTimeSlot: string,
+  now: Date,
+): string {
+  const bySendTrigger = new Map(row.outbound.map((o) => [o.trigger, o]));
+  const welcomeSend = bySendTrigger.get('welcome');
+  const welcomeDone = Boolean(row.welcomeSentAt) || welcomeSend?.status === 'sent';
+
+  if (!welcomeDone) {
+    if (welcomeSend?.status === 'failed') return 'Benvenuto da sbloccare';
+    const checkin = new Date(row.checkinAt);
+    const [slotHours, slotMinutes] = welcomeTimeSlot.split(':').map(Number);
+    const expectedAt = new Date(checkin);
+    expectedAt.setHours(slotHours ?? 8, slotMinutes ?? 0, 0, 0);
+    if (expectedAt.getTime() < now.getTime()) return 'Benvenuto non inviato';
+    return `Benvenuto ${dayPhrase(row.checkinAt, now)} alle ${welcomeTimeSlot}`;
+  }
+
+  if (row.surveyStatus === 'sent') return 'Survey inviata, aspetto la risposta';
+  if (row.surveyStatus === 'not_yet') {
+    const surveyDate = new Date(row.checkinAt);
+    surveyDate.setDate(surveyDate.getDate() - 7);
+    return surveyDate.getTime() < now.getTime()
+      ? 'Survey in coda (giro delle 09:00)'
+      : `Survey ${dayPhrase(surveyDate.toISOString(), now)}`;
+  }
+
+  const midstay = bySendTrigger.get('midstay');
+  if (midstay && midstay.status !== 'sent' && midstay.status !== 'skipped') {
+    return midstay.status === 'failed' ? 'Mid-stay da sbloccare' : 'Mid-stay in coda';
+  }
+
+  return 'Tutto inviato';
 }
 
 // ─── Board ─────────────────────────────────────────────────────────
 
 type RowState = {
   draft: string;
-  editing: boolean;
   error: string | null;
   flashSuccess: boolean;
 };
@@ -252,7 +293,7 @@ function reasonToMessage(reason: SetPhoneActionResult & { ok: false }): string {
 }
 
 function defaultState(): RowState {
-  return { draft: '', editing: false, error: null, flashSuccess: false };
+  return { draft: '', error: null, flashSuccess: false };
 }
 
 const PROPERTY_FILTER_STORAGE_KEY = 'premura.checkins.propertyFilter';
@@ -277,53 +318,61 @@ export function UpcomingCheckinsBoard({
     setPropertyFilter(value);
     window.localStorage.setItem(PROPERTY_FILTER_STORAGE_KEY, value);
   };
+
   const [state, setState] = useState<Record<string, RowState>>(() =>
     Object.fromEntries(
-      rows.map((r) => [
-        r.id,
-        { draft: r.guestPhone ?? '', editing: false, error: null, flashSuccess: false },
-      ]),
+      rows.map((r) => [r.id, { draft: r.guestPhone ?? '', error: null, flashSuccess: false }]),
     ),
   );
-  // now calcolato una volta al mount: le etichette relative ("fra 3
-  // giorni") non devono cambiare sotto gli occhi durante la sessione.
+  // Un solo campo numero espanso alla volta (punto 3): la prima riga
+  // senza numero parte aperta, le altre si aprono col "+".
+  const [expandedPhoneRow, setExpandedPhoneRow] = useState<string | null>(null);
+  const [openMenuRow, setOpenMenuRow] = useState<string | null>(null);
+  // now calcolato una volta al mount: le etichette relative ("arriva
+  // domani") non devono cambiare sotto gli occhi durante la sessione.
   const [now] = useState(() => new Date());
 
   const updateRow = (id: string, patch: Partial<RowState>): void => {
     setState((s) => ({ ...s, [id]: { ...(s[id] ?? defaultState()), ...patch } }));
   };
 
-  // Prenotazioni vere e fasce "occupato sorgente ignota" separate alla
-  // radice: mai nello stesso gruppo, mai negli stessi conteggi.
-  const { groups, occupiedGroups } = useMemo(() => {
+  // Gruppi per urgenza (punto 1). Le fasce "occupato sorgente ignota"
+  // restano separate alla radice: mai nei gruppi, mai nei conteggi.
+  const { needsPhone, handled, excluded, occupiedGroups } = useMemo(() => {
     const visible =
       propertyFilter === 'all' ? rows : rows.filter((r) => r.propertyId === propertyFilter);
-    const byProperty = new Map<string, UpcomingCheckinCardData[]>();
+    const real = visible.filter((r) => !r.unknownOccupied);
     const occupiedByProperty = new Map<string, UpcomingCheckinCardData[]>();
-    for (const r of visible) {
-      const target = r.unknownOccupied ? occupiedByProperty : byProperty;
-      const list = target.get(r.propertyId) ?? [];
+    for (const r of visible.filter((x) => x.unknownOccupied)) {
+      const list = occupiedByProperty.get(r.propertyId) ?? [];
       list.push(r);
-      target.set(r.propertyId, list);
+      occupiedByProperty.set(r.propertyId, list);
     }
-    // Ordine gruppi = ordine alfabetico delle property (stesso del select),
-    // limitato a quelle che hanno righe visibili.
     return {
-      groups: properties
-        .filter((p) => byProperty.has(p.id))
-        .map((p) => ({ property: p, rows: byProperty.get(p.id) ?? [] })),
+      needsPhone: real.filter((r) => r.premuraState === 'missing_phone'),
+      handled: real.filter((r) => r.premuraState === 'active'),
+      excluded: real.filter((r) => r.premuraState === 'excluded'),
       occupiedGroups: properties
         .filter((p) => occupiedByProperty.has(p.id))
         .map((p) => ({ property: p, rows: occupiedByProperty.get(p.id) ?? [] })),
     };
   }, [rows, properties, propertyFilter]);
 
+  // La prima riga senza numero parte col campo aperto.
+  useEffect(() => {
+    setExpandedPhoneRow((current) => {
+      if (current && needsPhone.some((r) => r.id === current)) return current;
+      return needsPhone[0]?.id ?? null;
+    });
+  }, [needsPhone]);
+
   const handleSave = (id: string, currentPhone: string | null): void => {
     const rowState = state[id];
     if (!rowState) return;
     const trimmed = rowState.draft.trim();
     if (trimmed.length === 0 || trimmed === (currentPhone ?? '')) {
-      updateRow(id, { editing: false, error: null });
+      updateRow(id, { error: null });
+      if (id !== needsPhone[0]?.id) setExpandedPhoneRow(needsPhone[0]?.id ?? null);
       return;
     }
     updateRow(id, { error: null });
@@ -334,7 +383,7 @@ export function UpcomingCheckinsBoard({
           updateRow(id, { error: reasonToMessage(result) });
           return;
         }
-        updateRow(id, { editing: false, flashSuccess: true });
+        updateRow(id, { flashSuccess: true });
         setTimeout(() => updateRow(id, { flashSuccess: false }), 1500);
       } catch (err) {
         updateRow(id, { error: err instanceof Error ? err.message : 'Errore di rete' });
@@ -351,7 +400,7 @@ export function UpcomingCheckinsBoard({
           updateRow(id, { error: 'Rimozione fallita' });
           return;
         }
-        updateRow(id, { draft: '', editing: false, error: null });
+        updateRow(id, { draft: '', error: null });
       } catch (err) {
         updateRow(id, { error: err instanceof Error ? err.message : 'Errore di rete' });
       }
@@ -371,6 +420,66 @@ export function UpcomingCheckinsBoard({
         updateRow(id, { error: err instanceof Error ? err.message : 'Errore di rete' });
       }
     });
+  };
+
+  const totalVisible = needsPhone.length + handled.length + excluded.length;
+
+  // ── Pezzi di riga condivisi ──────────────────────────────────────
+
+  const rowHeader = (r: UpcomingCheckinCardData, menu: React.ReactNode): React.JSX.Element => (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="truncate font-medium text-body text-ink">
+          {r.guestFirstName ?? r.guestFullName}
+        </p>
+        <p className="text-[12px] text-ink-mute">
+          {r.propertyName} · {PLATFORM_LABELS[r.platform]} ·{' '}
+          {formatDayMonth(new Date(r.checkinAt))} – {formatDayMonth(new Date(r.checkoutAt))}
+        </p>
+        <p className="mt-0.5 text-body-sm text-ink-soft">{statePhrase(r, now)}</p>
+      </div>
+      {menu}
+    </div>
+  );
+
+  const rowMenu = (
+    r: UpcomingCheckinCardData,
+    items: Array<{ label: string; onClick: () => void }>,
+  ): React.JSX.Element => (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        aria-label={`Azioni per ${r.guestFullName}`}
+        aria-expanded={openMenuRow === r.id}
+        onClick={() => setOpenMenuRow(openMenuRow === r.id ? null : r.id)}
+        className="rounded-full px-2 py-0.5 text-[18px] leading-none text-ink-mute hover:bg-line-soft hover:text-ink"
+      >
+        ⋯
+      </button>
+      {openMenuRow === r.id ? (
+        <div className="absolute right-0 z-10 mt-1 w-44 overflow-hidden rounded-card border border-line bg-paper py-1 shadow-md">
+          {items.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                setOpenMenuRow(null);
+                item.onClick();
+              }}
+              className="block w-full px-3 py-1.5 text-left text-body-sm text-ink hover:bg-ivory"
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const phoneError = (id: string): React.JSX.Element | null => {
+    const s = state[id];
+    return s?.error ? <p className="mt-1 text-body-sm text-alert">{s.error}</p> : null;
   };
 
   return (
@@ -395,179 +504,145 @@ export function UpcomingCheckinsBoard({
         </select>
       </div>
 
-      {groups.length === 0 && occupiedGroups.length === 0 ? (
+      {totalVisible === 0 && occupiedGroups.length === 0 ? (
         <div className="rounded-card border border-line-soft bg-paper px-6 py-8 text-center text-body text-ink-soft shadow-sm">
           Nessuna prenotazione per questa struttura nella finestra dei 14 giorni.
         </div>
       ) : null}
 
       <div className="space-y-8">
-        {groups.map(({ property, rows: groupRows }) => (
-          <section key={property.id} aria-label={property.name}>
-            <h2 className="mb-3 flex items-baseline gap-2 font-serif text-h3 leading-tight text-ink">
-              {property.name}
-              <span className="text-body-sm font-sans text-ink-mute">
-                {groupRows.length} {groupRows.length === 1 ? 'prenotazione' : 'prenotazioni'}
-              </span>
+        {/* SERVE IL TUO NUMERO */}
+        {needsPhone.length > 0 ? (
+          <section aria-label="Serve il tuo numero">
+            <h2 className="mb-2 text-eyebrow uppercase tracking-wider text-gold-deep">
+              Serve il tuo numero · {needsPhone.length}
             </h2>
-
-            <div className="overflow-hidden rounded-card border border-line bg-paper shadow-sm">
-              {/* Intestazione visibile solo su desktop */}
-              <div className="hidden border-b border-line-soft bg-ivory px-4 py-2.5 text-eyebrow uppercase tracking-wider text-ink-mute lg:grid lg:grid-cols-[minmax(10rem,1.3fr)_minmax(8rem,1fr)_minmax(6rem,0.7fr)_minmax(13rem,1.3fr)_minmax(9rem,0.9fr)_auto] lg:gap-4">
-                <span>Ospite</span>
-                <span>Date</span>
-                <span>Arrivo</span>
-                <span>Numero WhatsApp</span>
-                <span>Stato</span>
-                <span className="sr-only">Azioni</span>
-              </div>
-
-              {groupRows.map((r) => {
+            <div className="overflow-visible rounded-card border border-line bg-paper shadow-sm">
+              {needsPhone.map((r) => {
                 const s = state[r.id] ?? defaultState();
-                const arrival = arrivalLabel(r.checkinAt, r.checkoutAt, now);
-                const dateRange = `${formatDayMonth(new Date(r.checkinAt))} – ${formatDayMonth(new Date(r.checkoutAt))}`;
-                // Lo stato mostrato reagisce subito al salvataggio del
-                // numero (flashSuccess) senza aspettare la revalidate.
-                const shownState: PremuraStateUI =
-                  r.premuraState === 'missing_phone' && s.flashSuccess ? 'active' : r.premuraState;
-
+                const expanded = expandedPhoneRow === r.id;
                 return (
-                  <div key={r.id} className="border-t border-line-soft first:border-t-0">
-                    <div className="grid grid-cols-1 gap-2 px-4 py-3 lg:grid-cols-[minmax(10rem,1.3fr)_minmax(8rem,1fr)_minmax(6rem,0.7fr)_minmax(13rem,1.3fr)_minmax(9rem,0.9fr)_auto] lg:items-center lg:gap-4">
-                      {/* Ospite */}
-                      <div className="flex items-baseline justify-between gap-2 lg:block">
-                        <p className="font-medium text-body text-ink">
-                          {r.guestFirstName ?? r.guestFullName}
-                        </p>
-                        <p className="text-[12px] text-ink-mute">
-                          {r.numGuests} {r.numGuests === 1 ? 'ospite' : 'ospiti'} ·{' '}
-                          {PLATFORM_LABELS[r.platform]}
-                        </p>
+                  <div key={r.id} className="border-t border-line-soft px-4 py-3 first:border-t-0">
+                    {rowHeader(r, null)}
+                    {expanded ? (
+                      <div className="mt-2 flex items-center gap-2">
+                        <input
+                          type="tel"
+                          inputMode="tel"
+                          autoComplete="tel"
+                          defaultValue={s.draft}
+                          placeholder="Numero WhatsApp dell'ospite"
+                          disabled={pending}
+                          aria-label={`Numero WhatsApp ospite ${r.guestFullName}`}
+                          aria-invalid={s.error ? true : undefined}
+                          className={`h-9 w-full max-w-64 rounded-card-sm border bg-paper px-2.5 text-body text-ink focus:outline-none focus:ring-2 focus:ring-terracotta-soft/40 ${s.error ? 'border-alert' : 'border-line'}`}
+                          onChange={(e) => updateRow(r.id, { draft: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSave(r.id, r.guestPhone);
+                            }
+                          }}
+                          onBlur={() => handleSave(r.id, r.guestPhone)}
+                        />
+                        {pending ? (
+                          <Loader2 aria-hidden className="size-4 animate-spin text-ink-mute" />
+                        ) : null}
+                        {s.flashSuccess ? <Check aria-hidden className="size-4 text-ok" /> : null}
                       </div>
-
-                      {/* Date */}
-                      <p className="text-body-sm text-ink-soft lg:whitespace-nowrap">{dateRange}</p>
-
-                      {/* Arrivo relativo */}
-                      <p
-                        className={`text-body-sm lg:whitespace-nowrap ${
-                          arrival === 'oggi' || arrival === 'in corso'
-                            ? 'font-medium text-terracotta-2'
-                            : 'text-ink-soft'
-                        }`}
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedPhoneRow(r.id)}
+                        className="mt-1.5 text-body-sm font-medium text-terracotta-2 underline-offset-2 hover:underline"
                       >
-                        {arrival}
-                      </p>
-
-                      {/* Numero — sempre editabile */}
-                      <div>
-                        {s.editing || !r.guestPhone ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="tel"
-                              inputMode="tel"
-                              autoComplete="tel"
-                              defaultValue={s.draft}
-                              placeholder="+39 333 1234567"
-                              disabled={pending}
-                              aria-label={`Numero WhatsApp ospite ${r.guestFullName}`}
-                              aria-invalid={s.error ? true : undefined}
-                              className={`h-9 w-full max-w-52 rounded-card-sm border bg-paper px-2.5 text-body text-ink focus:outline-none focus:ring-2 focus:ring-terracotta-soft/40 ${s.error ? 'border-alert' : 'border-line'}`}
-                              onChange={(e) => updateRow(r.id, { draft: e.target.value })}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  handleSave(r.id, r.guestPhone);
-                                }
-                                if (e.key === 'Escape') {
-                                  updateRow(r.id, {
-                                    editing: false,
-                                    draft: r.guestPhone ?? '',
-                                    error: null,
-                                  });
-                                }
-                              }}
-                              onBlur={() => handleSave(r.id, r.guestPhone)}
-                            />
-                            {pending && s.editing ? (
-                              <Loader2 aria-hidden className="size-4 animate-spin text-ink-mute" />
-                            ) : null}
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                updateRow(r.id, { editing: true, draft: r.guestPhone ?? '' })
-                              }
-                              title="Modifica numero"
-                              className="rounded-card-sm bg-line-soft px-2.5 py-1 font-mono text-body-sm text-ink hover:bg-line"
-                            >
-                              {r.guestPhone}
-                            </button>
-                            {s.flashSuccess ? (
-                              <Check aria-hidden className="size-4 text-ok" />
-                            ) : null}
-                            <button
-                              type="button"
-                              onClick={() => handleClear(r.id)}
-                              disabled={pending}
-                              aria-label={`Rimuovi numero ${r.guestFullName}`}
-                              className="rounded-full p-1 text-ink-mute hover:bg-line-soft hover:text-ink-soft"
-                            >
-                              <Trash2 aria-hidden className="size-3.5" />
-                            </button>
-                          </div>
-                        )}
-                        {s.error ? <p className="mt-1 text-body-sm text-alert">{s.error}</p> : null}
-                      </div>
-
-                      {/* Stato */}
-                      <div>
-                        <StateBadge state={shownState} />
-                      </div>
-
-                      {/* Toggle Escluso <-> Attivo */}
-                      <div className="flex items-center gap-2 lg:justify-end">
-                        {shownState === 'active' ? (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleActive(r.id, false)}
-                            disabled={pending}
-                            title="Escludi: l'agente non contattera' questo ospite"
-                            className="inline-flex items-center gap-1.5 rounded-card-sm border border-line px-2.5 py-1.5 text-[12px] font-medium text-ink-soft hover:bg-line-soft"
-                          >
-                            <Pause aria-hidden className="size-3.5" />
-                            Escludi
-                          </button>
-                        ) : null}
-                        {shownState === 'excluded' ? (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleActive(r.id, true)}
-                            disabled={pending}
-                            title="Riattiva: l'agente riprende a gestire questo ospite"
-                            className="inline-flex items-center gap-1.5 rounded-card-sm border border-ok/30 px-2.5 py-1.5 text-[12px] font-medium text-ok hover:bg-line-soft"
-                          >
-                            <Play aria-hidden className="size-3.5" />
-                            Attiva
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    {/* Timeline invii — solo per righe attive */}
-                    {shownState === 'active' ? (
-                      <div className="border-t border-dashed border-line-soft bg-ivory/60 px-4 py-2">
-                        <TimelineRow items={buildTimeline(r, welcomeTimeSlot, now)} />
-                      </div>
-                    ) : null}
+                        + Aggiungi numero
+                      </button>
+                    )}
+                    {phoneError(r.id)}
                   </div>
                 );
               })}
             </div>
           </section>
-        ))}
+        ) : null}
+
+        {/* PREMURA SE NE OCCUPA */}
+        {handled.length > 0 ? (
+          <section aria-label="Premura se ne occupa">
+            <h2 className="mb-2 text-eyebrow uppercase tracking-wider text-ok">
+              Premura se ne occupa · {handled.length}
+            </h2>
+            <div className="overflow-visible rounded-card border border-line bg-paper shadow-sm">
+              {handled.map((r) => {
+                const s = state[r.id] ?? defaultState();
+                const items = buildTimeline(r, welcomeTimeSlot, now);
+                return (
+                  <div key={r.id} className="border-t border-line-soft px-4 py-3 first:border-t-0">
+                    {rowHeader(
+                      r,
+                      rowMenu(r, [
+                        {
+                          label: 'Escludi da Premura',
+                          onClick: () => handleToggleActive(r.id, false),
+                        },
+                        { label: 'Rimuovi numero', onClick: () => handleClear(r.id) },
+                      ]),
+                    )}
+                    {/* Timeline in una riga; il dettaglio si apre al tap. */}
+                    <details className="mt-1.5">
+                      <summary className="flex cursor-pointer list-none items-center gap-2 text-[12px] text-ink-mute [&::-webkit-details-marker]:hidden">
+                        <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-ok" />
+                        <span className="text-ink-soft">{nextStepLine(r, welcomeTimeSlot, now)}</span>
+                        {r.guestPhone ? (
+                          <span className="font-mono text-ink-mute">{r.guestPhone}</span>
+                        ) : null}
+                        {s.flashSuccess ? <Check aria-hidden className="size-3.5 text-ok" /> : null}
+                      </summary>
+                      <ul className="mt-2 space-y-1 border-t border-dashed border-line-soft pt-2 text-[12px] text-ink-mute">
+                        {items.map((it) => (
+                          <li key={it.label} className="flex items-center gap-1.5">
+                            <span
+                              aria-hidden
+                              className={`size-1.5 rounded-full ${it.done ? 'bg-ok' : 'bg-line'}`}
+                            />
+                            <span className={it.done ? 'text-ink-soft' : undefined}>
+                              <span className="font-medium">{it.label}</span> · {it.detail}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                    {phoneError(r.id)}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+
+        {/* HAI ESCLUSO TU */}
+        {excluded.length > 0 ? (
+          <section aria-label="Hai escluso tu">
+            <h2 className="mb-2 text-eyebrow uppercase tracking-wider text-ink-mute">
+              Hai escluso tu · {excluded.length}
+            </h2>
+            <div className="overflow-visible rounded-card border border-line bg-paper shadow-sm">
+              {excluded.map((r) => (
+                <div key={r.id} className="border-t border-line-soft px-4 py-3 first:border-t-0">
+                  {rowHeader(
+                    r,
+                    rowMenu(r, [
+                      { label: 'Riattiva Premura', onClick: () => handleToggleActive(r.id, true) },
+                      { label: 'Rimuovi numero', onClick: () => handleClear(r.id) },
+                    ]),
+                  )}
+                  {phoneError(r.id)}
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
 
       {/* Fasce "occupato — sorgente ignota": il feed iCal Booking dice
