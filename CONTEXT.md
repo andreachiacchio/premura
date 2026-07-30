@@ -111,8 +111,13 @@ su una feature, rileggere qui.
    - **gestire il kit** con la cleaner, in autonomia;
    - **gestire ogni problema**: "da ora puoi scrivere qui per qualsiasi
      cosa, ti rispondo subito".
-5. **Ogni messaggio automatico è firmato PREMURA.AI** — trasparenza
-   sull'AI e conformità art. 50 AI Act in un colpo solo.
+5. **Trasparenza AI: due concetti separati, mai confusi (Andrea, 30/07).**
+   - **Disclosure**: UNA volta, all'inizio della conversazione — "stai
+     parlando con l'assistente automatico di [nome struttura]". È quello
+     che richiede l'art. 50 AI Act.
+   - **Firma di ogni messaggio**: SEMPRE il nome della struttura, mai
+     PREMURA.AI. Il valore che vendiamo è che l'host mantiene il suo
+     brand.
 
 L'host interviene **solo quando c'è una decisione di soldi**.
 
@@ -281,13 +286,10 @@ Mai notifiche su 🟢.
 - **Firma messaggi all'ospite:** nome della struttura
   (es. "— La Goccia di S.Gennaro"). L'ospite deve pensare di parlare con
   l'host umano, non con un brand esterno.
-  **Aggiornamento 30/07/2026 (flusso canonico §2b, punto 5):** i messaggi
-  AUTOMATICI portano la firma PREMURA.AI per trasparenza AI (art. 50
-  AI Act). Le due cose convivono: il tono e l'identità restano quelli
-  della struttura, la firma tecnica dichiara l'automazione.
-  ⚠️ Il composer del benvenuto firma ancora col solo nome struttura:
-  cambio da propagare previa conferma di Andrea (tocca il testo già
-  approvato per il go-live dell'1/08).
+  **Chiarimento 30/07/2026 (vedi §2b punto 5):** la trasparenza AI
+  (art. 50) è la DISCLOSURE una volta a inizio conversazione; la firma
+  di ogni messaggio resta SEMPRE il nome della struttura, mai
+  PREMURA.AI. Il testo del benvenuto approvato per l'1/08 resta com'è.
 
 ### Pricing
 - **Prezzi:**

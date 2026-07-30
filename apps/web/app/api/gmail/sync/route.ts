@@ -1,8 +1,9 @@
+import { getDb } from '@/lib/db';
 import { syncGmailForHost } from '@/lib/gmail-sync-orchestrator';
 import { createJob } from '@/lib/repositories/gmail-sync-jobs';
 import { getTokenByHostAndEmail } from '@/lib/repositories/google-tokens';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
-import { type ServerClient, createServerClient, googleTokens } from '@premura/db';
+import { googleTokens } from '@premura/db';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
@@ -29,12 +30,6 @@ export const dynamic = 'force-dynamic';
 // Su hobby tier resta capped a 60s; su Pro 300s.
 export const maxDuration = 300;
 
-let clientPromise: Promise<ServerClient> | null = null;
-function getClient(): Promise<ServerClient> {
-  if (!clientPromise) clientPromise = Promise.resolve(createServerClient());
-  return clientPromise;
-}
-
 /**
  * Percorso MACCHINA (30/07): il cron sul worker Fly chiama questa route
  * ogni 15 minuti con `Authorization: Bearer ${GMAIL_SYNC_CRON_SECRET}`.
@@ -48,7 +43,7 @@ async function runMachineSync(req: Request): Promise<NextResponse | null> {
   const auth = req.headers.get('authorization') ?? '';
   if (auth !== `Bearer ${secret}`) return null;
 
-  const serverClient = await getClient();
+  const serverClient = await getDb();
   const { db } = serverClient;
   const tokens = await db
     .select({ hostId: googleTokens.hostId, googleEmail: googleTokens.googleEmail })
@@ -86,7 +81,7 @@ export async function POST(req: Request): Promise<NextResponse> {
   }
   const hostId = user.id;
 
-  const serverClient = await getClient();
+  const serverClient = await getDb();
   const { db } = serverClient;
 
   // 1. Trova il googleEmail collegato a questo host (per ora 1:1).

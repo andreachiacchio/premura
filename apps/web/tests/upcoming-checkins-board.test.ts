@@ -3,6 +3,9 @@ import {
   type UpcomingCheckinCardData,
   arrivalLabel,
   buildTimeline,
+  dayPhrase,
+  nextStepLine,
+  statePhrase,
 } from '../app/dashboard/upcoming-checkins/_components/UpcomingCheckinsBoard';
 
 // Unit test delle funzioni pure del board (niente jsdom: il root vitest
@@ -166,5 +169,64 @@ describe('buildTimeline', () => {
     );
     expect(items.find((i) => i.label === 'Survey')?.done).toBe(true);
     expect(items.find((i) => i.label === 'Mid-stay')?.done).toBe(true);
+  });
+});
+
+// NOW = mercoledì 29 lug 2026; 1 ago = sabato (+3 giorni).
+
+describe('dayPhrase', () => {
+  it('oggi / domani / giorno della settimana entro 6 giorni / data oltre', () => {
+    expect(dayPhrase('2026-07-29T15:00:00+02:00', NOW)).toBe('oggi');
+    expect(dayPhrase('2026-07-30T15:00:00+02:00', NOW)).toBe('domani');
+    expect(dayPhrase('2026-08-01T15:00:00+02:00', NOW)).toBe('sabato');
+    expect(dayPhrase('2026-08-10T15:00:00+02:00', NOW)).toBe('il 10 ago');
+  });
+});
+
+describe('statePhrase (stato come frase, punto 4 UX)', () => {
+  it('arrivo futuro: "arriva sabato · 6 ospiti"', () => {
+    expect(statePhrase(baseRow({}), NOW)).toBe('arriva sabato · 6 ospiti');
+  });
+
+  it('soggiorno in corso: "in casa, parte domani"', () => {
+    expect(
+      statePhrase(
+        baseRow({
+          checkinAt: '2026-07-27T15:00:00+02:00',
+          checkoutAt: '2026-07-30T10:00:00+02:00',
+        }),
+        NOW,
+      ),
+    ).toBe('in casa, parte domani');
+  });
+});
+
+describe('nextStepLine (timeline in una riga, punto 5 UX)', () => {
+  it('niente inviato, check-in futuro: "Benvenuto sabato alle 08:00"', () => {
+    expect(nextStepLine(baseRow({}), '08:00', NOW)).toBe('Benvenuto sabato alle 08:00');
+  });
+
+  it('welcome fallito: "Benvenuto da sbloccare"', () => {
+    const row = baseRow({
+      outbound: [{ trigger: 'welcome', status: 'failed', sentAt: null, dryRun: false }],
+    });
+    expect(nextStepLine(row, '08:00', NOW)).toBe('Benvenuto da sbloccare');
+  });
+
+  it('welcome inviato, survey fuori finestra: "Survey in coda (giro delle 09:00)"', () => {
+    const row = baseRow({ welcomeSentAt: '2026-07-29T08:05:00+02:00' });
+    expect(nextStepLine(row, '08:00', NOW)).toBe('Survey in coda (giro delle 09:00)');
+  });
+
+  it('tutto fatto: "Tutto inviato"', () => {
+    const row = baseRow({
+      welcomeSentAt: '2026-07-29T08:05:00+02:00',
+      surveyStatus: 'completed',
+      surveyCompletedAt: '2026-07-26T18:00:00+02:00',
+      outbound: [
+        { trigger: 'midstay', status: 'sent', sentAt: '2026-08-04T11:00:00+02:00', dryRun: false },
+      ],
+    });
+    expect(nextStepLine(row, '08:00', NOW)).toBe('Tutto inviato');
   });
 });
