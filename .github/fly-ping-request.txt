@@ -1,0 +1,2 @@
+Richiesta ping: 2026-07-30 — verifica post-deploy v13 (Fly -> Tailscale -> WAHA -> WhatsApp).
+Bump di questo file in un PR mergiato = un ping al numero del founder.
