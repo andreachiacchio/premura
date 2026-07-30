@@ -1,0 +1,44 @@
+# FASE 5 weekend (30/07) — seed demo REVERSIBILE per la sezione
+# Conversazioni. Esegue apps/api/src/scripts/seed-demo-conversation.ts
+# SULLA macchina worker di Fly (l'unico posto con DATABASE_URL e
+# ANTHROPIC_API_KEY): crea un booking finto marcato data_source='demo',
+# una conversazione con 2 inbound finti e UNA bozza generata davvero
+# dalla pipeline. Nessun invio: la bozza resta pending, e comunque il
+# kill switch e' acceso.
+#
+# Cleanup (una sola delete, FK cascade):
+#   DELETE FROM bookings WHERE data_source = 'demo';
+#
+# Si lancia in due modi (stesso pattern di fly-diag):
+#  - workflow_dispatch (bottone per Andrea)
+#  - push su main che tocca .github/demo-seed-request.txt
+
+name: Demo seed Conversazioni
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/demo-seed-request.txt']
+
+concurrency:
+  group: demo-seed
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    name: seed demo conversazione (reversibile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # UN tentativo, mai retry (lezione fly-ping 30/07): flyctl ssh puo'
+      # uscire con codice != 0 anche a comando riuscito. Lo script e'
+      # comunque idempotente.
+      - name: Esegui seed sul worker
+        run: |
+          out=$(flyctl ssh console --app premura-api-staging --process-group worker -C "pnpm exec tsx src/scripts/seed-demo-conversation.ts" 2>&1) || true
+          echo "$out"
