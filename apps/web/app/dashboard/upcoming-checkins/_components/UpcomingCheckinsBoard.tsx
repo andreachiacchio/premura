@@ -137,11 +137,21 @@ export function buildTimeline(
   } else if (welcomeSend?.status === 'failed') {
     items.push({ label: 'Benvenuto', detail: 'invio fallito — da sbloccare', done: false });
   } else {
-    items.push({
-      label: 'Benvenuto',
-      detail: `previsto ${formatDayMonth(checkin)} ore ${welcomeTimeSlot}`,
-      done: false,
-    });
+    // Un evento passato non e' mai "previsto" (bug 30/07): se l'orario
+    // del benvenuto e' gia' trascorso e nulla e' partito, la verita' e'
+    // "non inviato".
+    const [slotHours, slotMinutes] = welcomeTimeSlot.split(':').map(Number);
+    const expectedAt = new Date(checkin);
+    expectedAt.setHours(slotHours ?? 8, slotMinutes ?? 0, 0, 0);
+    items.push(
+      expectedAt.getTime() < now.getTime()
+        ? { label: 'Benvenuto', detail: 'non inviato', done: false }
+        : {
+            label: 'Benvenuto',
+            detail: `previsto ${formatDayMonth(checkin)} ore ${welcomeTimeSlot}`,
+            done: false,
+          },
+    );
   }
 
   // Survey pre-arrivo: parte a T-7 giorni (±1) al giro delle 09:00.
@@ -192,7 +202,7 @@ export function buildTimeline(
       done: midstay.status === 'sent',
     });
   } else {
-    items.push({ label: 'Mid-stay', detail: 'a meta soggiorno, se c e consenso', done: false });
+    items.push({ label: 'Mid-stay', detail: "a metà soggiorno, se c'è consenso", done: false });
   }
 
   return items;
