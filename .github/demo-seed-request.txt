@@ -1,2 +1,2 @@
 Richiesta seed demo Conversazioni (Fase 5 weekend).
-Bump di questo file su main = esegui il seed. run: 1
+Bump di questo file su main = esegui il seed. run: 2 (diagnosi causa errore Anthropic)
