@@ -1,4 +1,5 @@
 import { getCurrentHostId } from '@/lib/auth';
+import Link from 'next/link';
 
 export const metadata = {
   title: 'Connetti Gmail — Premura',
@@ -78,12 +79,12 @@ export default async function ConnectGmailPage() {
           >
             Continua con Google
           </a>
-          <a
+          <Link
             href="/"
             className="text-body-sm text-ink-mute underline-offset-2 hover:text-ink-soft hover:underline"
           >
             Non ora
-          </a>
+          </Link>
         </div>
       </div>
     </main>
