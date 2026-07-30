@@ -31,15 +31,20 @@ export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 export const DEFAULT_LANGUAGE: SupportedLanguage = 'en';
 
 /**
- * Testi predefiniti. Devono dire tre cose senza giri di parole:
- * che risponde un assistente automatico, di chi è, e come si
- * raggiunge una persona vera. L'ultimo punto non è richiesto
- * dall'art. 50 ma è ciò che rende la disclosure utile invece che
- * burocratica.
+ * Testi predefiniti. Dicono due cose senza giri di parole: che
+ * risponde un assistente automatico, e di chi è.
+ *
+ * NIENTE "scrivi operatore/human per parlare con una persona"
+ * (rimosso 30/07 su verifica di Andrea): nessun codice inbound
+ * riconosce quella parola — conversation_handover viene solo LETTA
+ * in uscita, mai scritta da un keyword. Una promessa fatta a un
+ * ospite vero nel primo messaggio va mantenuta dal codice, non
+ * dalla speranza. Quando l'handover a parola chiave esisterà, la
+ * frase torna.
  */
 export const DEFAULT_AI_DISCLOSURE: Record<SupportedLanguage, string> = {
-  it: 'Ciao! Ti risponde l’assistente automatico di Villa Cristina. Per parlare con una persona, scrivi “operatore” in qualsiasi momento.',
-  en: 'Hi! You’re chatting with Villa Cristina’s automated assistant. Type “human” at any time to reach a person.',
+  it: 'Ciao! Ti risponde l’assistente automatico di Villa Cristina.',
+  en: 'Hi! You’re chatting with Villa Cristina’s automated assistant.',
 };
 
 /**

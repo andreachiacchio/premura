@@ -15,18 +15,26 @@ const JULIAN = {
   checkinAt: new Date('2026-08-01T13:00:00Z'),
   language: 'en',
   guestAppUrl: 'https://andreachiacchio.github.io/villa-cristina-guest-app/',
-  meetingPoint: { name: 'Paolo', place: 'La Moressa', phone: '+39 340 488 7726' },
+  meetingPoint: {
+    name: 'Paolo',
+    place: 'La Moressa restaurant in Praiano',
+    phone: '+39 340 488 7726',
+  },
   aiDisclosureCustom: null,
 };
 
 describe('composeBookingWelcome', () => {
   it('EN completo — il testo che parte a Julian', () => {
+    // Correzioni Andrea 30/07: niente doppio "Hi" (la disclosure saluta
+    // gia'), meeting point qualificato ("restaurant in Praiano" — Julian
+    // e' norvegese, "La Moressa" da solo non dice cos'e'), e NIENTE
+    // "type human": promessa non collegata a nessun handover nel codice.
     expect(composeBookingWelcome(JULIAN)).toBe(
-      'Hi! You’re chatting with Villa Cristina’s automated assistant. Type “human” at any time to reach a person.\n' +
+      'Hi! You’re chatting with Villa Cristina’s automated assistant.\n' +
         '\n' +
-        "Hi Julian, welcome! We're delighted to host you at Villa Cristina from Saturday 1 August.\n" +
+        "Julian, welcome! We're delighted to host you at Villa Cristina from Saturday 1 August.\n" +
         '\n' +
-        'Paolo will meet you at La Moressa — message him to arrange the time: +39 340 488 7726\n' +
+        'Paolo will meet you at La Moressa restaurant in Praiano — message him to arrange the time: +39 340 488 7726\n' +
         '\n' +
         "Here you'll find everything for your stay — house info and our local services (boat tours, transfers, private chef): https://andreachiacchio.github.io/villa-cristina-guest-app/\n" +
         '\n' +
@@ -46,15 +54,16 @@ describe('composeBookingWelcome', () => {
 
   it('lingua norvegese cade su EN (lingua di invio, non nazionalita)', () => {
     const text = composeBookingWelcome({ ...JULIAN, language: 'no' });
-    expect(text).toContain('Hi Julian, welcome!');
+    expect(text).toContain('Julian, welcome!');
   });
 
   it('IT per ospiti italiani, meeting point incluso', () => {
     const text = composeBookingWelcome({ ...JULIAN, language: 'it' });
-    expect(text).toContain('Ciao Julian, benvenuto!');
+    expect(text).toContain('Julian, benvenuto!');
+    expect(text).not.toContain('Ciao Julian');
     expect(text).toContain('sabato 1 agosto');
     expect(text).toContain(
-      "All'arrivo Paolo ti aspetta a La Moressa — scrivigli per concordare l'orario: +39 340 488 7726",
+      "All'arrivo Paolo ti aspetta a La Moressa restaurant in Praiano — scrivigli per concordare l'orario: +39 340 488 7726",
     );
     expect(text.endsWith('A presto,\nVilla Cristina')).toBe(true);
   });
@@ -62,7 +71,14 @@ describe('composeBookingWelcome', () => {
   it('senza guest app URL la riga sparisce, niente link rotti', () => {
     const text = composeBookingWelcome({ ...JULIAN, guestAppUrl: null });
     expect(text).not.toContain('http');
-    expect(text).toContain('Hi Julian, welcome!');
+    expect(text).toContain('Julian, welcome!');
+  });
+
+  it('la promessa "type human" non esiste finche non esiste l handover', () => {
+    for (const language of ['en', 'it']) {
+      const text = composeBookingWelcome({ ...JULIAN, language });
+      expect(text).not.toMatch(/human|operatore/i);
+    }
   });
 
   it('senza meeting point la riga sparisce, mai persone inventate', () => {
@@ -79,7 +95,7 @@ describe('composeBookingWelcome', () => {
 
   it('senza first name usa il nome completo', () => {
     const text = composeBookingWelcome({ ...JULIAN, guestFirstName: null });
-    expect(text).toContain('Hi Julian Falch Milde, welcome!');
+    expect(text).toContain('Julian Falch Milde, welcome!');
   });
 
   it('disclosure custom dell host sostituisce il default', () => {

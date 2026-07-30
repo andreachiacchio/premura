@@ -57,8 +57,10 @@ export function composeBookingWelcome(input: BookingWelcomeInput): string {
   const lines: string[] = [disclosure, ''];
 
   if (lang === 'it') {
+    // Niente "Ciao" qui: la disclosure in testa saluta gia', e due
+    // saluti di fila leggono male (correzione Andrea 30/07).
     lines.push(
-      `Ciao ${name}, benvenuto! Siamo felici di accoglierti a ${input.propertyName} da ${date}.`,
+      `${name}, benvenuto! Siamo felici di accoglierti a ${input.propertyName} da ${date}.`,
     );
     if (input.meetingPoint) {
       lines.push(
@@ -75,7 +77,7 @@ export function composeBookingWelcome(input: BookingWelcomeInput): string {
     lines.push('', 'A presto,', input.propertyName);
   } else {
     lines.push(
-      `Hi ${name}, welcome! We're delighted to host you at ${input.propertyName} from ${date}.`,
+      `${name}, welcome! We're delighted to host you at ${input.propertyName} from ${date}.`,
     );
     if (input.meetingPoint) {
       lines.push(
