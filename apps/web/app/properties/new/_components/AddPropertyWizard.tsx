@@ -7,13 +7,16 @@ import {
   createPropertyFromWizardAction,
   geocodeAddressAction,
   importListingAction,
+  importListingFromUrlAction,
 } from '../actions';
 
-// Wizard "Aggiungi struttura". Primo passo: "Hai già l'annuncio online?"
-// L'import (testo incollato o screenshot) precompila il form: l'host
-// CORREGGE, non scrive. Un campo che l'import non trova resta vuoto.
+// Wizard "Aggiungi struttura". Primo passo: UN campo — il link
+// dell'annuncio. Premura prova a leggerlo; se Booking/Airbnb bloccano
+// (caso normale da datacenter) NIENTE errore: si propone il
+// copia-incolla guidato. L'import precompila il form: l'host CORREGGE,
+// non scrive. Un campo che l'import non trova resta vuoto.
 
-type Step = 'source' | 'paste' | 'screenshots' | 'form';
+type Step = 'link' | 'paste' | 'screenshots' | 'form';
 
 const EMPTY: ListingImportData = {
   nome: null,
@@ -64,11 +67,15 @@ function Field(props: {
 }
 
 export function AddPropertyWizard() {
-  const [step, setStep] = useState<Step>('source');
+  const [step, setStep] = useState<Step>('link');
   const [prefill, setPrefill] = useState<ListingImportData>(EMPTY);
   const [imported, setImported] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importing, startImport] = useTransition();
+  const [listingUrl, setListingUrl] = useState('');
+  // Il link non si apriva da qui: il passo 'paste' mostra la guida
+  // Ctrl+A invece del suo testo standard.
+  const [fromBlockedLink, setFromBlockedLink] = useState(false);
 
   const [addressDraft, setAddressDraft] = useState<string | null>(null);
   const [geo, setGeo] = useState<GeocodeResult | null>(null);
@@ -108,31 +115,77 @@ export function AddPropertyWizard() {
     });
   }
 
-  if (step === 'source') {
+  function tryLink() {
+    setImportError(null);
+    startImport(async () => {
+      const result = await importListingFromUrlAction(listingUrl);
+      if (result.ok) {
+        setPrefill(result.data);
+        setImported(true);
+        setStep('form');
+      } else if (result.blocked) {
+        setFromBlockedLink(true);
+        setStep('paste');
+      } else {
+        setImportError(result.error);
+      }
+    });
+  }
+
+  if (step === 'link') {
     return (
       <div className="flex flex-col gap-4">
         <h2 className="text-[18px] font-semibold text-ink">Hai già l'annuncio online?</h2>
         <p className="text-body-sm text-ink-mute">
-          Se la casa è già su Booking o Airbnb, il grosso è scritto lì: portalo qui e ti precompilo
-          tutto. Tu controlli e correggi.
+          Incolla il link del tuo annuncio Booking o Airbnb: provo a leggerlo e ti precompilo tutto.
+          Tu controlli e correggi.
         </p>
-        <button type="button" onClick={() => setStep('paste')} className={PRIMARY_BTN}>
-          Sì — incollo il testo dell'annuncio
-        </button>
-        <button type="button" onClick={() => setStep('screenshots')} className={GHOST_BTN}>
-          Sì — carico 2-3 screenshot
-        </button>
+        <input
+          type="url"
+          value={listingUrl}
+          onChange={(e) => setListingUrl(e.target.value)}
+          placeholder="https://www.booking.com/hotel/it/…"
+          className={INPUT_CLS}
+        />
+        {importError ? <p className="text-body-sm text-terracotta-2">{importError}</p> : null}
         <button
           type="button"
-          onClick={() => {
-            setPrefill(EMPTY);
-            setImported(false);
-            setStep('form');
-          }}
-          className="text-body-sm text-ink-mute underline-offset-2 hover:underline"
+          onClick={tryLink}
+          disabled={importing || listingUrl.trim().length === 0}
+          className={PRIMARY_BTN}
         >
-          No, parto da zero
+          {importing ? 'Provo a leggerlo…' : "Leggi l'annuncio"}
         </button>
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setFromBlockedLink(false);
+              setStep('paste');
+            }}
+            className="text-body-sm text-ink-mute underline-offset-2 hover:underline"
+          >
+            Preferisco incollare il testo
+          </button>
+          <button
+            type="button"
+            onClick={() => setStep('screenshots')}
+            className="text-body-sm text-ink-mute underline-offset-2 hover:underline"
+          >
+            Ho degli screenshot dell'annuncio
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPrefill(EMPTY);
+              setImported(false);
+              setStep('form');
+            }}
+            className="text-body-sm text-ink-mute underline-offset-2 hover:underline"
+          >
+            Non ho un annuncio, parto da zero
+          </button>
+        </div>
       </div>
     );
   }
@@ -141,10 +194,18 @@ export function AddPropertyWizard() {
     return (
       <form action={runImport} className="flex flex-col gap-4">
         <h2 className="text-[18px] font-semibold text-ink">Incolla l'annuncio</h2>
-        <p className="text-body-sm text-ink-mute">
-          Apri il tuo annuncio su Booking o Airbnb, seleziona tutto il testo (titolo, descrizione,
-          servizi, regole) e incollalo qui.
-        </p>
+        {fromBlockedLink ? (
+          <p className="rounded-card border border-line bg-paper px-4 py-3 text-body-sm text-ink-soft">
+            Non riesco ad aprire l'annuncio da qui — capita, Booking e Airbnb non aprono a tutti.
+            Fai così: apri la pagina del tuo annuncio, seleziona tutto (Ctrl+A), copia e incolla qui
+            sotto. Il risultato è identico.
+          </p>
+        ) : (
+          <p className="text-body-sm text-ink-mute">
+            Apri il tuo annuncio su Booking o Airbnb, seleziona tutto il testo (titolo, descrizione,
+            servizi, regole) e incollalo qui.
+          </p>
+        )}
         <textarea
           name="listingText"
           rows={12}
@@ -157,7 +218,7 @@ export function AddPropertyWizard() {
           <button type="submit" disabled={importing} className={PRIMARY_BTN}>
             {importing ? 'Leggo l’annuncio…' : 'Estrai i dati'}
           </button>
-          <button type="button" onClick={() => setStep('source')} className={GHOST_BTN}>
+          <button type="button" onClick={() => setStep('link')} className={GHOST_BTN}>
             Indietro
           </button>
         </div>
@@ -186,7 +247,7 @@ export function AddPropertyWizard() {
           <button type="submit" disabled={importing} className={PRIMARY_BTN}>
             {importing ? 'Leggo gli screenshot…' : 'Estrai i dati'}
           </button>
-          <button type="button" onClick={() => setStep('source')} className={GHOST_BTN}>
+          <button type="button" onClick={() => setStep('link')} className={GHOST_BTN}>
             Indietro
           </button>
         </div>
@@ -329,7 +390,7 @@ export function AddPropertyWizard() {
         <button type="submit" disabled={creating} className={PRIMARY_BTN}>
           {creating ? 'Creo la struttura…' : 'Crea la struttura'}
         </button>
-        <button type="button" onClick={() => setStep('source')} className={GHOST_BTN}>
+        <button type="button" onClick={() => setStep('link')} className={GHOST_BTN}>
           Indietro
         </button>
       </div>

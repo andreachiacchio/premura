@@ -33,16 +33,18 @@ jobs:
     steps:
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
-      - name: sendText "Premura è online" al founder
+      # UN tentativo, MAI retry: flyctl ssh esce con codice != 0 anche a
+      # messaggio partito, e il retry del run #1 ha mandato 5 ping in 5
+      # minuti al founder (incidente 30/07). L'esito vero si legge dai
+      # marker dello script; se manca, si indaga — non si rimanda.
+      - name: sendText "Premura è online" al founder (singolo, senza retry)
         run: |
-          for attempt in 1 2 3 4 5; do
-            if flyctl ssh console --app premura-api-staging --process-group worker -C "pnpm exec tsx src/scripts/send-test-message.ts +393383963307 Premura è online"; then
-              exit 0
-            fi
-            echo "tentativo ${attempt} fallito (deploy in corso?), riprovo tra 45s"
-            sleep 45
-          done
-          exit 1
+          out=$(flyctl ssh console --app premura-api-staging --process-group worker -C "pnpm exec tsx src/scripts/send-test-message.ts +393383963307 Premura è online" 2>&1) || true
+          echo "$out"
+          echo "$out" | grep -q "\[test-send\] \(INVIATO\|SIMULATO\|BLOCCATO\)" || {
+            echo "::error::Nessun esito dallo script: NON riprovare alla cieca, leggere i log."
+            exit 1
+          }
 
       - name: Log recenti del worker (evidenza cron e webhook)
         if: always()

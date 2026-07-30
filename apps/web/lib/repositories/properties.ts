@@ -1,5 +1,5 @@
-import { asc, eq } from "drizzle-orm";
-import { properties, type Database, type IcalSource } from "@premura/db";
+import { type Database, type IcalSource, properties } from '@premura/db';
+import { asc, eq } from 'drizzle-orm';
 
 // Repository properties: lettura per onboarding/dashboard + creazione
 // dalla form prima property (slice 6 fase 6).
@@ -47,7 +47,7 @@ export async function createProperty(args: CreatePropertyArgs): Promise<{
   const { db, hostId, name, city, icalBookingUrl } = args;
 
   const icalSources: IcalSource[] = icalBookingUrl
-    ? [{ source: "booking", url: icalBookingUrl }]
+    ? [{ source: 'booking', url: icalBookingUrl }]
     : [];
 
   const inserted = await db
@@ -63,7 +63,7 @@ export async function createProperty(args: CreatePropertyArgs): Promise<{
     .returning({ id: properties.id });
 
   if (inserted.length === 0) {
-    throw new Error("[properties.createProperty] INSERT ... RETURNING vuoto");
+    throw new Error('[properties.createProperty] INSERT ... RETURNING vuoto');
   }
   return { id: inserted[0]!.id };
 }

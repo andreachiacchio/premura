@@ -74,6 +74,8 @@ export async function runBookingWelcomeTick(now: Date = new Date()): Promise<voi
       .where(
         and(
           ne(bookings.status, 'cancelled'),
+          // Un blocco calendario non riceve benvenuti, mai.
+          eq(bookings.isCalendarBlock, false),
           isNotNull(bookings.premuraActiveAt),
           isNotNull(bookings.guestPhone),
           sql`(${bookings.checkinAt} at time zone 'Europe/Rome')::date = (now() at time zone 'Europe/Rome')::date`,

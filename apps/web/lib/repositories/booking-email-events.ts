@@ -1,15 +1,11 @@
+import { type Database, bookingEmailEvents } from '@premura/db';
 import { eq } from 'drizzle-orm';
-import { bookingEmailEvents, type Database } from '@premura/db';
 
 // Repository booking_email_events: audit trail delle email Booking.com
 // processate (M2a.3 Fase 3). Idempotenza job-level via uniqueIndex su
 // raw_email_id + onConflictDoNothing.
 
-export type BookingEmailEventStatus =
-  | 'matched'
-  | 'unmatched'
-  | 'skipped'
-  | 'error';
+export type BookingEmailEventStatus = 'matched' | 'unmatched' | 'skipped' | 'error';
 
 export type BookingEmailEventInsert = {
   hostId: string;
@@ -50,10 +46,7 @@ export async function insertBookingEmailEvent(
 
 // Verifica se una specifica email è già stata processata in passato (per
 // idempotenza in early-skip lato orchestrator).
-export async function existsBookingEmailEvent(
-  db: Database,
-  rawEmailId: string,
-): Promise<boolean> {
+export async function existsBookingEmailEvent(db: Database, rawEmailId: string): Promise<boolean> {
   const rows = await db
     .select({ id: bookingEmailEvents.id })
     .from(bookingEmailEvents)

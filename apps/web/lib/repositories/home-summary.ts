@@ -95,6 +95,7 @@ export async function getHomeSummary(
         and(
           eq(properties.hostId, hostId),
           ne(bookings.status, 'cancelled'),
+          eq(bookings.isCalendarBlock, false),
           lte(bookings.checkinAt, now),
           gt(bookings.checkoutAt, now),
         ),
@@ -108,6 +109,7 @@ export async function getHomeSummary(
         and(
           eq(properties.hostId, hostId),
           ne(bookings.status, 'cancelled'),
+          eq(bookings.isCalendarBlock, false),
           gt(bookings.checkinAt, now),
           lte(bookings.checkinAt, arrivingEnd),
         ),

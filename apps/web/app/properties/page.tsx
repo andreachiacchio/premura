@@ -50,7 +50,13 @@ export default async function PropertiesPage() {
       })
       .from(bookings)
       .innerJoin(properties, eq(properties.id, bookings.propertyId))
-      .where(and(eq(properties.hostId, hostId), ne(bookings.status, 'cancelled')))
+      .where(
+        and(
+          eq(properties.hostId, hostId),
+          ne(bookings.status, 'cancelled'),
+          eq(bookings.isCalendarBlock, false),
+        ),
+      )
       .groupBy(bookings.propertyId),
   ]);
   const countsByProperty = new Map(counts.map((c) => [c.propertyId, c]));

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
+import { type Database, guestProfiles } from '@premura/db';
 import { and, eq, sql } from 'drizzle-orm';
-import { guestProfiles, type Database } from '@premura/db';
 import type { ParsedAirbnbConfirmation } from '../airbnb-email-parser';
 
 // Repository guest_profiles: directory ospiti host-scoped (M2a.3 Fase 2).

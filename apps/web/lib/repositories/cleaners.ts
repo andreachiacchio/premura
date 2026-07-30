@@ -1,4 +1,4 @@
-import { type Database, cleaners, kits, properties, bookings } from '@premura/db';
+import { type Database, bookings, cleaners, kits, properties } from '@premura/db';
 import { and, count, desc, eq, sql } from 'drizzle-orm';
 
 // Slice F — Cleaner repository.
@@ -20,10 +20,7 @@ export type CleanerListRow = {
   createdAt: Date;
 };
 
-export async function listCleanersForHost(
-  db: Database,
-  hostId: string,
-): Promise<CleanerListRow[]> {
+export async function listCleanersForHost(db: Database, hostId: string): Promise<CleanerListRow[]> {
   const rows = await db
     .select({
       id: cleaners.id,
@@ -68,10 +65,7 @@ export async function listCleanersForHost(
     .innerJoin(bookings, eq(kits.bookingId, bookings.id))
     .innerJoin(properties, eq(bookings.propertyId, properties.id))
     .where(
-      and(
-        eq(properties.hostId, hostId),
-        sql`${kits.status} IN ('set_up', 'delivered_to_guest')`,
-      ),
+      and(eq(properties.hostId, hostId), sql`${kits.status} IN ('set_up', 'delivered_to_guest')`),
     )
     .groupBy(properties.cleanerId);
 
@@ -278,10 +272,7 @@ export async function listPropertiesForCleaner(
     .orderBy(properties.name);
 }
 
-export async function countActiveCleanersForHost(
-  db: Database,
-  hostId: string,
-): Promise<number> {
+export async function countActiveCleanersForHost(db: Database, hostId: string): Promise<number> {
   const [row] = await db
     .select({ count: count(cleaners.id).as('count') })
     .from(cleaners)

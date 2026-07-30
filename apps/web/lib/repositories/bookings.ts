@@ -200,6 +200,8 @@ export async function findByHostId(args: {
   const filter = and(
     eq(properties.hostId, hostId),
     ne(bookings.status, 'cancelled'),
+    // I blocchi calendario non sono ospiti: fuori dalla lista.
+    eq(bookings.isCalendarBlock, false),
     gte(bookings.checkinAt, cutoff),
     propertyId ? eq(bookings.propertyId, propertyId) : undefined,
   );

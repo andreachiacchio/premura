@@ -1,5 +1,5 @@
-import pino from 'pino';
 import type { VEvent } from 'node-ical';
+import pino from 'pino';
 
 /**
  * Logger dedicato al mapper. Pino e non console per allineamento con il
@@ -66,6 +66,26 @@ export type IcalBookingShell = {
  *  - nights: differenza in giorni tra checkout e checkin, arrotondata. Math.round
  *    per assorbire artefatti DST quando le date sono datetime con TZ.
  */
+/**
+ * Tre categorie (decisione Andrea 30/07), perche' Booking non
+ * distingue: esporta OGNI fascia occupata come "CLOSED - Not
+ * available", prenotazioni vere incluse.
+ *
+ *  - BLOCCO CERTO -> scartato: Airbnb "(Not available)" (Airbnb
+ *    dichiara i blocchi), e Booking sopra le 30 notti (nessun
+ *    soggiorno breve dura tanto — es. "31 lug 2027 - 30 gen 2028").
+ *  - OCCUPATO, SORGENTE IGNOTA -> importato: Booking sotto le 30
+ *    notti. Probabile ospite vero; la UI lo mostra con etichetta
+ *    propria ("date occupate — verifica sull'extranet"), mai nascosto.
+ *  - PRENOTAZIONE -> importato: Airbnb "Reserved" e tutto il resto.
+ */
+const BLOCK_SUMMARY = /not available|unavailable|closed|blocked/i;
+const MAX_UNKNOWN_OCCUPIED_NIGHTS = 30;
+
+export function isCalendarBlockSummary(summary: unknown): boolean {
+  return typeof summary === 'string' && BLOCK_SUMMARY.test(summary);
+}
+
 export function mapIcalEventToBookingShell(
   event: VEvent,
   propertyId: string,
@@ -89,9 +109,19 @@ export function mapIcalEventToBookingShell(
 
   const checkinAt = event.start instanceof Date ? event.start : new Date(event.start);
   const checkoutAt = event.end instanceof Date ? event.end : new Date(event.end);
-  const nights = Math.round(
-    (checkoutAt.getTime() - checkinAt.getTime()) / MS_PER_DAY,
-  );
+  const nights = Math.round((checkoutAt.getTime() - checkinAt.getTime()) / MS_PER_DAY);
+
+  if (isCalendarBlockSummary(event.summary)) {
+    const certainBlock = source === 'airbnb' || nights > MAX_UNKNOWN_OCCUPIED_NIGHTS;
+    if (certainBlock) {
+      logger.debug(
+        { propertyId, source, uid: event.uid, nights, summary: event.summary },
+        'skipping calendar block (not a booking)',
+      );
+      return null;
+    }
+    // Booking <= 30 notti: occupato, sorgente ignota — si importa.
+  }
 
   return {
     propertyId,
