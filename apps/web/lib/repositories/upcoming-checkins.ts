@@ -127,6 +127,8 @@ export async function listUpcomingCheckins(
       and(
         eq(properties.hostId, hostId),
         ne(bookings.status, 'cancelled'),
+        // I blocchi calendario non sono ospiti: fuori da lista e conteggi.
+        eq(bookings.isCalendarBlock, false),
         // Soggiorni in corso inclusi: e' il checkout a dover essere futuro.
         gte(bookings.checkoutAt, startOfToday),
         lte(bookings.checkinAt, windowEnd),

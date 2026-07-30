@@ -1,5 +1,5 @@
+import { type Database, googleTokens } from '@premura/db';
 import { and, eq, gt, sql } from 'drizzle-orm';
-import { googleTokens, type Database } from '@premura/db';
 import { decryptToken, encryptToken } from '../google-oauth';
 
 // Repository thin sopra Drizzle per google_tokens.
@@ -30,10 +30,7 @@ export type DecryptedToken = {
 // Upsert: se (host_id, google_email) esiste già, sostituisce i token.
 // Caso reale: l'host revoca su myaccount.google.com e rifà il flow per
 // rinnovare i permessi — ci ritrova la stessa riga aggiornata.
-export async function upsertToken(
-  db: Database,
-  input: UpsertTokenInput,
-): Promise<{ id: string }> {
+export async function upsertToken(db: Database, input: UpsertTokenInput): Promise<{ id: string }> {
   const row = {
     hostId: input.hostId,
     googleEmail: input.googleEmail,
@@ -74,12 +71,7 @@ export async function getTokenByHostAndEmail(
   const [row] = await db
     .select()
     .from(googleTokens)
-    .where(
-      and(
-        eq(googleTokens.hostId, hostId),
-        eq(googleTokens.googleEmail, googleEmail),
-      ),
-    )
+    .where(and(eq(googleTokens.hostId, hostId), eq(googleTokens.googleEmail, googleEmail)))
     .limit(1);
   if (!row) return null;
   return decryptRow(row);
@@ -88,10 +80,7 @@ export async function getTokenByHostAndEmail(
 // Lista di token NON scaduti (expires_at > NOW). Riservato a worker futuri
 // (M2a.3 Fase 2 — polling Gmail). Non usato nella Fase 1.
 export async function getAllActiveTokens(db: Database): Promise<DecryptedToken[]> {
-  const rows = await db
-    .select()
-    .from(googleTokens)
-    .where(gt(googleTokens.expiresAt, new Date()));
+  const rows = await db.select().from(googleTokens).where(gt(googleTokens.expiresAt, new Date()));
   return rows.map(decryptRow);
 }
 

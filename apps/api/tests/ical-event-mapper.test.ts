@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
 import type { VEvent } from 'node-ical';
+import { describe, expect, it } from 'vitest';
 import { mapIcalEventToBookingShell } from '../src/jobs/ical-event-mapper';
 
 // Test del mapper VEVENT -> IcalBookingShell. Pure unit, niente I/O ne DB.
@@ -15,7 +15,10 @@ function makeVEvent(overrides: Partial<VEvent> = {}): VEvent {
     uid: 'a90207a6098fea365fa0d9ebc4af632d@booking.com',
     start: new Date('2026-05-01T15:00:00Z'),
     end: new Date('2026-05-04T11:00:00Z'),
-    summary: 'CLOSED - Not available',
+    // Summary neutra: dal 30/07 le summary di blocco ("CLOSED - Not
+    // available", "(Not available)") vengono FILTRATE dal mapper — i
+    // casi blocco hanno i loro test dedicati in fondo al file.
+    summary: 'Reserved',
     ...overrides,
   } as unknown as VEvent;
 }
@@ -74,11 +77,7 @@ describe('mapIcalEventToBookingShell - VEVENT validi', () => {
   it('preserva checkinAt e checkoutAt come Date object', () => {
     const start = new Date('2026-07-15T16:00:00Z');
     const end = new Date('2026-07-17T10:00:00Z');
-    const shell = mapIcalEventToBookingShell(
-      makeVEvent({ start, end }),
-      PROPERTY_ID,
-      'booking',
-    );
+    const shell = mapIcalEventToBookingShell(makeVEvent({ start, end }), PROPERTY_ID, 'booking');
     expect(shell?.checkinAt).toEqual(start);
     expect(shell?.checkoutAt).toEqual(end);
   });
@@ -108,5 +107,58 @@ describe('mapIcalEventToBookingShell - skip cases (return null)', () => {
   it('end mancante -> null', () => {
     const event = makeVEvent({ end: undefined as unknown as VEvent['end'] });
     expect(mapIcalEventToBookingShell(event, PROPERTY_ID, 'booking')).toBeNull();
+  });
+});
+
+import { describe as describeBlocks, expect as expectBlocks, it as itBlocks } from 'vitest';
+// Bug 30/07: blocchi calendario importati come prenotazioni. Booking
+// esporta OGNI fascia occupata come "CLOSED - Not available" (mai un
+// ospite via iCal); Airbnb distingue "Reserved" dai blocchi. Il mapper
+// deve filtrare i blocchi in ingresso.
+import {
+  isCalendarBlockSummary,
+  mapIcalEventToBookingShell as mapForBlocks,
+} from '../src/jobs/ical-event-mapper';
+
+describeBlocks('filtro blocchi calendario', () => {
+  itBlocks('riconosce le summary di blocco di Booking e Airbnb', () => {
+    expectBlocks(isCalendarBlockSummary('CLOSED - Not available')).toBe(true);
+    expectBlocks(isCalendarBlockSummary('Airbnb (Not available)')).toBe(true);
+    expectBlocks(isCalendarBlockSummary('Blocked')).toBe(true);
+    expectBlocks(isCalendarBlockSummary('Reserved')).toBe(false);
+    expectBlocks(isCalendarBlockSummary('Mario Rossi')).toBe(false);
+    expectBlocks(isCalendarBlockSummary(undefined)).toBe(false);
+  });
+
+  itBlocks('un VEVENT di blocco non diventa una prenotazione', () => {
+    const shell = mapForBlocks(
+      {
+        type: 'VEVENT',
+        uid: 'b11dc36aa9ab73e9466a854d6360d3c0@booking.com',
+        summary: 'CLOSED - Not available',
+        start: new Date('2027-07-31'),
+        end: new Date('2028-01-30'),
+        // biome-ignore lint/suspicious/noExplicitAny: fixture VEvent minima
+      } as any,
+      'prop-1',
+      'booking',
+    );
+    expectBlocks(shell).toBeNull();
+  });
+
+  itBlocks('un Reserved Airbnb resta una prenotazione', () => {
+    const shell = mapForBlocks(
+      {
+        type: 'VEVENT',
+        uid: 'x@airbnb.com',
+        summary: 'Reserved',
+        start: new Date('2026-09-16'),
+        end: new Date('2026-09-19'),
+        // biome-ignore lint/suspicious/noExplicitAny: fixture VEvent minima
+      } as any,
+      'prop-1',
+      'airbnb',
+    );
+    expectBlocks(shell?.guestFullName).toBe('Reserved');
   });
 });

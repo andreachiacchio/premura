@@ -1,5 +1,5 @@
-import pino from 'pino';
 import type { VEvent } from 'node-ical';
+import pino from 'pino';
 
 /**
  * Logger dedicato al mapper. Pino e non console per allineamento con il
@@ -66,12 +66,34 @@ export type IcalBookingShell = {
  *  - nights: differenza in giorni tra checkout e checkin, arrotondata. Math.round
  *    per assorbire artefatti DST quando le date sono datetime con TZ.
  */
+/**
+ * Blocco calendario = fascia occupata senza ospite. Airbnb lo dichiara
+ * ("Airbnb (Not available)" vs "Reserved"); Booking esporta OGNI fascia
+ * come "CLOSED - Not available" — l'iCal Booking non porta mai un
+ * ospite, i dati veri arrivano da email parser o form manuale. Un
+ * blocco importato come prenotazione gonfia ogni conteggio (bug 30/07:
+ * "31 lug 2027 - 30 gen 2028", 183 notti, contato come ospite).
+ */
+const BLOCK_SUMMARY = /not available|unavailable|closed|blocked/i;
+
+export function isCalendarBlockSummary(summary: unknown): boolean {
+  return typeof summary === 'string' && BLOCK_SUMMARY.test(summary);
+}
+
 export function mapIcalEventToBookingShell(
   event: VEvent,
   propertyId: string,
   source: 'booking' | 'airbnb',
 ): IcalBookingShell | null {
   if (event.type !== 'VEVENT') return null;
+
+  if (isCalendarBlockSummary(event.summary)) {
+    logger.debug(
+      { propertyId, source, uid: event.uid ?? null, summary: event.summary },
+      'skipping calendar block (not a booking)',
+    );
+    return null;
+  }
 
   if (!event.uid || !event.start || !event.end) {
     logger.warn(
@@ -89,9 +111,7 @@ export function mapIcalEventToBookingShell(
 
   const checkinAt = event.start instanceof Date ? event.start : new Date(event.start);
   const checkoutAt = event.end instanceof Date ? event.end : new Date(event.end);
-  const nights = Math.round(
-    (checkoutAt.getTime() - checkinAt.getTime()) / MS_PER_DAY,
-  );
+  const nights = Math.round((checkoutAt.getTime() - checkinAt.getTime()) / MS_PER_DAY);
 
   return {
     propertyId,

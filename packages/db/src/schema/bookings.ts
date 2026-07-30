@@ -104,6 +104,13 @@ export const bookings = pgTable(
     guestNote: text('guest_note'),
     status: bookingStatusEnum('status').notNull().default('confirmed'),
 
+    // Fascia occupata SENZA ospite (blocco calendario): Booking esporta
+    // ogni occupazione come "CLOSED - Not available", Airbnb marca i
+    // blocchi "(Not available)". Le query di prodotto (home, liste,
+    // conteggi, cron benvenuto) escludono le righe true. Il mapper iCal
+    // ora filtra i blocchi in ingresso; questa colonna marca lo storico.
+    isCalendarBlock: boolean('is_calendar_block').notNull().default(false),
+
     // Origine dei dati prenotazione: determina se il workflow agente AI parte
     // (Guest DNA, messaggi pre-arrivo, kit composer) o resta silente per
     // quella prenotazione.
