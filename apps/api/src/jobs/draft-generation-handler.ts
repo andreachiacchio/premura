@@ -38,6 +38,7 @@ export async function processDraftGenerationJob(
       direction: messages.direction,
       fromEntity: messages.fromEntity,
       hostId: properties.hostId,
+      conversationId: messages.conversationId,
       guestFirstName: bookings.guestFirstName,
       guestFullName: bookings.guestFullName,
       propertyName: properties.name,
@@ -74,6 +75,7 @@ export async function processDraftGenerationJob(
     bookingId: row.bookingId,
     body: row.body,
     hostId: row.hostId,
+    conversationId: row.conversationId,
   });
 
   logger.info(

@@ -1,4 +1,4 @@
-import type { Database } from '@premura/db';
+import { type Database, conversations, hosts, providers } from '@premura/db';
 import { describe, expect, it, vi } from 'vitest';
 import { triggerDraftGeneration } from '../lib/draft-generator-pipeline';
 
@@ -23,6 +23,7 @@ function makeMockDb(opts: {
     hostId: string;
     guestFirstName: string | null;
     guestFullName: string;
+    guestLanguage?: string | null;
   } | null;
   messages?: Array<{ direction: string; fromEntity: string; body: string; sentAt: Date | null }>;
   voiceProfile?: {
@@ -36,6 +37,11 @@ function makeMockDb(opts: {
   } | null;
   propertyKnowledge?: Record<string, unknown> | null;
   guestInsights?: { messageInsights?: Record<string, unknown> } | null;
+  // FASE 3: numeri dei fornitori 'internal' dell'host (guardia bozze).
+  providerPhones?: string[];
+  // FASE 3: conversations.ai_disclosure_sent_at del thread (null = mai).
+  disclosureSentAt?: Date | null;
+  hostDisclosureCustom?: { it?: string; en?: string } | null;
 }) {
   const inserts: Array<{ table: string; values: Record<string, unknown> }> = [];
   let limitCount = 0;
@@ -43,7 +49,31 @@ function makeMockDb(opts: {
 
   const mock = {
     select: () => ({
-      from: () => ({
+      // Le tre query Fase 3 (fornitori, conversation, host) sono
+      // instradate per IDENTITA' di tabella; tutto il resto resta sul
+      // contatore posizionale originale, cosi' i test esistenti non
+      // cambiano sequenza.
+      from: (table: unknown) => {
+        if (table === providers) {
+          return {
+            where: () => Promise.resolve((opts.providerPhones ?? []).map((phone) => ({ phone }))),
+          };
+        }
+        if (table === conversations) {
+          return {
+            where: () => ({
+              limit: () => Promise.resolve([{ at: opts.disclosureSentAt ?? null }]),
+            }),
+          };
+        }
+        if (table === hosts) {
+          return {
+            where: () => ({
+              limit: () => Promise.resolve([{ custom: opts.hostDisclosureCustom ?? null }]),
+            }),
+          };
+        }
+        return {
         innerJoin: () => ({
           innerJoin: () => ({
             where: () => ({
@@ -105,7 +135,8 @@ function makeMockDb(opts: {
             },
           }),
         }),
-      }),
+        };
+      },
     }),
     insert: () => ({
       values: (vals: Record<string, unknown>) => {
@@ -333,5 +364,98 @@ describe('triggerDraftGeneration - generator error', () => {
     });
     expect(r.status).toBe('generator_error');
     expect(r.reason).toBe('Anthropic timeout');
+  });
+});
+
+// FASE 3 (30/07): le due guardie sulla bozza. Anche una bozza che
+// l'host approverebbe con un tocco deve rispettare le stesse regole
+// degli invii automatici: mai contatti di fornitori interni, disclosure
+// AI in testa alla prima risposta della conversazione.
+describe('triggerDraftGeneration - guardie Fase 3', () => {
+  const bookingRow = {
+    bookingId: 'b1',
+    propertyId: 'p1',
+    propertyName: 'La Goccia',
+    hostId: 'host-1',
+    guestFirstName: 'Mario',
+    guestFullName: 'Mario Rossi',
+    guestLanguage: 'it',
+  };
+  const inboundContext = [
+    { direction: 'inbound', fromEntity: 'guest', body: 'Serve un transfer', sentAt: new Date() },
+  ];
+
+  it('bozza col numero di un fornitore interno -> provider_contact_leak, nessun draft inserito', async () => {
+    const leakyGenerator = vi.fn().mockResolvedValue({
+      ...baseDraft,
+      draft_body: 'Per il transfer chiama Antonio al +39 350 032 8207.',
+    });
+    const { db, inserts } = makeMockDb({
+      existingDraft: null,
+      recentOutbound: null,
+      bookingRow,
+      messages: inboundContext,
+      providerPhones: ['+393500328207'],
+    });
+    const r = await triggerDraftGeneration(db, {
+      messageId: 'm1',
+      bookingId: 'b1',
+      body: 'Ci serve un transfer dall aeroporto',
+      hostId: 'host-1',
+      conversationId: 'conv-1',
+      generator: leakyGenerator,
+    });
+    expect(r.status).toBe('provider_contact_leak');
+    // La generazione resta loggata (observabilita'), la bozza NO.
+    expect(inserts.find((i) => i.table === 'agent_actions')).toBeDefined();
+    expect(inserts.find((i) => i.table === 'pending_drafts')).toBeUndefined();
+  });
+
+  it('prima bozza della conversazione -> disclosure AI (lingua del booking) in testa', async () => {
+    fakeGenerator.mockClear();
+    const { db, inserts } = makeMockDb({
+      existingDraft: null,
+      recentOutbound: null,
+      bookingRow,
+      messages: inboundContext,
+      disclosureSentAt: null,
+    });
+    const r = await triggerDraftGeneration(db, {
+      messageId: 'm1',
+      bookingId: 'b1',
+      body: 'A che ora il check-in?',
+      hostId: 'host-1',
+      conversationId: 'conv-1',
+      generator: fakeGenerator,
+    });
+    expect(r.status).toBe('generated');
+    const draftInsert = inserts.find((i) => i.table === 'pending_drafts');
+    if (!draftInsert) throw new Error('expected draft insert');
+    expect(draftInsert.values.draftResponse).toBe(
+      `Ciao! Ti risponde l’assistente automatico di La Goccia.\n\n${baseDraft.draft_body}`,
+    );
+  });
+
+  it('disclosure gia inviata nella conversazione -> testo proposto senza premessa', async () => {
+    fakeGenerator.mockClear();
+    const { db, inserts } = makeMockDb({
+      existingDraft: null,
+      recentOutbound: null,
+      bookingRow,
+      messages: inboundContext,
+      disclosureSentAt: new Date('2026-07-29T10:00:00Z'),
+    });
+    const r = await triggerDraftGeneration(db, {
+      messageId: 'm1',
+      bookingId: 'b1',
+      body: 'A che ora il check-in?',
+      hostId: 'host-1',
+      conversationId: 'conv-1',
+      generator: fakeGenerator,
+    });
+    expect(r.status).toBe('generated');
+    const draftInsert = inserts.find((i) => i.table === 'pending_drafts');
+    if (!draftInsert) throw new Error('expected draft insert');
+    expect(draftInsert.values.draftResponse).toBe(baseDraft.draft_body);
   });
 });
