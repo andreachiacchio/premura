@@ -7,6 +7,7 @@ import { listGuestsArrivingSoon, listGuestsInHouse } from '@/lib/repositories/ho
 import { getHomeSummary, listGuestsMissingPhoneSoon } from '@/lib/repositories/home-summary';
 import { countKitsByStatusForHost } from '@/lib/repositories/kits';
 import { findByHostId as findPropertiesByHostId } from '@/lib/repositories/properties';
+import { listPossibleCancellations } from '@/lib/repositories/possible-cancellations';
 import { listPendingReplyDraftsForHost } from '@/lib/repositories/reply-drafts';
 import { isIncompleteDataSource } from '@/lib/types';
 import { hosts } from '@premura/db';
@@ -146,9 +147,10 @@ export default async function DashboardPage() {
   // Home desktop (30/07): ospiti in casa e in arrivo, stessi predicati
   // della metrica dell'agent card ("mai due verita'").
   const now = new Date();
-  const [guestsInHouseRows, guestsArrivingRows] = await Promise.all([
+  const [guestsInHouseRows, guestsArrivingRows, possibleCancellations] = await Promise.all([
     safeQuery('listGuestsInHouse', () => listGuestsInHouse(db, hostId, now), []),
     safeQuery('listGuestsArrivingSoon', () => listGuestsArrivingSoon(db, hostId, now), []),
+    safeQuery('listPossibleCancellations', () => listPossibleCancellations(db, hostId), []),
   ]);
 
   const incompleteToCompleteCount = bookings.filter(
@@ -173,6 +175,7 @@ export default async function DashboardPage() {
     missingPhoneSoon,
     incompleteCount: incompleteToCompleteCount,
     pendingKitsCount,
+    possibleCancellations,
   };
 
   const startOfToday = new Date();

@@ -111,6 +111,15 @@ export const bookings = pgTable(
     // ora filtra i blocchi in ingresso; questa colonna marca lo storico.
     isCalendarBlock: boolean('is_calendar_block').notNull().default(false),
 
+    // Rilevamento cancellazioni 2-poll (30/07): poll RIUSCITI consecutivi
+    // in cui l'evento iCal non compare piu' nel feed. Un poll fallito
+    // (HTTP error, timeout, body non parsabile) NON incrementa mai.
+    feedMissingCount: integer('feed_missing_count').notNull().default(0),
+    // Valorizzato al secondo poll mancante: "possibile cancellazione",
+    // mostrata in "Serve una tua decisione". L'host conferma (cancellata)
+    // o smentisce (ancora attiva: si azzera contatore e sospetto).
+    possibleCancellationAt: timestamp('possible_cancellation_at', { withTimezone: true }),
+
     // Origine dei dati prenotazione: determina se il workflow agente AI parte
     // (Guest DNA, messaggi pre-arrivo, kit composer) o resta silente per
     // quella prenotazione.

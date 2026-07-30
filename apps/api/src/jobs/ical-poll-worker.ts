@@ -6,6 +6,8 @@ import { getRedisConnection } from './redis-connection';
 import type { IcalPollJobData } from './queues';
 import { mapIcalEventToBookingShell } from './ical-event-mapper';
 import { upsertBookingShell } from './booking-upsert-repository';
+import { reconcileMissingEvents } from './feed-reconciliation';
+import { recordFeedOutcome } from './feed-sync-state';
 import { redactIcalUrl } from './redact-ical-url';
 
 /**
@@ -81,11 +83,20 @@ export const icalPollWorker = new Worker<IcalPollJobData>(
       let skipped = 0;
       let dateChanged = 0;
       let errors = 0;
+      // UID visti in QUESTO poll (anche di eventi-blocco che il mapper
+      // scarta): servono alla riconciliazione cancellazioni.
+      const seenRefs = new Set<string>();
+      let hasVcalendar = false;
 
       for (const component of components) {
+        const type = (component as { type?: string }).type ?? '';
+        if (type.toUpperCase() === 'VCALENDAR') hasVcalendar = true;
         if (component.type !== 'VEVENT') continue;
+        const rawUid = (component as { uid?: string }).uid;
+        if (rawUid) seenRefs.add(rawUid);
         const shell = mapIcalEventToBookingShell(component, propertyId, source);
         if (!shell) continue;
+        seenRefs.add(shell.platformBookingRef);
         mapped += 1;
 
         try {
@@ -134,6 +145,40 @@ export const icalPollWorker = new Worker<IcalPollJobData>(
         }
       }
 
+      // VINCOLO (Andrea 30/07): "feed risponde e l'evento non c'e'" e'
+      // diverso da "feed non risponde". La riconciliazione cancellazioni
+      // gira SOLO se il body era un calendario vero (VCALENDAR presente
+      // o almeno un evento mappato); un body non parsabile e' un errore
+      // feed, mai "zero eventi".
+      const parsedOk = hasVcalendar || mapped > 0;
+      try {
+        await recordFeedOutcome(
+          client.db,
+          propertyId,
+          icalUrl,
+          parsedOk
+            ? { ok: true, eventsCount: mapped }
+            : { ok: false, error: 'body non parsabile: nessun VCALENDAR nel feed' },
+        );
+      } catch (feedStateErr) {
+        logger.warn({ err: feedStateErr, propertyId }, 'recordFeedOutcome fallita (best-effort)');
+      }
+
+      let cancellations: Awaited<ReturnType<typeof reconcileMissingEvents>> | null = null;
+      if (parsedOk && (source === 'booking' || source === 'airbnb')) {
+        try {
+          cancellations = await reconcileMissingEvents(client.db, propertyId, source, seenRefs);
+          for (const flaggedId of cancellations.flagged) {
+            logger.warn(
+              { propertyId, source, bookingId: flaggedId },
+              'possibile cancellazione: evento assente da 2 poll riusciti consecutivi',
+            );
+          }
+        } catch (reconcileErr) {
+          logger.warn({ err: reconcileErr, propertyId }, 'riconciliazione cancellazioni fallita');
+        }
+      }
+
       logger.info(
         {
           propertyId,
@@ -144,10 +189,23 @@ export const icalPollWorker = new Worker<IcalPollJobData>(
           skipped,
           dateChanged,
           errors,
+          parsedOk,
+          cancellations,
         },
         'ical poll completed',
       );
     } catch (err) {
+      // Poll fallito: NON incrementa mai il contatore cancellazioni.
+      // Si registra come errore feed — e' cio' che alimentera' il
+      // "feed da ricollegare" mostrato all'host.
+      try {
+        await recordFeedOutcome(client.db, propertyId, icalUrl, {
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      } catch (feedStateErr) {
+        logger.warn({ err: feedStateErr, propertyId }, 'recordFeedOutcome fallita (best-effort)');
+      }
       logger.error(
         { err, propertyId, source, icalUrl: redactIcalUrl(icalUrl) },
         'ical poll failed',
