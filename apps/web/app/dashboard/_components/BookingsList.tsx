@@ -51,7 +51,8 @@ function GroupedRows({
           <h3 className="sticky top-0 z-10 -mx-1 bg-ivory/95 px-1 py-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-ink-mute backdrop-blur-sm">
             {propertyName}
           </h3>
-          <ul className="flex flex-col gap-2">
+          {/* Desktop: griglia 2-3 colonne; mobile: colonna del prototipo. */}
+          <ul className="flex flex-col gap-2 md:grid md:grid-cols-2 md:items-start xl:grid-cols-3">
             {rows.map((b) => (
               <li key={b.id}>
                 <BookingRow booking={b} completeAction={completeAction} skipAction={skipAction} />
@@ -97,7 +98,7 @@ export function BookingsList({
   const unknownOccupied = bookings.filter(isUnknownOccupied);
 
   return (
-    <div className="px-5 pt-8">
+    <div className="px-5 pt-8 md:px-0">
       {toComplete.length > 0 ? (
         <section id="incomplete" className="mb-8 scroll-mt-6">
           <SectionHeader

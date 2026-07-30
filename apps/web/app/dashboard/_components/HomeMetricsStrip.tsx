@@ -38,15 +38,16 @@ export function HomeMetricsStrip({
   metrics: HomeMetrics;
   actionsToday: number;
 }): React.JSX.Element {
-  const guestsTotal = metrics.guestsInHouse + metrics.guestsArriving;
-
   return (
-    <section aria-label="Riepilogo" className="mx-5 mt-4 grid grid-cols-2 gap-2.5">
+    <section aria-label="Riepilogo" className="mx-5 mt-4 grid grid-cols-2 gap-2.5 md:mx-0 md:mt-1">
+      {/* Stessa semantica dell'agent card ("In casa"): il numero grande
+          e' chi c'e' ADESSO, gli arrivi stanno nel dettaglio — mai due
+          verita' con etichette uguali (bug 30/07). */}
       <Tile
-        value={String(guestsTotal)}
-        label="Ospiti"
+        value={String(metrics.guestsInHouse)}
+        label="In casa"
         detail={
-          guestsTotal === 0
+          metrics.guestsInHouse === 0 && metrics.guestsArriving === 0
             ? 'Nessuno in casa, nessuno in arrivo.'
             : `${metrics.guestsInHouse} in casa · ${metrics.guestsArriving} in arrivo`
         }

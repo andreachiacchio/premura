@@ -61,7 +61,7 @@ export function AgentFeed({ items }: { items: FeedItemUI[] }): React.JSX.Element
   }, [items]);
 
   return (
-    <section aria-label="Fatto dall'agente" className="mx-5 mt-5">
+    <section aria-label="Fatto dall'agente" className="mx-5 mt-5 md:mx-0">
       <h2 className="mb-3 mt-2 font-serif text-[24px] font-medium leading-tight text-ink">
         Fatto dall'agente — oggi
       </h2>
