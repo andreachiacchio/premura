@@ -101,6 +101,9 @@ export type EmergencyContact = {
   name: string;
   phone: string;
   role: string; // es. "Idraulico", "Vicino", "Cleaner"
+  // Se valorizzato, questo contatto è il punto d'incontro all'arrivo
+  // ("Paolo ti aspetta a La Moressa") e il benvenuto lo include.
+  meetingPlace?: string;
 };
 
 export type NearbyEssential = {

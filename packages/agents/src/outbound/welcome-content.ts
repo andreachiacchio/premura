@@ -11,13 +11,13 @@ import { type AiDisclosureCustom, normalizeLanguage, resolveAiDisclosure } from 
 //     la disclosure e' dovuta e non negoziabile (outbound-guard rifiuta
 //     il corpo se manca).
 //  2. Benvenuto con nome ospite e data di arrivo.
-//  3. Link alla guest app con i servizi — omesso se l'URL non e'
+//  3. Meeting point all'arrivo ("Paolo will meet you at La Moressa") —
+//     da property_knowledge.emergency_contacts, il primo contatto con
+//     meetingPlace. Omesso se assente: mai inventare persone o numeri.
+//  4. Link alla guest app con i servizi — omesso se l'URL non e'
 //     configurato: meglio nessun link che un link rotto.
-//  4. Firma = NOME DELLA STRUTTURA (decisione blindata: l'ospite deve
+//  5. Firma = NOME DELLA STRUTTURA (decisione blindata: l'ospite deve
 //     pensare di parlare con l'host, mai con un brand terzo).
-//
-// NIENTE referente in loco (decisione Andrea 30/07): l'accoglienza
-// fisica — chiavi, arrivo — e' gestita fuori da questo messaggio.
 
 export type BookingWelcomeInput = {
   guestFirstName: string | null;
@@ -28,6 +28,8 @@ export type BookingWelcomeInput = {
   language: string | null;
   /** URL della guest app (servizi). Da env WELCOME_GUEST_APP_URL. */
   guestAppUrl: string | null;
+  /** Punto d'incontro all'arrivo, da emergency_contacts (meetingPlace). */
+  meetingPoint: { name: string; place: string; phone: string } | null;
   aiDisclosureCustom?: AiDisclosureCustom;
 };
 
@@ -58,6 +60,12 @@ export function composeBookingWelcome(input: BookingWelcomeInput): string {
     lines.push(
       `Ciao ${name}, benvenuto! Siamo felici di accoglierti a ${input.propertyName} da ${date}.`,
     );
+    if (input.meetingPoint) {
+      lines.push(
+        '',
+        `All'arrivo ${input.meetingPoint.name} ti aspetta a ${input.meetingPoint.place} — scrivigli per concordare l'orario: ${input.meetingPoint.phone}`,
+      );
+    }
     if (input.guestAppUrl) {
       lines.push(
         '',
@@ -69,6 +77,12 @@ export function composeBookingWelcome(input: BookingWelcomeInput): string {
     lines.push(
       `Hi ${name}, welcome! We're delighted to host you at ${input.propertyName} from ${date}.`,
     );
+    if (input.meetingPoint) {
+      lines.push(
+        '',
+        `${input.meetingPoint.name} will meet you at ${input.meetingPoint.place} — message him to arrange the time: ${input.meetingPoint.phone}`,
+      );
+    }
     if (input.guestAppUrl) {
       lines.push(
         '',
