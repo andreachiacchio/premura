@@ -74,7 +74,26 @@ export function toChatId(raw: string): string {
 // La risposta di sendText/sendImage e' un WAMessage. A noi interessa solo
 // l'id, ma passthrough() perche' WAHA aggiunge campi tra le versioni e non
 // vogliamo che un campo nuovo faccia fallire il parse di un invio riuscito.
-const wahaMessageSchema = z.object({ id: z.string() }).passthrough();
+//
+// BUG 30/07 (invito Julian, slot failed con "expected string received
+// object, path: [id]"): con l'engine WEBJS l'id NON e' una stringa ma
+// l'oggetto MessageID di whatsapp-web.js:
+//   { fromMe, remote, id: "3EB0...", _serialized: "true_39...@c.us_3EB0..." }
+// L'HTTP era gia' 200: il messaggio ERA PARTITO, e il parse della
+// risposta lo marcava failed — un audit bugiardo su un invio riuscito.
+// Accettiamo entrambe le forme e normalizziamo a stringa.
+const wahaMessageIdSchema = z.union([
+  z.string(),
+  z
+    .object({ _serialized: z.string().optional(), id: z.string().optional() })
+    .passthrough(),
+]);
+const wahaMessageSchema = z.object({ id: wahaMessageIdSchema }).passthrough();
+
+export function extractWahaMessageId(id: z.infer<typeof wahaMessageIdSchema>): string {
+  if (typeof id === 'string') return id;
+  return id._serialized ?? id.id ?? 'waha-unknown-id';
+}
 
 async function wahaPost<T>(path: string, payload: unknown, parse: (j: unknown) => T): Promise<T> {
   const { baseUrl, apiKey } = getConfig();
@@ -107,7 +126,7 @@ export async function sendTextViaWaha(to: string, body: string): Promise<{ messa
     },
     (j) => wahaMessageSchema.parse(j),
   );
-  return { messageId: msg.id };
+  return { messageId: extractWahaMessageId(msg.id) };
 }
 
 export async function sendImageViaWaha(params: {
@@ -128,7 +147,7 @@ export async function sendImageViaWaha(params: {
     },
     (j) => wahaMessageSchema.parse(j),
   );
-  return { messageId: msg.id };
+  return { messageId: extractWahaMessageId(msg.id) };
 }
 
 const numberStatusSchema = z
