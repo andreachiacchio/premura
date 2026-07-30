@@ -1,7 +1,9 @@
+import type { OccupiedRange } from '@/lib/occupied-ranges';
 import { type BookingForDashboard, isIncompleteDataSource } from '@/lib/types';
 import Link from 'next/link';
 import { BookingRow } from './BookingRow';
 import type { CompleteBookingActionFn, SkipBookingActionFn } from './CompleteBookingDialog';
+import { OccupiedRangesSection } from './OccupiedRangesSection';
 
 // Liste prenotazioni della HOME (ristrutturazione 30/07):
 //  - "Da completare" (data_source incomplete non-iCal, non skipped)
@@ -120,18 +122,26 @@ export function BookingsList({
             title="Date occupate"
             eyebrow={`${unknownOccupied.length} ${unknownOccupied.length === 1 ? 'fascia' : 'fasce'}`}
           />
-          <p className="mt-1 text-body-sm text-ink-mute">
+          <p className="mb-3 mt-1 text-body-sm text-ink-mute">
             Il calendario Booking dice solo che queste date sono occupate, non chi arriva — verifica
-            sull'extranet e completa i dati dell'ospite.
+            sull'extranet e tocca la fascia per completare i dati dell'ospite.
           </p>
-          <GroupedRows
-            items={unknownOccupied.slice(0, HOME_ROWS_LIMIT)}
+          {/* Ristrutturazione 30/07: gruppi per urgenza, chip struttura,
+              date complete — vedi OccupiedRangesSection. */}
+          <OccupiedRangesSection
+            ranges={unknownOccupied.map(
+              (b): OccupiedRange => ({
+                id: b.id,
+                propertyId: b.propertyId,
+                propertyName: b.propertyName,
+                checkinAtIso: b.checkinAt.toISOString(),
+                checkoutAtIso: b.checkoutAt.toISOString(),
+              }),
+            )}
+            bookingsById={Object.fromEntries(unknownOccupied.map((b) => [b.id, b]))}
             completeAction={completeAction}
             skipAction={skipAction}
           />
-          {unknownOccupied.length > HOME_ROWS_LIMIT ? (
-            <SeeAll total={unknownOccupied.length} />
-          ) : null}
         </section>
       ) : null}
     </div>
