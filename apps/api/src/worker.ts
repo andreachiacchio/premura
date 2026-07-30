@@ -11,6 +11,7 @@ import { startGmailSyncCron } from './jobs/gmail-sync-cron';
 import { startGuestAppInviteCron } from './jobs/guest-app-invite-cron';
 import { startIcalCron } from './jobs/ical-cron';
 import { icalPollWorker } from './jobs/ical-poll-worker';
+import { startOutboundQueueCron } from './jobs/outbound-queue-worker';
 import { startSurveyCron } from './jobs/survey-cron';
 import { surveyWorker } from './jobs/survey-worker';
 import { startWelcomeMessageCron } from './jobs/welcome-message-cron';
@@ -72,6 +73,8 @@ const bookingWelcomeCron = startBookingWelcomeCron();
 const gmailSyncCron = startGmailSyncCron();
 // Invito guest app appena compare il numero (flusso canonico §2b).
 const guestAppInviteCron = startGuestAppInviteCron();
+// Coda outbound (Fase 4): unico punto che invia i messaggi approvati.
+const outboundQueueCron = startOutboundQueueCron();
 
 // Health del worker: non "il processo risponde" ma "i cron sono ancora
 // schedulati". Un croner fermo restituisce nextRun() null, ed e' quello
@@ -84,6 +87,7 @@ app.get('/health', () => {
     bookingWelcome: bookingWelcomeCron.nextRun()?.toISOString() ?? null,
     gmailSync: gmailSyncCron.nextRun()?.toISOString() ?? null,
     guestAppInvite: guestAppInviteCron.nextRun()?.toISOString() ?? null,
+    outboundQueue: outboundQueueCron.nextRun()?.toISOString() ?? null,
   };
   const allScheduled = Object.values(crons).every((next) => next !== null);
   return {
@@ -110,6 +114,7 @@ app.log.info(
     bookingWelcome: bookingWelcomeCron.nextRun()?.toISOString() ?? null,
     gmailSync: gmailSyncCron.nextRun()?.toISOString() ?? null,
     guestAppInvite: guestAppInviteCron.nextRun()?.toISOString() ?? null,
+    outboundQueue: outboundQueueCron.nextRun()?.toISOString() ?? null,
   },
   'cron schedulati',
 );
@@ -122,6 +127,7 @@ const shutdown = async (signal: string): Promise<void> => {
   bookingWelcomeCron.stop();
   gmailSyncCron.stop();
   guestAppInviteCron.stop();
+  outboundQueueCron.stop();
   await Promise.all([
     icalPollWorker.close(),
     draftGenerationWorker.close(),

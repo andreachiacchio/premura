@@ -12,7 +12,7 @@ import { composeGuestInvite } from '@/lib/guest-invite';
 import { findOwnership } from '@/lib/repositories/bookings';
 import { findHostWaNumber } from '@/lib/repositories/hosts';
 import { createProperty } from '@/lib/repositories/properties';
-import { approveAndSendReplyDraft, rejectReplyDraft } from '@/lib/repositories/reply-drafts';
+import { approveAndQueueReplyDraft, rejectReplyDraft } from '@/lib/repositories/reply-drafts';
 import { bookings, properties } from '@premura/db';
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
@@ -183,35 +183,24 @@ export async function markDeflectionSentAction(draftId: string): Promise<void> {
   revalidatePath('/dashboard');
 }
 
-// Slice 11 / 7B — Reply draft actions (approve/edit/reject).
+// Slice 11 / 7B / Fase 4 — Reply draft actions (approve/edit/reject).
 //
-// approveReplyDraftAction: usato dal bottone "Invia". Body rimane il
-// draft originale. Slice 7B: chiama Meta Cloud API per inviare
-// realmente al guest. Ritorna l'esito strutturato (sent/failed/...) cosi'
-// l'UI mostra toast appropriato senza throw generico.
+// Fase 4 (30/07): "Approva" NON invia. Marca la bozza approvata e la
+// mette in coda (messages.status='queued'); l'invio lo fa il worker
+// outbound-queue su apps/api quando il kill switch lo permette. L'UI
+// lo dice esplicitamente: nessun messaggio parte da qui.
 //
-// editAndSendReplyDraftAction: usato dal bottone "Invia modifiche"
-// dopo edit inline. Body custom passato dal client. status='modified'
-// + invio Meta come sopra.
-//
-// rejectReplyDraftAction: usato dal bottone "Scarta". Slice 7B accetta
-// reason opzionale (audit). Niente outbound message.
+// rejectReplyDraftAction: usato dal bottone "Scarta". Reason opzionale
+// (audit). Niente outbound message.
 
 const replyDraftBodySchema = z.string().trim().min(2).max(2000);
 const rejectionReasonSchema = z.string().trim().max(500).optional();
 
-// Risultato pubblico per l'UI: enumeration per tipi di esito senza
-// leakare dettagli implementativi (Meta error body, ecc.). Lato client
-// si fa switch per mostrare toast giusto.
 export type ApproveActionResult =
-  // metaMessageId null = invio simulato (WHATSAPP_DRY_RUN) o bloccato dal
-  // kill switch: la bozza risulta inviata nel nostro stato ma nessun
-  // provider l'ha accettata, quindi non c'e' un id a cui agganciare gli
-  // ack. L'UI deve poter distinguere "inviato" da "inviato davvero".
-  | { ok: true; metaMessageId: string | null }
+  | { ok: true; queued: true }
   | {
       ok: false;
-      reason: 'not_found' | 'no_guest_phone' | 'channel_not_supported' | 'send_failed';
+      reason: 'not_found' | 'no_guest_phone' | 'channel_not_supported' | 'already_processed';
       detail?: string;
     };
 
@@ -229,12 +218,13 @@ export async function approveReplyDraftAction(draftId: string): Promise<ApproveA
   if (!draft || draft.hostId !== hostId) {
     return { ok: false, reason: 'not_found' };
   }
-  const result = await approveAndSendReplyDraft(db, id, draft.body, hostId);
+  const result = await approveAndQueueReplyDraft(db, id, draft.body ?? '', hostId);
   revalidatePath('/dashboard');
+  revalidatePath('/dashboard/conversations');
   return mapApproveResult(result);
 }
 
-export async function editAndSendReplyDraftAction(
+export async function editAndQueueReplyDraftAction(
   draftId: string,
   finalBody: string,
 ): Promise<ApproveActionResult> {
@@ -242,26 +232,22 @@ export async function editAndSendReplyDraftAction(
   const body = replyDraftBodySchema.parse(finalBody);
   const hostId = await getCurrentHostId();
   const { db } = await getDb();
-  const result = await approveAndSendReplyDraft(db, id, body, hostId);
+  const result = await approveAndQueueReplyDraft(db, id, body, hostId);
   revalidatePath('/dashboard');
+  revalidatePath('/dashboard/conversations');
   return mapApproveResult(result);
 }
 
 function mapApproveResult(
-  r: Awaited<ReturnType<typeof approveAndSendReplyDraft>>,
+  r: Awaited<ReturnType<typeof approveAndQueueReplyDraft>>,
 ): ApproveActionResult {
-  if (r.status === 'sent') return { ok: true, metaMessageId: r.metaMessageId };
-  if (r.status === 'already_sent') {
-    return r.metaMessageId
-      ? { ok: true, metaMessageId: r.metaMessageId }
-      : { ok: false, reason: 'send_failed', detail: 'gia processato senza wamid' };
-  }
+  if (r.status === 'queued') return { ok: true, queued: true };
   if (r.status === 'not_found') return { ok: false, reason: 'not_found' };
   if (r.status === 'no_guest_phone') return { ok: false, reason: 'no_guest_phone' };
   if (r.status === 'channel_not_supported') {
     return { ok: false, reason: 'channel_not_supported', detail: r.channel };
   }
-  return { ok: false, reason: 'send_failed', detail: r.error };
+  return { ok: false, reason: 'already_processed' };
 }
 
 export async function rejectReplyDraftAction(draftId: string, reason?: string): Promise<void> {
@@ -271,6 +257,7 @@ export async function rejectReplyDraftAction(draftId: string, reason?: string): 
   const { db } = await getDb();
   await rejectReplyDraft(db, id, hostId, parsedReason);
   revalidatePath('/dashboard');
+  revalidatePath('/dashboard/conversations');
 }
 
 // L1 del principio di onboarding: quando il numero non c'e', l'host
