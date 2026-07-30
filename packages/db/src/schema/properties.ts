@@ -31,6 +31,17 @@ export const properties = pgTable(
     postalCode: varchar('postal_code', { length: 16 }),
     countryCode: varchar('country_code', { length: 2 }).notNull().default('IT'),
 
+    // Coordinate dall'indirizzo CONFERMATO dall'host (Nominatim/OSM).
+    // Base per mappa e POI della guest app. Nullable: senza indirizzo
+    // confermato niente coordinate, mai geocoding di un dato incerto.
+    latitude: decimal('latitude', { precision: 9, scale: 6 }),
+    longitude: decimal('longitude', { precision: 9, scale: 6 }),
+
+    // Codice annuncio Booking.com (es. "10194397"): tiene tracciata la
+    // corrispondenza property ↔ annuncio, che i token iCal (opachi) non
+    // documentano. Compilato solo con corrispondenza verificata.
+    bookingListingId: varchar('booking_listing_id', { length: 32 }),
+
     // Sorgenti iCal come jsonb array.
     // Motivo: supportare channel manager (es. Smoobu, Hostaway) oltre a
     // Booking/Airbnb direct. Un host potrebbe avere un solo URL Smoobu
