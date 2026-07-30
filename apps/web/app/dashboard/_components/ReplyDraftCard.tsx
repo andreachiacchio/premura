@@ -1,15 +1,18 @@
 'use client';
 
-// Slice 11 — ReplyDraftCard.
+// Slice 11 / Fase 4 — ReplyDraftCard.
 // Card dashboard per un pending reply_draft. Mostra ospite + ultimo
 // messaggio inbound + draft proposto + confidence + classification.
-// 3 azioni: Invia, Modifica (textarea + Invia), Scarta.
+// 3 azioni: Approva, Modifica (textarea + Approva), Scarta.
+//
+// Fase 4 (30/07): Approva NON invia — accoda. La card lo dice sotto i
+// bottoni, e l'esito si segue nel thread della conversazione.
 
-import { Check, Edit3, Send, Trash2, X } from 'lucide-react';
+import { Check, Edit3, Trash2, X } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import {
   approveReplyDraftAction,
-  editAndSendReplyDraftAction,
+  editAndQueueReplyDraftAction,
   rejectReplyDraftAction,
 } from '../actions';
 
@@ -48,18 +51,18 @@ export function ReplyDraftCard({ draft }: { draft: ReplyDraftCardData }) {
           ? 'Airbnb'
           : 'email';
 
-  // Slice 7B: messaggi user-facing per gli esiti dell'approve action
-  // (Meta API call). Sostituisce il try/catch generico precedente.
+  // Messaggi user-facing per gli esiti dell'approve action (Fase 4:
+  // l'esito positivo e' "in coda", non "inviato").
   const reasonToMessage = (reason: string, detail?: string): string => {
     switch (reason) {
       case 'not_found':
-        return "Draft non trovato. Forse e' gia' stato gestito.";
+        return "Bozza non trovata. Forse e' gia' stata gestita.";
       case 'no_guest_phone':
         return 'Numero ospite mancante. Aggiungilo dalla scheda prenotazione.';
       case 'channel_not_supported':
         return `Canale "${detail}" non ancora supportato. Solo WhatsApp.`;
-      case 'send_failed':
-        return `Invio fallito${detail ? `: ${detail.slice(0, 200)}` : ''}.`;
+      case 'already_processed':
+        return "Bozza gia' gestita (forse da un altro dispositivo).";
       default:
         return 'Errore inatteso.';
     }
@@ -72,7 +75,7 @@ export function ReplyDraftCard({ draft }: { draft: ReplyDraftCardData }) {
         const result = await approveReplyDraftAction(draft.id);
         if (!result.ok) setError(reasonToMessage(result.reason, result.detail));
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Invio fallito');
+        setError(err instanceof Error ? err.message : 'Approvazione fallita');
       }
     });
   };
@@ -85,10 +88,10 @@ export function ReplyDraftCard({ draft }: { draft: ReplyDraftCardData }) {
     }
     startTransition(async () => {
       try {
-        const result = await editAndSendReplyDraftAction(draft.id, editedBody);
+        const result = await editAndQueueReplyDraftAction(draft.id, editedBody);
         if (!result.ok) setError(reasonToMessage(result.reason, result.detail));
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Invio fallito');
+        setError(err instanceof Error ? err.message : 'Approvazione fallita');
       }
     });
   };
@@ -142,8 +145,8 @@ export function ReplyDraftCard({ draft }: { draft: ReplyDraftCardData }) {
               disabled={pending}
               className="inline-flex h-10 items-center gap-1.5 rounded-full bg-terracotta px-4 text-body-sm font-medium text-paper shadow-sm hover:bg-terracotta-2 disabled:opacity-50"
             >
-              <Send aria-hidden className="size-4" />
-              Invia modifiche
+              <Check aria-hidden className="size-4" />
+              Approva modifiche
             </button>
             <button
               type="button"
@@ -179,7 +182,7 @@ export function ReplyDraftCard({ draft }: { draft: ReplyDraftCardData }) {
               className="inline-flex h-10 items-center gap-1.5 rounded-full bg-terracotta px-4 text-body-sm font-medium text-paper shadow-sm hover:bg-terracotta-2 disabled:opacity-50"
             >
               <Check aria-hidden className="size-4" />
-              Invia
+              Approva
             </button>
             <button
               type="button"
@@ -211,6 +214,12 @@ export function ReplyDraftCard({ draft }: { draft: ReplyDraftCardData }) {
               Scarta
             </button>
           </div>
+          {/* Fase 4: detto esplicitamente — Approva non invia. */}
+          <p className="text-body-sm text-ink-mute">
+            Approva mette il messaggio in coda, non lo invia subito. Con gli invii automatici in
+            pausa (rodaggio) resta in coda finché non li riattivi: lo vedi nel thread come «in
+            coda».
+          </p>
         </div>
       )}
 

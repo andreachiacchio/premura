@@ -1,14 +1,15 @@
 import { type Database, bookings, messages, pendingDrafts, properties } from '@premura/db';
-import { WhatsappSendError, sendText } from '@premura/integrations';
 import { and, desc, eq } from 'drizzle-orm';
 
-// Slice 11 / 7B — Repository helpers per reply_draft pending.
+// Slice 11 / 7B / Fase 4 weekend — Repository helpers per reply_draft.
 //
-// Slice 7B (outbound): approveAndSendReplyDraft chiama davvero Meta
-// Cloud API per inviare il messaggio al guest, poi traccia status
-// ('sent' su 200, 'failed' su errore non recuperabile). Retry inline
-// 1x su 5xx/429 (transient). Per resilienza piu' robusta (cron retry,
-// dead-letter), TODO follow-up con worker BullMQ in apps/api.
+// Fase 4 (30/07): "Approva" NON invia. Marca la bozza approvata e
+// ACCODA il messaggio (messages.status='queued'); l'invio vero lo fa
+// solo il worker outbound-queue su apps/api, che rispetta kill switch,
+// dry-run e guardia fornitori. Prima l'invio partiva da qui (Vercel)
+// con la Meta Cloud API e col kill switch acceso la bozza risultava
+// "sent" senza che nulla fosse partito: uno stato che mentiva. Ora lo
+// stato dice la verita': queued finche' non parte davvero.
 
 export type ReplyDraftView = {
   id: string;
@@ -99,42 +100,36 @@ export async function listPendingReplyDraftsForHost(
 }
 
 export type ApproveResult =
-  // metaMessageId null = invio simulato (WHATSAPP_DRY_RUN) o kill switch:
-  // la bozza risulta inviata nel nostro stato ma nessun provider l'ha
-  // accettata, quindi non esiste un id a cui agganciare gli ack.
-  | { status: 'sent'; messageId: string; metaMessageId: string | null }
-  | { status: 'already_sent'; metaMessageId: string | null }
+  | { status: 'queued'; messageId: string }
+  | { status: 'already_processed' }
   | { status: 'not_found' }
   | { status: 'no_guest_phone' }
-  | { status: 'failed'; error: string }
   | { status: 'channel_not_supported'; channel: string };
 
-// Slice 7B: approve + invio outbound via Meta Cloud API (canale whatsapp).
+// Fase 4: approve + ACCODA (nessuna chiamata di rete da qui).
 // Step:
-//  1. Fetch draft + booking + guest_phone (singola query JOIN).
+//  1. Fetch draft + booking + guest_phone + conversation dell'inbound.
 //  2. Validate: draft esiste, status=pending, guest_phone presente,
-//     canale=whatsapp (per ora; slice 7B v1 fa solo WA).
-//  3. Mark status='approved' temporaneamente (idempotency lock).
-//  4. Call sendText (Meta Cloud API). Retry 1x su 5xx/429.
-//  5. Su success: status='sent', sent_at, meta_message_id;
-//     insert messages row con platform_message_id=wamid.
-//  6. Su failure: status='failed', error_log.
-//
-// Idempotenza: status check pre-send. Se gia' sent/failed/approved,
-// non rifa la chiamata. Race su click multipli: l'UPDATE atomico
-// con WHERE status='pending' garantisce singolo invio.
-export async function approveAndSendReplyDraft(
+//     canale=whatsapp (Booking/Airbnb inbox restano read-only).
+//  3. Lock atomico status='approved'/'modified' (WHERE status='pending':
+//     il doppio click perde la corsa e riceve already_processed).
+//  4. Insert messages row con status='queued', sent_at NULL.
+//     Il worker outbound-queue (apps/api) fara' l'invio quando il kill
+//     switch lo permette, e portera' lo stato a sent/failed.
+export async function approveAndQueueReplyDraft(
   db: Database,
   draftId: string,
   finalBody: string,
   hostId: string,
 ): Promise<ApproveResult> {
-  // Single query: draft + booking guest_phone + inbound channel.
+  // Single query: draft + booking guest_phone + inbound channel +
+  // conversation (il messaggio in coda resta nel thread giusto).
   const [row] = await db
     .select({
       draft: pendingDrafts,
       guestPhone: bookings.guestPhone,
       inboundChannel: messages.channel,
+      inboundConversationId: messages.conversationId,
     })
     .from(pendingDrafts)
     .innerJoin(bookings, eq(pendingDrafts.bookingId, bookings.id))
@@ -149,14 +144,11 @@ export async function approveAndSendReplyDraft(
     .limit(1);
 
   if (!row) return { status: 'not_found' };
-  const { draft, guestPhone, inboundChannel } = row;
+  const { draft, guestPhone, inboundChannel, inboundConversationId } = row;
 
-  // Idempotency: gia' processato.
-  if (draft.status === 'sent' || draft.status === 'approved' || draft.status === 'modified') {
-    return { status: 'already_sent', metaMessageId: draft.metaMessageId };
-  }
+  // Idempotency: qualunque stato diverso da pending e' gia' deciso.
   if (draft.status !== 'pending') {
-    return { status: 'failed', error: `unexpected status: ${draft.status}` };
+    return { status: 'already_processed' };
   }
 
   if (!guestPhone) {
@@ -177,8 +169,9 @@ export async function approveAndSendReplyDraft(
   const now = new Date();
 
   // Lock atomico: passa a 'approved' SOLO se status='pending'. Race
-  // condition (doppio click): la seconda update non matcha (status
-  // gia' approved) e ritorniamo already_sent.
+  // condition (doppio click): la seconda update non matcha e riceve
+  // already_processed. Il lock viene PRIMA dell'insert in coda, cosi'
+  // un doppio click non accoda mai due messaggi.
   const [locked] = await db
     .update(pendingDrafts)
     .set({
@@ -189,88 +182,36 @@ export async function approveAndSendReplyDraft(
     .where(and(eq(pendingDrafts.id, draftId), eq(pendingDrafts.status, 'pending')))
     .returning({ id: pendingDrafts.id });
   if (!locked) {
-    // Race: qualcun altro l'ha gia' approvato. Re-leggi per vedere lo
-    // stato corrente e ritornare il metaMessageId se sent.
-    const [latest] = await db
-      .select({ metaMessageId: pendingDrafts.metaMessageId })
-      .from(pendingDrafts)
-      .where(eq(pendingDrafts.id, draftId))
-      .limit(1);
-    return { status: 'already_sent', metaMessageId: latest?.metaMessageId ?? null };
+    return { status: 'already_processed' };
   }
 
-  // Send via Meta. Retry 1x su 5xx/429.
-  // null quando l'invio e' simulato: pendingDrafts.metaMessageId e
-  // messages.platformMessageId sono gia' nullable a schema.
-  let wamid: string | null;
-  let lastError: string | null = null;
-  let retried = false;
-  while (true) {
-    try {
-      const result = await sendText(guestPhone, finalBody);
-      wamid = result.messageId;
-      break;
-    } catch (err) {
-      const isWa = err instanceof WhatsappSendError;
-      const errStr = isWa ? `${err.status}: ${err.body.slice(0, 500)}` : String(err);
-      lastError = errStr;
-      const retryable = isWa ? err.retryable : true; // network/timeout = retry
-      if (retryable && !retried) {
-        retried = true;
-        await new Promise((r) => setTimeout(r, 1000));
-        continue;
-      }
-      // Non recuperabile o retry esaurito: status='failed' + error_log.
-      await db
-        .update(pendingDrafts)
-        .set({
-          status: 'failed',
-          errorLog: errStr,
-          retryCount: retried ? 1 : 0,
-        })
-        .where(eq(pendingDrafts.id, draftId));
-      return { status: 'failed', error: errStr };
-    }
-  }
-
-  // Success: persist outbound message + finalize draft state.
+  // In coda: sent_at NULL e platform_message_id NULL finche' il worker
+  // non invia davvero. Lo stato del thread mostra "in coda".
   const [insertedMsg] = await db
     .insert(messages)
     .values({
       bookingId: draft.bookingId,
-      conversationId: null,
+      conversationId: inboundConversationId ?? null,
       channel: outboundChannel,
       direction: 'outbound',
       fromEntity: 'host',
       toEntity: 'guest',
       body: finalBody,
-      sentAt: now,
-      platformMessageId: wamid,
+      status: 'queued',
       recipientExternalId: guestPhone,
       metadata: {
         reply_draft_id: draftId,
         was_modified: wasModified,
-        sent_via_dashboard: true,
-        retried: retried,
+        queued_via_dashboard: true,
       },
     })
     .returning({ id: messages.id });
 
-  await db
-    .update(pendingDrafts)
-    .set({
-      status: 'sent',
-      sentAt: now,
-      metaMessageId: wamid,
-      retryCount: retried ? 1 : 0,
-    })
-    .where(eq(pendingDrafts.id, draftId));
+  if (!insertedMsg) {
+    throw new Error('[reply-drafts] queued message insert returned no row');
+  }
 
-  return {
-    status: 'sent',
-    messageId: insertedMsg?.id ?? '',
-    metaMessageId: wamid,
-  };
+  return { status: 'queued', messageId: insertedMsg.id };
 }
 
 export type RejectResult =

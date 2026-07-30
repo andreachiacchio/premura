@@ -1,80 +1,43 @@
 import type { Database } from '@premura/db';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { approveAndQueueReplyDraft, rejectReplyDraft } from '../lib/repositories/reply-drafts';
 
-// Slice 7B — unit test approveAndSendReplyDraft + rejectReplyDraft.
-// Mocka @premura/integrations sendText: testiamo lo state machine
-// senza chiamare Meta vero. Il client Meta ha test propri.
+// Fase 4 weekend (30/07) — unit test approveAndQueueReplyDraft +
+// rejectReplyDraft. L'approve NON fa piu' chiamate di rete: il test
+// verifica lo state machine puro su DB (lock atomico + insert 'queued').
+// L'invio vero e' del worker outbound-queue (apps/api, test suoi).
 
-const sendTextMock = vi.fn();
-class MockWhatsappSendError extends Error {
-  status: number;
-  body: string;
-  retryable: boolean;
-  constructor(status: number, body: string) {
-    super(`mock ${status}`);
-    this.name = 'WhatsappSendError';
-    this.status = status;
-    this.body = body;
-    this.retryable = status >= 500 || status === 429;
-  }
-}
-
-vi.mock('@premura/integrations', async () => {
-  const actual = (await vi.importActual('@premura/integrations')) as Record<string, unknown>;
-  return {
-    ...actual,
-    sendText: (...args: unknown[]) => sendTextMock(...args),
-    WhatsappSendError: MockWhatsappSendError,
-  };
-});
-
-const { approveAndSendReplyDraft, rejectReplyDraft } = await import(
-  '../lib/repositories/reply-drafts'
-);
-
-// Drizzle mock: serve a coprire le 4 query principali del path:
+// Drizzle mock: copre le 3 query del path:
 //   1. SELECT pendingDrafts JOIN bookings LEFT JOIN messages -> draft row
-//   2. UPDATE pendingDrafts -> status=approved (lock)
-//   3. INSERT messages -> outbound row
-//   4. UPDATE pendingDrafts -> status=sent + sent_at + meta_message_id
+//   2. UPDATE pendingDrafts -> status=approved/modified (lock)
+//   3. INSERT messages -> outbound row 'queued'
 
 type MockState = {
   draftRow: {
     draft: Record<string, unknown>;
     guestPhone: string | null;
     inboundChannel: string | null;
+    inboundConversationId: string | null;
   } | null;
-  // Capture insert/update calls for assertions.
   inserts: Array<{ table: string; values: Record<string, unknown> }>;
   updates: Array<{ table: string; values: Record<string, unknown> }>;
-  // For UPDATE pendingDrafts WHERE status=pending: ritorna []
-  // se "lockTaken" e' true, altrimenti [{id}].
+  // true = un altro processo ha gia' preso il lock: l'UPDATE non matcha.
   lockTaken: boolean;
-  // Per re-leggi dopo race.
-  latestMetaMessageId: string | null;
 };
 
 function makeMockDb(state: MockState): Database {
-  let selectCount = 0;
-  let updateCount = 0;
   return {
     select: () => ({
       from: () => ({
         innerJoin: () => ({
           leftJoin: () => ({
             where: () => ({
-              limit: () => {
-                selectCount++;
-                return Promise.resolve(state.draftRow ? [state.draftRow] : []);
-              },
+              limit: () => Promise.resolve(state.draftRow ? [state.draftRow] : []),
             }),
           }),
         }),
         where: () => ({
-          limit: () => {
-            // SELECT metaMessageId post-race.
-            return Promise.resolve([{ metaMessageId: state.latestMetaMessageId }]);
-          },
+          limit: () => Promise.resolve([]),
         }),
       }),
     }),
@@ -82,13 +45,8 @@ function makeMockDb(state: MockState): Database {
       set: (vals: Record<string, unknown>) => ({
         where: () => ({
           returning: () => {
-            updateCount++;
-            // Prima UPDATE = lock atomico.
-            if (updateCount === 1) {
-              state.updates.push({ table: 'pending_drafts', values: vals });
-              return Promise.resolve(state.lockTaken ? [] : [{ id: 'pd-locked' }]);
-            }
-            return Promise.resolve([]);
+            state.updates.push({ table: 'pending_drafts', values: vals });
+            return Promise.resolve(state.lockTaken ? [] : [{ id: 'pd-locked' }]);
           },
         }),
       }),
@@ -119,72 +77,74 @@ function makeState(opts: Partial<MockState> = {}): MockState {
       draft: { ...baseDraft },
       guestPhone: '+393331234567',
       inboundChannel: 'whatsapp',
+      inboundConversationId: 'conv-1',
       ...opts.draftRow,
     },
     inserts: [],
     updates: [],
     lockTaken: false,
-    latestMetaMessageId: null,
     ...opts,
   };
 }
 
-describe('approveAndSendReplyDraft', () => {
-  beforeEach(() => {
-    sendTextMock.mockReset();
-  });
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('happy path: send 200 -> status sent + insert messages outbound + update meta_message_id', async () => {
+describe('approveAndQueueReplyDraft', () => {
+  it('happy path: lock approved + insert messages QUEUED nel thread giusto, nessun invio', async () => {
     const state = makeState();
-    sendTextMock.mockResolvedValue({ messageId: 'wamid.ABC' });
     const db = makeMockDb(state);
 
-    const r = await approveAndSendReplyDraft(db, 'pd-1', baseDraft.draftResponse, 'host-1');
+    const r = await approveAndQueueReplyDraft(db, 'pd-1', baseDraft.draftResponse, 'host-1');
 
-    expect(r.status).toBe('sent');
-    if (r.status === 'sent') {
-      expect(r.metaMessageId).toBe('wamid.ABC');
+    expect(r.status).toBe('queued');
+    if (r.status === 'queued') {
       expect(r.messageId).toBe('msg-inserted');
     }
-    expect(sendTextMock).toHaveBeenCalledOnce();
-    expect(sendTextMock).toHaveBeenCalledWith('+393331234567', baseDraft.draftResponse);
-    // 1 messages insert + 2 pending_drafts updates (lock + sent).
+    // Lock: body identico al draft -> status 'approved' (non 'modified').
+    expect(state.updates.length).toBe(1);
+    expect(state.updates[0]?.values.status).toBe('approved');
+    expect(state.updates[0]?.values.finalResponseSent).toBe(baseDraft.draftResponse);
+    // Insert: 'queued', niente sent_at, niente platform id, thread giusto.
     expect(state.inserts.length).toBe(1);
     const msgInsert = state.inserts[0];
-    expect(msgInsert?.values.platformMessageId).toBe('wamid.ABC');
+    expect(msgInsert?.values.status).toBe('queued');
+    expect(msgInsert?.values.sentAt).toBeUndefined();
+    expect(msgInsert?.values.platformMessageId).toBeUndefined();
+    expect(msgInsert?.values.conversationId).toBe('conv-1');
     expect(msgInsert?.values.direction).toBe('outbound');
-    expect(msgInsert?.values.fromEntity).toBe('host');
     expect(msgInsert?.values.recipientExternalId).toBe('+393331234567');
+    expect((msgInsert?.values.metadata as Record<string, unknown>).reply_draft_id).toBe('pd-1');
+  });
+
+  it('body modificato dall host -> lock con status modified', async () => {
+    const state = makeState();
+    const db = makeMockDb(state);
+    const r = await approveAndQueueReplyDraft(db, 'pd-1', 'Testo riscritto dall host.', 'host-1');
+    expect(r.status).toBe('queued');
+    expect(state.updates[0]?.values.status).toBe('modified');
+    expect(state.updates[0]?.values.finalResponseSent).toBe('Testo riscritto dall host.');
+    expect(state.inserts[0]?.values.body).toBe('Testo riscritto dall host.');
   });
 
   it('draft not found -> not_found', async () => {
-    const state: MockState = {
-      draftRow: null,
-      inserts: [],
-      updates: [],
-      lockTaken: false,
-      latestMetaMessageId: null,
-    };
+    const state = makeState({ draftRow: null });
+    state.draftRow = null;
     const db = makeMockDb(state);
-    const r = await approveAndSendReplyDraft(db, 'pd-x', 'body', 'host-1');
+    const r = await approveAndQueueReplyDraft(db, 'pd-x', 'body', 'host-1');
     expect(r.status).toBe('not_found');
-    expect(sendTextMock).not.toHaveBeenCalled();
+    expect(state.inserts.length).toBe(0);
   });
 
-  it('no guest phone -> no_guest_phone, niente call Meta', async () => {
+  it('no guest phone -> no_guest_phone, niente coda', async () => {
     const state = makeState();
     state.draftRow = {
       draft: { ...baseDraft },
       guestPhone: null,
       inboundChannel: 'whatsapp',
+      inboundConversationId: 'conv-1',
     };
     const db = makeMockDb(state);
-    const r = await approveAndSendReplyDraft(db, 'pd-1', 'body', 'host-1');
+    const r = await approveAndQueueReplyDraft(db, 'pd-1', 'body', 'host-1');
     expect(r.status).toBe('no_guest_phone');
-    expect(sendTextMock).not.toHaveBeenCalled();
+    expect(state.inserts.length).toBe(0);
   });
 
   it('canale email -> channel_not_supported', async () => {
@@ -193,83 +153,39 @@ describe('approveAndSendReplyDraft', () => {
       draft: { ...baseDraft },
       guestPhone: '+393331234567',
       inboundChannel: 'email',
+      inboundConversationId: null,
     };
     const db = makeMockDb(state);
-    const r = await approveAndSendReplyDraft(db, 'pd-1', 'body', 'host-1');
+    const r = await approveAndQueueReplyDraft(db, 'pd-1', 'body', 'host-1');
     expect(r.status).toBe('channel_not_supported');
     if (r.status === 'channel_not_supported') {
       expect(r.channel).toBe('email');
     }
+    expect(state.inserts.length).toBe(0);
   });
 
-  it('Meta 400 (4xx non-retryable) -> status failed + error_log, no retry', async () => {
-    const state = makeState();
-    sendTextMock.mockRejectedValue(new MockWhatsappSendError(400, '{"error":"recipient invalid"}'));
-    const db = makeMockDb(state);
-
-    const r = await approveAndSendReplyDraft(db, 'pd-1', 'body proper', 'host-1');
-
-    expect(r.status).toBe('failed');
-    if (r.status === 'failed') {
-      expect(r.error).toContain('400');
-    }
-    expect(sendTextMock).toHaveBeenCalledOnce(); // no retry on 4xx
-  });
-
-  it('Meta 503 (5xx retryable) -> retry 1x, poi success se 200', async () => {
-    const state = makeState();
-    sendTextMock
-      .mockRejectedValueOnce(new MockWhatsappSendError(503, 'service unavailable'))
-      .mockResolvedValueOnce({ messageId: 'wamid.RETRY' });
-    const db = makeMockDb(state);
-
-    const r = await approveAndSendReplyDraft(db, 'pd-1', 'body proper', 'host-1');
-
-    expect(r.status).toBe('sent');
-    if (r.status === 'sent') {
-      expect(r.metaMessageId).toBe('wamid.RETRY');
-    }
-    expect(sendTextMock).toHaveBeenCalledTimes(2);
-  });
-
-  it('Meta 503 + 503 (retry esaurito) -> failed', async () => {
-    const state = makeState();
-    sendTextMock.mockRejectedValue(new MockWhatsappSendError(503, 'still unavailable'));
-    const db = makeMockDb(state);
-
-    const r = await approveAndSendReplyDraft(db, 'pd-1', 'body proper', 'host-1');
-
-    expect(r.status).toBe('failed');
-    expect(sendTextMock).toHaveBeenCalledTimes(2); // 1 + 1 retry
-  });
-
-  it('draft gia approved (idempotency) -> already_sent senza call Meta', async () => {
+  it('draft gia approvato (idempotency) -> already_processed, niente doppia coda', async () => {
     const state = makeState();
     state.draftRow = {
-      draft: { ...baseDraft, status: 'sent', metaMessageId: 'wamid.OLD' },
+      draft: { ...baseDraft, status: 'approved' },
       guestPhone: '+393331234567',
       inboundChannel: 'whatsapp',
+      inboundConversationId: 'conv-1',
     };
     const db = makeMockDb(state);
-    const r = await approveAndSendReplyDraft(db, 'pd-1', 'body proper', 'host-1');
-    expect(r.status).toBe('already_sent');
-    if (r.status === 'already_sent') {
-      expect(r.metaMessageId).toBe('wamid.OLD');
-    }
-    expect(sendTextMock).not.toHaveBeenCalled();
+    const r = await approveAndQueueReplyDraft(db, 'pd-1', 'body proper', 'host-1');
+    expect(r.status).toBe('already_processed');
+    expect(state.inserts.length).toBe(0);
+    expect(state.updates.length).toBe(0);
   });
 
-  it('race condition: lock fallito -> already_sent (re-leggi metaMessageId)', async () => {
+  it('race condition: lock perso -> already_processed, nessun insert', async () => {
     const state = makeState();
     state.lockTaken = true;
-    state.latestMetaMessageId = 'wamid.RACE';
     const db = makeMockDb(state);
-    const r = await approveAndSendReplyDraft(db, 'pd-1', 'body proper', 'host-1');
-    expect(r.status).toBe('already_sent');
-    if (r.status === 'already_sent') {
-      expect(r.metaMessageId).toBe('wamid.RACE');
-    }
-    expect(sendTextMock).not.toHaveBeenCalled();
+    const r = await approveAndQueueReplyDraft(db, 'pd-1', 'body proper', 'host-1');
+    expect(r.status).toBe('already_processed');
+    expect(state.inserts.length).toBe(0);
   });
 });
 

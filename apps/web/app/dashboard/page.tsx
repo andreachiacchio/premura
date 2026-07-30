@@ -220,6 +220,12 @@ export default async function DashboardPage() {
           Home
         </span>
         <Link
+          href="/dashboard/conversations"
+          className="text-body-sm font-medium text-ink-soft hover:text-ink"
+        >
+          Conversazioni
+        </Link>
+        <Link
           href="/dashboard/upcoming-checkins"
           className="text-body-sm font-medium text-ink-soft hover:text-ink"
         >
