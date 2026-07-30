@@ -225,6 +225,13 @@
       "when": 1780200000000,
       "tag": "0031_services_provider_link",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1780300000000,
+      "tag": "0032_guest_app_invite",
+      "breakpoints": true
     }
   ]
 }

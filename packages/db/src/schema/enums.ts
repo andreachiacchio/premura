@@ -250,7 +250,13 @@ export const consentSourceEnum = pgEnum('consent_source', [
 // Mappatura verso messageStageEnum, per l'audit trail in messages:
 //  welcome → pre_arrival_welcome, midstay → mid_stay_checkin,
 //  checkout → post_stay_review_nudge.
-export const outboundTriggerEnum = pgEnum('outbound_trigger', ['welcome', 'midstay', 'checkout']);
+export const outboundTriggerEnum = pgEnum('outbound_trigger', [
+  'welcome',
+  'midstay',
+  'checkout',
+  // Invito guest app appena compare il numero (flusso canonico §2b).
+  'guest_app_invite',
+]);
 
 // Ciclo di vita di uno slot di invio.
 //  reserved → lo slot è stato preso, l'invio non è ancora partito

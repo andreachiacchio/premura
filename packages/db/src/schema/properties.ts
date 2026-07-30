@@ -42,6 +42,11 @@ export const properties = pgTable(
     // documentano. Compilato solo con corrispondenza verificata.
     bookingListingId: varchar('booking_listing_id', { length: 32 }),
 
+    // URL della guest app della struttura (es. la pagina GitHub Pages di
+    // Villa Cristina). Nullable: senza URL l'invito automatico non parte
+    // — mai mandare link rotti.
+    guestAppUrl: text('guest_app_url'),
+
     // Sorgenti iCal come jsonb array.
     // Motivo: supportare channel manager (es. Smoobu, Hostaway) oltre a
     // Booking/Airbnb direct. Un host potrebbe avere un solo URL Smoobu
