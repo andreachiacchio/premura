@@ -32,7 +32,7 @@ export type SurveyStatusUI = 'not_yet' | 'sent' | 'completed' | 'skipped';
 export type PremuraStateUI = 'active' | 'missing_phone' | 'excluded';
 
 export type OutboundEntryUI = {
-  trigger: 'welcome' | 'midstay' | 'checkout';
+  trigger: 'welcome' | 'midstay' | 'checkout' | 'guest_app_invite';
   status: 'reserved' | 'sent' | 'failed' | 'skipped';
   sentAt: string | null;
   dryRun: boolean;

@@ -52,24 +52,28 @@ export function composeGuestAppInvite(input: GuestAppInviteInput): string {
 
   const lines: string[] = [resolveAiDisclosure(disclosures, lang), ''];
 
+  // Correzioni Andrea (30/07): niente promesse sulla velocita' di
+  // risposta (in modalita' bozza la risposta aspetta l'approvazione —
+  // stesso principio del "type human" rimosso); il nome della struttura
+  // sta nella disclosure e nella firma, non anche in mezzo.
   if (lang === 'it') {
     lines.push(
-      `${name}, stiamo preparando tutto per il tuo soggiorno a ${input.propertyName}.`,
+      `${name}, stiamo preparando tutto per il tuo soggiorno.`,
       '',
       `Qui trovi la guida della casa e i nostri servizi (tour, transfer, chef): ${input.guestAppUrl}`,
       '',
-      'Da ora puoi scrivere qui per qualsiasi cosa — ti rispondiamo subito.',
+      'Da ora puoi scrivere qui per qualsiasi cosa ti serva.',
       '',
       'A presto,',
       input.propertyName,
     );
   } else {
     lines.push(
-      `${name}, we're getting everything ready for your stay at ${input.propertyName}.`,
+      `${name}, we're getting everything ready for your stay.`,
       '',
       `Here you'll find the house guide and our local services (tours, transfers, private chef): ${input.guestAppUrl}`,
       '',
-      'From now on you can write here for anything — we reply right away.',
+      'From now on you can write here for anything you need.',
       '',
       'See you soon,',
       input.propertyName,

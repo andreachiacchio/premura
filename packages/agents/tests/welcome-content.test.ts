@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { composeBookingWelcome } from '../src/outbound/welcome-content';
+import { composeBookingWelcome, guestAppUrlForWelcome } from '../src/outbound/welcome-content';
 
 // Il benvenuto e' contenuto FISSO: questi test inchiodano il testo
 // parola per parola. Se qualcuno lo cambia, il test glielo fa dichiarare.
@@ -104,5 +104,44 @@ describe('composeBookingWelcome', () => {
       aiDisclosureCustom: { en: 'Automated assistant of Villa Cristina here.' },
     });
     expect(text.startsWith('Automated assistant of Villa Cristina here.')).toBe(true);
+  });
+});
+
+// Correzione Andrea 30/07: se l'invito guest app e' GIA' partito, il
+// benvenuto non rimanda lo stesso link — resta solo la logistica
+// d'arrivo. Se non e' partito, il benvenuto resta com'e'. Entrambi i
+// percorsi verificati.
+describe('guestAppUrlForWelcome (invito gia partito vs no)', () => {
+  const APP_URL = 'https://andreachiacchio.github.io/villa-cristina-guest-app/';
+  const baseInput = {
+    guestFirstName: 'Julian',
+    guestFullName: 'Julian Falch Milde',
+    propertyName: 'Villa Cristina',
+    checkinAt: new Date('2026-08-01T00:00:00Z'),
+    language: 'no',
+    meetingPoint: {
+      name: 'Paolo',
+      place: 'La Moressa restaurant in Praiano',
+      phone: '+39 340 488 7726',
+    },
+  };
+
+  it('invito NON partito: il benvenuto resta com\'e\' (link presente)', () => {
+    const url = guestAppUrlForWelcome(false, APP_URL);
+    expect(url).toBe(APP_URL);
+    const body = composeBookingWelcome({ ...baseInput, guestAppUrl: url });
+    expect(body).toContain(APP_URL);
+    expect(body).toContain('Paolo will meet you');
+  });
+
+  it('invito GIA partito: solo logistica, nessun link ripetuto', () => {
+    const url = guestAppUrlForWelcome(true, APP_URL);
+    expect(url).toBeNull();
+    const body = composeBookingWelcome({ ...baseInput, guestAppUrl: url });
+    expect(body).not.toContain(APP_URL);
+    expect(body).not.toContain("Here you'll find");
+    // La logistica d'arrivo resta: meeting point e firma.
+    expect(body).toContain('Paolo will meet you at La Moressa restaurant in Praiano');
+    expect(body.endsWith('See you soon,\nVilla Cristina')).toBe(true);
   });
 });

@@ -48,6 +48,20 @@ const DATE_FMT: Record<'it' | 'en', Intl.DateTimeFormat> = {
   }),
 };
 
+/**
+ * Se l'invito guest app e' GIA' partito per questa prenotazione, il
+ * benvenuto non rimanda lo stesso link: resta solo la logistica
+ * d'arrivo — meeting point, firma (correzione Andrea 30/07: due
+ * messaggi quasi identici a distanza di giorni leggono da robot).
+ * Se l'invito non e' partito, il benvenuto resta com'e'.
+ */
+export function guestAppUrlForWelcome(
+  inviteAlreadySent: boolean,
+  configuredUrl: string | null,
+): string | null {
+  return inviteAlreadySent ? null : configuredUrl;
+}
+
 export function composeBookingWelcome(input: BookingWelcomeInput): string {
   const lang = normalizeLanguage(input.language);
   const disclosure = resolveAiDisclosure(input.aiDisclosureCustom ?? null, lang);

@@ -22,16 +22,20 @@ describe('composeGuestAppInvite', () => {
       [
         'Hi! You’re chatting with Villa Cristina’s automated assistant.',
         '',
-        "Julian, we're getting everything ready for your stay at Villa Cristina.",
+        "Julian, we're getting everything ready for your stay.",
         '',
         "Here you'll find the house guide and our local services (tours, transfers, private chef): https://andreachiacchio.github.io/villa-cristina-guest-app/",
         '',
-        'From now on you can write here for anything — we reply right away.',
+        'From now on you can write here for anything you need.',
         '',
         'See you soon,',
         'Villa Cristina',
       ].join('\n'),
     );
+    // Correzioni Andrea 30/07: nessuna promessa sulla velocita' di
+    // risposta; il nome struttura solo in disclosure e firma.
+    expect(body).not.toMatch(/right away|subito/i);
+    expect(body.split('Villa Cristina').length - 1).toBe(2);
   });
 
   it('IT: stessa struttura in italiano', () => {
@@ -46,11 +50,9 @@ describe('composeGuestAppInvite', () => {
     expect(body).toContain(
       'Ciao! Ti risponde l’assistente automatico di La Goccia di San Gennaro.',
     );
-    expect(body).toContain(
-      'Mario, stiamo preparando tutto per il tuo soggiorno a La Goccia di San Gennaro.',
-    );
+    expect(body).toContain('Mario, stiamo preparando tutto per il tuo soggiorno.');
     expect(body).toContain('https://esempio.it/app');
-    expect(body).toContain('Da ora puoi scrivere qui per qualsiasi cosa — ti rispondiamo subito.');
+    expect(body).toContain('Da ora puoi scrivere qui per qualsiasi cosa ti serva.');
     expect(body.endsWith('A presto,\nLa Goccia di San Gennaro')).toBe(true);
   });
 

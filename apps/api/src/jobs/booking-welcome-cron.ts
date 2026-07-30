@@ -1,5 +1,17 @@
-import { type OutboundTrigger, composeBookingWelcome, reserveAndSend } from '@premura/agents';
-import { bookings, createServerClient, hosts, properties, propertyKnowledge } from '@premura/db';
+import {
+  type OutboundTrigger,
+  composeBookingWelcome,
+  guestAppUrlForWelcome,
+  reserveAndSend,
+} from '@premura/agents';
+import {
+  bookings,
+  createServerClient,
+  hosts,
+  outboundSends,
+  properties,
+  propertyKnowledge,
+} from '@premura/db';
 import { checkOutboundCompliance } from '@premura/shared';
 import { Cron } from 'croner';
 import { and, eq, isNotNull, ne, sql } from 'drizzle-orm';
@@ -106,13 +118,31 @@ export async function runBookingWelcomeTick(now: Date = new Date()): Promise<voi
         }
       }
 
+      // Se l'invito guest app e' gia' partito (numero comparso giorni
+      // prima), il benvenuto non rimanda lo stesso link: solo logistica
+      // d'arrivo (correzione Andrea 30/07).
+      const [inviteSent] = await client.db
+        .select({ id: outboundSends.id })
+        .from(outboundSends)
+        .where(
+          and(
+            eq(outboundSends.bookingId, c.bookingId),
+            eq(outboundSends.trigger, 'guest_app_invite'),
+            eq(outboundSends.status, 'sent'),
+          ),
+        )
+        .limit(1);
+
       const body = composeBookingWelcome({
         guestFirstName: c.guestFirstName,
         guestFullName: c.guestFullName,
         propertyName: c.propertyName,
         checkinAt: c.checkinAt,
         language: c.guestLanguage,
-        guestAppUrl: process.env.WELCOME_GUEST_APP_URL?.trim() || null,
+        guestAppUrl: guestAppUrlForWelcome(
+          Boolean(inviteSent),
+          process.env.WELCOME_GUEST_APP_URL?.trim() || null,
+        ),
         meetingPoint,
         aiDisclosureCustom: c.aiDisclosureCustom,
       });
