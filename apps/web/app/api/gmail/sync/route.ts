@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
-import { createServerClient, googleTokens, type ServerClient } from '@premura/db';
-import { getTokenByHostAndEmail } from '@/lib/repositories/google-tokens';
-import { createJob } from '@/lib/repositories/gmail-sync-jobs';
 import { syncGmailForHost } from '@/lib/gmail-sync-orchestrator';
+import { createJob } from '@/lib/repositories/gmail-sync-jobs';
+import { getTokenByHostAndEmail } from '@/lib/repositories/google-tokens';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { type ServerClient, createServerClient, googleTokens } from '@premura/db';
+import { eq } from 'drizzle-orm';
+import { NextResponse } from 'next/server';
 
 // POST /api/gmail/sync
 //
@@ -35,7 +35,45 @@ function getClient(): Promise<ServerClient> {
   return clientPromise;
 }
 
-export async function POST(): Promise<NextResponse> {
+/**
+ * Percorso MACCHINA (30/07): il cron sul worker Fly chiama questa route
+ * ogni 15 minuti con `Authorization: Bearer ${GMAIL_SYNC_CRON_SECRET}`.
+ * In quel caso il sync parte per TUTTI gli host con un Gmail collegato.
+ * Senza secret configurato lato Vercel il percorso e' spento: si ricade
+ * sempre sull'auth di sessione.
+ */
+async function runMachineSync(req: Request): Promise<NextResponse | null> {
+  const secret = process.env.GMAIL_SYNC_CRON_SECRET?.trim();
+  if (!secret) return null;
+  const auth = req.headers.get('authorization') ?? '';
+  if (auth !== `Bearer ${secret}`) return null;
+
+  const serverClient = await getClient();
+  const { db } = serverClient;
+  const tokens = await db
+    .select({ hostId: googleTokens.hostId, googleEmail: googleTokens.googleEmail })
+    .from(googleTokens);
+
+  const jobIds: string[] = [];
+  for (const t of tokens) {
+    const job = await createJob(db, t.hostId, t.googleEmail);
+    jobIds.push(job.id);
+    void syncGmailForHost(serverClient, t.hostId, t.googleEmail, { reuseJobId: job.id }).catch(
+      (err) => {
+        console.error('[gmail-sync] orchestrator background error (cron)', {
+          jobId: job.id,
+          err,
+        });
+      },
+    );
+  }
+  return NextResponse.json({ jobIds, hosts: tokens.length }, { status: 202 });
+}
+
+export async function POST(req: Request): Promise<NextResponse> {
+  const machine = await runMachineSync(req);
+  if (machine) return machine;
+
   // Slice 6 fase 7: hostId dalla sessione Supabase. Il middleware non
   // intercetta /api/* (lascia passare le route handler che decidono
   // l'auth interna), quindi qui facciamo il check authoritativo.

@@ -1,6 +1,7 @@
 import { type Database, bookings, properties } from '@premura/db';
-import { and, desc, eq, gte, ne } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, lt, ne } from 'drizzle-orm';
 import type { ParsedAirbnbEmail } from '../airbnb-email-parser';
+import { isRangeCoveredByBookings } from '../booking-coverage';
 import type { BookingForDashboard, DataSource } from '../types';
 
 // Repository bookings: upsert da email Airbnb (M2a.3 Fase 2).
@@ -235,10 +236,54 @@ export async function findByHostId(args: {
   // Valori non riconosciuti restano string a runtime e degradano sul badge
   // 'neutral' lato UI senza crash; un type guard runtime non e' necessario
   // perche' la dashboard tollera il fallback.
-  return rows.map((r) => ({
-    ...r,
-    dataSource: r.dataSource as DataSource,
-  }));
+  // Doppioni iCal Booking (30/07): una fascia "occupato, sorgente
+  // ignota" interamente coperta da prenotazioni note della stessa
+  // property e' rumore — l'iCal Booking unisce soggiorni contigui
+  // (es. "30 lug - 8 ago" = Krzysztof + Julian). Le prenotazioni note
+  // si cercano SENZA il cutoff operativo: Krzysztof e' entrato ieri ma
+  // copre la fascia di oggi.
+  const unknown = rows.filter((r) => r.dataSource === 'booking_ical_only');
+  let coveredIds = new Set<string>();
+  if (unknown.length > 0) {
+    const minStart = new Date(Math.min(...unknown.map((u) => u.checkinAt.getTime())));
+    const maxEnd = new Date(Math.max(...unknown.map((u) => u.checkoutAt.getTime())));
+    const known = await db
+      .select({
+        propertyId: bookings.propertyId,
+        checkinAt: bookings.checkinAt,
+        checkoutAt: bookings.checkoutAt,
+      })
+      .from(bookings)
+      .innerJoin(properties, eq(properties.id, bookings.propertyId))
+      .where(
+        and(
+          eq(properties.hostId, hostId),
+          ne(bookings.status, 'cancelled'),
+          eq(bookings.isCalendarBlock, false),
+          ne(bookings.dataSource, 'booking_ical_only'),
+          lt(bookings.checkinAt, maxEnd),
+          gt(bookings.checkoutAt, minStart),
+        ),
+      );
+    const byProperty = new Map<string, { checkinAt: Date; checkoutAt: Date }[]>();
+    for (const k of known) {
+      const list = byProperty.get(k.propertyId) ?? [];
+      list.push(k);
+      byProperty.set(k.propertyId, list);
+    }
+    coveredIds = new Set(
+      unknown
+        .filter((u) => isRangeCoveredByBookings(u, byProperty.get(u.propertyId) ?? []))
+        .map((u) => u.id),
+    );
+  }
+
+  return rows
+    .filter((r) => !coveredIds.has(r.id))
+    .map((r) => ({
+      ...r,
+      dataSource: r.dataSource as DataSource,
+    }));
 }
 
 // Slice 6 fase 6.5: pre-check ownership per le server actions di

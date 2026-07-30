@@ -7,6 +7,7 @@ import { startBookingWelcomeCron } from './jobs/booking-welcome-cron';
 // Worker a module load e inizia subito ad ascoltare la coda. Stesso pattern
 // che questi worker avevano quando vivevano dentro index.ts.
 import { draftGenerationWorker } from './jobs/draft-generation-worker';
+import { startGmailSyncCron } from './jobs/gmail-sync-cron';
 import { startIcalCron } from './jobs/ical-cron';
 import { icalPollWorker } from './jobs/ical-poll-worker';
 import { startSurveyCron } from './jobs/survey-cron';
@@ -67,6 +68,7 @@ const surveyCron = startSurveyCron();
 const welcomeCron = startWelcomeMessageCron();
 // Benvenuto per prenotazioni senza kit — il percorso di Julian (1 ago).
 const bookingWelcomeCron = startBookingWelcomeCron();
+const gmailSyncCron = startGmailSyncCron();
 
 // Health del worker: non "il processo risponde" ma "i cron sono ancora
 // schedulati". Un croner fermo restituisce nextRun() null, ed e' quello
@@ -77,6 +79,7 @@ app.get('/health', () => {
     survey: surveyCron.nextRun()?.toISOString() ?? null,
     welcome: welcomeCron.nextRun()?.toISOString() ?? null,
     bookingWelcome: bookingWelcomeCron.nextRun()?.toISOString() ?? null,
+    gmailSync: gmailSyncCron.nextRun()?.toISOString() ?? null,
   };
   const allScheduled = Object.values(crons).every((next) => next !== null);
   return {
@@ -101,6 +104,7 @@ app.log.info(
     survey: surveyCron.nextRun()?.toISOString() ?? null,
     welcome: welcomeCron.nextRun()?.toISOString() ?? null,
     bookingWelcome: bookingWelcomeCron.nextRun()?.toISOString() ?? null,
+    gmailSync: gmailSyncCron.nextRun()?.toISOString() ?? null,
   },
   'cron schedulati',
 );
@@ -111,6 +115,7 @@ const shutdown = async (signal: string): Promise<void> => {
   surveyCron.stop();
   welcomeCron.stop();
   bookingWelcomeCron.stop();
+  gmailSyncCron.stop();
   await Promise.all([
     icalPollWorker.close(),
     draftGenerationWorker.close(),
