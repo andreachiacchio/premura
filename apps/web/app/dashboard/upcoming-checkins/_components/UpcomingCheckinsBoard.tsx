@@ -23,10 +23,9 @@ import {
 // umano.
 
 // Regola condivisa (lib/format-date): anno solo quando non e' il corrente.
-import { formatDayMonth } from '@/lib/format-date';
+import { dayPhrase, formatDayMonth } from '@/lib/format-date';
 
 const TIME_FMT = new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit' });
-const WEEKDAY_FMT = new Intl.DateTimeFormat('it-IT', { weekday: 'long' });
 
 export type SurveyStatusUI = 'not_yet' | 'sent' | 'completed' | 'skipped';
 export type PremuraStateUI = 'active' | 'missing_phone' | 'excluded';
@@ -70,19 +69,9 @@ export type BoardProps = {
 
 // ─── Giorni in linguaggio host ─────────────────────────────────────
 
-/** "oggi" / "domani" / "sabato" (entro 6 giorni) / "il 12 ago". */
-export function dayPhrase(dateIso: string, now: Date): string {
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-  const date = new Date(dateIso);
-  const day = new Date(date);
-  day.setHours(0, 0, 0, 0);
-  const diffDays = Math.round((day.getTime() - startOfToday.getTime()) / 86_400_000);
-  if (diffDays <= 0) return 'oggi';
-  if (diffDays === 1) return 'domani';
-  if (diffDays <= 6) return WEEKDAY_FMT.format(date);
-  return `il ${formatDayMonth(date, now)}`;
-}
+// dayPhrase vive in lib/format-date (condiviso con le card della home);
+// il re-export tiene stabili i test e gli import esistenti.
+export { dayPhrase } from '@/lib/format-date';
 
 export function arrivalLabel(checkinIso: string, checkoutIso: string, now: Date): string {
   const startOfToday = new Date(now);

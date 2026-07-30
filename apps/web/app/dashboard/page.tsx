@@ -3,6 +3,7 @@ import { getDb } from '@/lib/db';
 import { getOnboardingState, urlForStep } from '@/lib/onboarding';
 import { buildAgentStatus, findNextActiveArrival } from '@/lib/repositories/agent-status';
 import { findByHostId } from '@/lib/repositories/bookings';
+import { listGuestsArrivingSoon, listGuestsInHouse } from '@/lib/repositories/home-guests';
 import { getHomeSummary, listGuestsMissingPhoneSoon } from '@/lib/repositories/home-summary';
 import { countKitsByStatusForHost } from '@/lib/repositories/kits';
 import { findByHostId as findPropertiesByHostId } from '@/lib/repositories/properties';
@@ -18,7 +19,7 @@ import { BookingsList } from './_components/BookingsList';
 import { DashboardHeader } from './_components/DashboardHeader';
 import { DecisionsBlock, decisionsCount } from './_components/DecisionsBlock';
 import { EmptyOnboardingState } from './_components/EmptyOnboardingState';
-import { HomeMetricsStrip } from './_components/HomeMetricsStrip';
+import { HomeGuests } from './_components/HomeGuests';
 import { ReplyDraftCard } from './_components/ReplyDraftCard';
 import { completeBookingAction, createPropertyAction, skipBookingAction } from './actions';
 
@@ -142,6 +143,14 @@ export default async function DashboardPage() {
       ),
     ]);
 
+  // Home desktop (30/07): ospiti in casa e in arrivo, stessi predicati
+  // della metrica dell'agent card ("mai due verita'").
+  const now = new Date();
+  const [guestsInHouseRows, guestsArrivingRows] = await Promise.all([
+    safeQuery('listGuestsInHouse', () => listGuestsInHouse(db, hostId, now), []),
+    safeQuery('listGuestsArrivingSoon', () => listGuestsArrivingSoon(db, hostId, now), []),
+  ]);
+
   const incompleteToCompleteCount = bookings.filter(
     (b) => isIncompleteDataSource(b.dataSource) && !b.hostSkippedCompletion,
   ).length;
@@ -200,6 +209,13 @@ export default async function DashboardPage() {
         aria-label="Sezioni"
         className="mx-5 mb-5 flex gap-x-5 overflow-x-auto whitespace-nowrap border-y border-line-soft py-2.5 md:mx-0"
       >
+        {/* Voce corrente evidenziata (punto 5, 30/07). */}
+        <span
+          aria-current="page"
+          className="border-b-2 border-terracotta pb-0.5 text-body-sm font-semibold text-ink"
+        >
+          Home
+        </span>
         <Link
           href="/dashboard/upcoming-checkins"
           className="text-body-sm font-medium text-ink-soft hover:text-ink"
@@ -223,36 +239,41 @@ export default async function DashboardPage() {
         </Link>
       </nav>
 
-      {/* Riga alta desktop: agent card + metriche affiancate. */}
-      <div className="md:grid md:grid-cols-[1fr_340px] md:items-start md:gap-4">
-        <AgentCard
-          status={agentStatus}
-          stats={{
-            activeGuests: summary.metrics.guestsInHouse,
-            actionsToday,
-            needsYou: decisionsCount(decisionsData),
-          }}
-        />
-        <HomeMetricsStrip metrics={summary.metrics} actionsToday={actionsToday} />
-      </div>
+      {/* Agent card: barra a tutta larghezza su desktop (punto 2).
+          I riquadri metriche sono stati eliminati: il dato vive SOLO
+          qui (punto 3 — "9 in casa" non deve comparire due volte). */}
+      <AgentCard
+        status={agentStatus}
+        stats={{
+          activeGuests: summary.metrics.guestsInHouse,
+          actionsToday,
+          needsYou: decisionsCount(decisionsData),
+        }}
+      />
 
       {/* Da md: decisioni a sinistra, feed a destra; le liste sotto a
           tutta larghezza. Su mobile l'ordine DOM resta quello del
           prototipo: decisioni -> liste -> feed. */}
-      <div className="md:grid md:grid-cols-2 md:items-start md:gap-4">
-        <div className="md:col-start-1 md:row-start-1">
+      {/* Due colonne piene su desktop (punto 4): sinistra ospiti in
+          casa + in arrivo + liste, destra decisioni + feed. Ordine DOM
+          mobile invariato: decisioni -> liste -> feed. */}
+      <div className="md:mt-4 md:grid md:grid-cols-[3fr_2fr] md:items-start md:gap-4">
+        <div className="md:col-start-2 md:row-start-1">
           <DecisionsBlock data={decisionsData} />
         </div>
 
-        <div id="prenotazioni" className="scroll-mt-6 md:col-span-2 md:row-start-2">
-          <BookingsList
-            bookings={bookings}
-            completeAction={completeBookingAction}
-            skipAction={skipBookingAction}
-          />
+        <div className="md:col-start-1 md:row-span-2 md:row-start-1">
+          <HomeGuests inHouse={guestsInHouseRows} arriving={guestsArrivingRows} now={now} />
+          <div id="prenotazioni" className="scroll-mt-6">
+            <BookingsList
+              bookings={bookings}
+              completeAction={completeBookingAction}
+              skipAction={skipBookingAction}
+            />
+          </div>
         </div>
 
-        <div className="md:col-start-2 md:row-start-1">
+        <div className="md:col-start-2 md:row-start-2">
           <AgentFeed
             items={summary.feed.map((f) => ({
               at: f.at.toISOString(),
