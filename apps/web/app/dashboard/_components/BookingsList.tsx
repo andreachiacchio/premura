@@ -1,19 +1,20 @@
 import { type BookingForDashboard, isIncompleteDataSource } from '@/lib/types';
+import Link from 'next/link';
 import { BookingRow } from './BookingRow';
 import type { CompleteBookingActionFn, SkipBookingActionFn } from './CompleteBookingDialog';
 
-// Lista verticale di prenotazioni operative (in corso o future con
-// check-in da oggi - 2gg in avanti, filtro applicato in
-// findByHostId), raggruppate in TRE gruppi (decisione 30/07):
-//  1. "Da completare" (data_source incomplete non-iCal, non skipped)
-//  2. "Date occupate" (booking_ical_only): l'iCal Booking esporta ogni
-//     fascia occupata senza dire chi arriva — prenotazione vera o
-//     chiusura, non si sa. Etichetta propria, MAI mescolate al resto:
-//     "verifica chi arriva sull'extranet".
-//  3. "Prossimi ospiti" (skipped + RICH + airbnb_ical_only)
+// Liste prenotazioni della HOME (ristrutturazione 30/07):
+//  - "Da completare" (data_source incomplete non-iCal, non skipped)
+//  - "Date occupate" (booking_ical_only): fasce senza ospite noto,
+//    etichetta propria, mai mescolate al resto
+//  - NIENTE "Prossimi ospiti" qui: era il duplicato della pagina
+//    Prossimi check-in, che resta l'elenco operativo completo.
 //
-// L'archivio (prenotazioni passate) non ha ancora una vista dedicata,
-// vedi KNOWN-LIMITS sezione 20.
+// Regole mobile: righe RAGGRUPPATE PER STRUTTURA con intestazione
+// sticky; massimo 6 righe per sezione + "Vedi tutte (N)". Ogni riga
+// dice comunque di quale struttura parla (titolo o sottotitolo).
+
+const HOME_ROWS_LIMIT = 6;
 
 function isUnknownOccupied(b: BookingForDashboard): boolean {
   return b.dataSource === 'booking_ical_only' && !b.hostSkippedCompletion;
@@ -21,6 +22,66 @@ function isUnknownOccupied(b: BookingForDashboard): boolean {
 
 function isToComplete(b: BookingForDashboard): boolean {
   return isIncompleteDataSource(b.dataSource) && !b.hostSkippedCompletion && !isUnknownOccupied(b);
+}
+
+function groupByProperty(items: BookingForDashboard[]): Map<string, BookingForDashboard[]> {
+  const groups = new Map<string, BookingForDashboard[]>();
+  for (const b of items) {
+    const list = groups.get(b.propertyName) ?? [];
+    list.push(b);
+    groups.set(b.propertyName, list);
+  }
+  return groups;
+}
+
+function GroupedRows({
+  items,
+  completeAction,
+  skipAction,
+}: {
+  items: BookingForDashboard[];
+  completeAction: CompleteBookingActionFn;
+  skipAction: SkipBookingActionFn;
+}) {
+  const groups = groupByProperty(items);
+  return (
+    <div className="mt-3 flex flex-col gap-1.5">
+      {[...groups.entries()].map(([propertyName, rows]) => (
+        <section key={propertyName}>
+          <h3 className="sticky top-0 z-10 -mx-1 bg-ivory/95 px-1 py-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-ink-mute backdrop-blur-sm">
+            {propertyName}
+          </h3>
+          <ul className="flex flex-col gap-2">
+            {rows.map((b) => (
+              <li key={b.id}>
+                <BookingRow booking={b} completeAction={completeAction} skipAction={skipAction} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function SectionHeader({ title, eyebrow }: { title: string; eyebrow: string }) {
+  return (
+    <div className="flex items-baseline justify-between pt-2">
+      <h2 className="font-serif text-[24px] font-medium leading-tight text-ink">{title}</h2>
+      <span className="text-eyebrow font-medium uppercase text-ink-mute">{eyebrow}</span>
+    </div>
+  );
+}
+
+function SeeAll({ total }: { total: number }) {
+  return (
+    <Link
+      href="/dashboard/upcoming-checkins"
+      className="mt-2.5 inline-block text-body-sm font-medium text-terracotta-2 underline-offset-2 hover:underline"
+    >
+      Vedi tutte ({total})
+    </Link>
+  );
 }
 
 export function BookingsList({
@@ -34,28 +95,26 @@ export function BookingsList({
 }) {
   const toComplete = bookings.filter(isToComplete);
   const unknownOccupied = bookings.filter(isUnknownOccupied);
-  const others = bookings.filter((b) => !isToComplete(b) && !isUnknownOccupied(b));
 
   return (
-    <div className="px-5 pt-6">
+    <div className="px-5 pt-8">
       {toComplete.length > 0 ? (
-        <section id="incomplete" className="mb-6 scroll-mt-6">
+        <section id="incomplete" className="mb-8 scroll-mt-6">
           <SectionHeader
             title="Da completare"
             eyebrow={`${toComplete.length} ${toComplete.length === 1 ? 'prenotazione' : 'prenotazioni'}`}
           />
-          <ul className="mt-3 flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:items-start xl:grid-cols-3">
-            {toComplete.map((b) => (
-              <li key={b.id}>
-                <BookingRow booking={b} completeAction={completeAction} skipAction={skipAction} />
-              </li>
-            ))}
-          </ul>
+          <GroupedRows
+            items={toComplete.slice(0, HOME_ROWS_LIMIT)}
+            completeAction={completeAction}
+            skipAction={skipAction}
+          />
+          {toComplete.length > HOME_ROWS_LIMIT ? <SeeAll total={toComplete.length} /> : null}
         </section>
       ) : null}
 
       {unknownOccupied.length > 0 ? (
-        <section className="mb-6">
+        <section className="mb-8">
           <SectionHeader
             title="Date occupate"
             eyebrow={`${unknownOccupied.length} ${unknownOccupied.length === 1 ? 'fascia' : 'fasce'}`}
@@ -64,46 +123,16 @@ export function BookingsList({
             Il calendario Booking dice solo che queste date sono occupate, non chi arriva — verifica
             sull'extranet e completa i dati dell'ospite.
           </p>
-          <ul className="mt-3 flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:items-start xl:grid-cols-3">
-            {unknownOccupied.map((b) => (
-              <li key={b.id}>
-                <BookingRow booking={b} completeAction={completeAction} skipAction={skipAction} />
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {others.length > 0 ? (
-        <section>
-          <SectionHeader
-            title="Prossimi ospiti"
-            eyebrow={`${others.length} ${others.length === 1 ? 'prenotazione' : 'prenotazioni'}`}
+          <GroupedRows
+            items={unknownOccupied.slice(0, HOME_ROWS_LIMIT)}
+            completeAction={completeAction}
+            skipAction={skipAction}
           />
-          <ul className="mt-3 flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:items-start xl:grid-cols-3">
-            {others.map((b) => (
-              <li key={b.id}>
-                <BookingRow booking={b} completeAction={completeAction} skipAction={skipAction} />
-              </li>
-            ))}
-          </ul>
+          {unknownOccupied.length > HOME_ROWS_LIMIT ? (
+            <SeeAll total={unknownOccupied.length} />
+          ) : null}
         </section>
       ) : null}
-    </div>
-  );
-}
-
-function SectionHeader({
-  title,
-  eyebrow,
-}: {
-  title: string;
-  eyebrow: string;
-}) {
-  return (
-    <div className="flex items-baseline justify-between">
-      <h2 className="font-serif text-[22px] leading-tight text-ink">{title}</h2>
-      <span className="text-eyebrow font-medium uppercase text-ink-mute">{eyebrow}</span>
     </div>
   );
 }

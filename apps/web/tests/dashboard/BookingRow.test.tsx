@@ -76,7 +76,10 @@ describe("BookingRow badge per data_source", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("INCOMPLETE non skipped maschera il nome ospite con \"Ospite\"", () => {
+  it("INCOMPLETE non skipped: titolo = struttura, mai il nome non verificato", () => {
+    // Regola mobile 30/07: quando il nome vero non c'e' (o non e'
+    // verificato), il titolo della riga e' la STRUTTURA, non "Ospite"
+    // ripetuto venti volte.
     render(
       <BookingRow
         booking={makeBooking({
@@ -87,7 +90,7 @@ describe("BookingRow badge per data_source", () => {
         skipAction={noopSkip}
       />,
     );
-    expect(screen.getByText("Ospite")).toBeInTheDocument();
+    expect(screen.getByText("La Goccia")).toBeInTheDocument();
     expect(screen.queryByText("Mario Rossi")).not.toBeInTheDocument();
   });
 
