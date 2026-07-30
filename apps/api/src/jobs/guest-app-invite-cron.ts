@@ -7,7 +7,7 @@ import {
 import { bookings, createServerClient, hosts, outboundSends, properties } from '@premura/db';
 import { checkOutboundCompliance } from '@premura/shared';
 import { Cron } from 'croner';
-import { and, eq, gt, isNotNull, isNull, ne } from 'drizzle-orm';
+import { and, eq, gte, isNotNull, isNull, ne } from 'drizzle-orm';
 import pino from 'pino';
 
 // Invito guest app APPENA COMPARE IL NUMERO (flusso canonico §2b,
@@ -39,13 +39,18 @@ const logger = pino({
 
 const TRIGGER: OutboundTrigger = 'guest_app_invite';
 
-/** Check-in a piu' di N giorni interi da oggi (Europe/Rome ~ server). */
+/** Check-in a piu' di N giorni INTERI da oggi. BUG 30/07: la soglia a
+ *  startOfToday+2 con gt() lasciava passare le prenotazioni del giorno
+ *  +2 con orario reale (Julian, 1/8 ore 15: 1/8 15:00 > 1/8 00:00) —
+ *  esattamente chi doveva restare fuori. La soglia giusta e' l'INIZIO
+ *  del giorno +3: tutto cio' che arriva nei prossimi 2 giorni interi
+ *  (oggi compreso) resta al benvenuto del check-in. */
 export const MIN_FULL_DAYS_BEFORE_CHECKIN = 2;
 
 export function checkinThreshold(now: Date): Date {
   const t = new Date(now);
   t.setHours(0, 0, 0, 0);
-  t.setDate(t.getDate() + MIN_FULL_DAYS_BEFORE_CHECKIN);
+  t.setDate(t.getDate() + MIN_FULL_DAYS_BEFORE_CHECKIN + 1);
   return t;
 }
 
@@ -76,7 +81,7 @@ export async function runGuestAppInviteTick(now: Date = new Date()): Promise<voi
           isNotNull(bookings.premuraActiveAt),
           isNotNull(bookings.guestPhone),
           isNotNull(properties.guestAppUrl),
-          gt(bookings.checkinAt, checkinThreshold(now)),
+          gte(bookings.checkinAt, checkinThreshold(now)),
           // Mai due volte: se lo slot esiste (sent, skipped o failed),
           // questa prenotazione ha gia' avuto il suo turno.
           isNull(outboundSends.id),
