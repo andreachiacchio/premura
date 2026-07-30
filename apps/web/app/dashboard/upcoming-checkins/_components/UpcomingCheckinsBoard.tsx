@@ -1,5 +1,6 @@
 'use client';
 
+import { OccupiedRangesSection } from '@/app/dashboard/_components/OccupiedRangesSection';
 import { Check, Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import {
@@ -338,25 +339,17 @@ export function UpcomingCheckinsBoard({
 
   // Gruppi per urgenza (punto 1). Le fasce "occupato sorgente ignota"
   // restano separate alla radice: mai nei gruppi, mai nei conteggi.
-  const { needsPhone, handled, excluded, occupiedGroups } = useMemo(() => {
+  const { needsPhone, handled, excluded, occupied } = useMemo(() => {
     const visible =
       propertyFilter === 'all' ? rows : rows.filter((r) => r.propertyId === propertyFilter);
     const real = visible.filter((r) => !r.unknownOccupied);
-    const occupiedByProperty = new Map<string, UpcomingCheckinCardData[]>();
-    for (const r of visible.filter((x) => x.unknownOccupied)) {
-      const list = occupiedByProperty.get(r.propertyId) ?? [];
-      list.push(r);
-      occupiedByProperty.set(r.propertyId, list);
-    }
     return {
       needsPhone: real.filter((r) => r.premuraState === 'missing_phone'),
       handled: real.filter((r) => r.premuraState === 'active'),
       excluded: real.filter((r) => r.premuraState === 'excluded'),
-      occupiedGroups: properties
-        .filter((p) => occupiedByProperty.has(p.id))
-        .map((p) => ({ property: p, rows: occupiedByProperty.get(p.id) ?? [] })),
+      occupied: visible.filter((r) => r.unknownOccupied),
     };
-  }, [rows, properties, propertyFilter]);
+  }, [rows, propertyFilter]);
 
   // La prima riga senza numero parte col campo aperto.
   useEffect(() => {
@@ -504,7 +497,7 @@ export function UpcomingCheckinsBoard({
         </select>
       </div>
 
-      {totalVisible === 0 && occupiedGroups.length === 0 ? (
+      {totalVisible === 0 && occupied.length === 0 ? (
         <div className="rounded-card border border-line-soft bg-paper px-6 py-8 text-center text-body text-ink-soft shadow-sm">
           Nessuna prenotazione per questa struttura nella finestra dei 14 giorni.
         </div>
@@ -646,43 +639,25 @@ export function UpcomingCheckinsBoard({
       </div>
 
       {/* Fasce "occupato — sorgente ignota": il feed iCal Booking dice
-          solo che le date sono prese, non chi arriva. Sezione propria,
-          righe semplificate (niente numero, stato o timeline: senza
-          ospite non c'e' nulla da attivare). */}
-      {occupiedGroups.length > 0 ? (
+          solo che le date sono prese, non chi arriva. Sezione condivisa
+          con la home (gruppi per urgenza, chip struttura, date complete);
+          qui e' informativa — il completamento sta sulla home. */}
+      {occupied.length > 0 ? (
         <section aria-label="Date occupate" className="mt-10">
           <h2 className="mb-1 font-serif text-h3 leading-tight text-ink">Date occupate</h2>
           <p className="mb-3 text-body-sm text-ink-mute">
             Il calendario Booking dice solo che queste date sono occupate — verifica chi arriva
             sull'extranet.
           </p>
-          <div className="space-y-4">
-            {occupiedGroups.map(({ property, rows: groupRows }) => (
-              <div
-                key={property.id}
-                className="overflow-hidden rounded-card border border-line bg-paper shadow-sm"
-              >
-                <p className="border-b border-line-soft bg-ivory px-4 py-2 text-eyebrow uppercase tracking-wider text-ink-mute">
-                  {property.name}
-                </p>
-                {groupRows.map((r) => (
-                  <div
-                    key={r.id}
-                    className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-line-soft px-4 py-2.5 first:border-t-0"
-                  >
-                    <p className="text-body text-ink">
-                      {formatDayMonth(new Date(r.checkinAt))} –{' '}
-                      {formatDayMonth(new Date(r.checkoutAt))}
-                    </p>
-                    <p className="text-body-sm text-ink-soft">
-                      {arrivalLabel(r.checkinAt, r.checkoutAt, now)}
-                    </p>
-                    <p className="text-[12px] text-ink-mute">da iCal Booking · ospite ignoto</p>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
+          <OccupiedRangesSection
+            ranges={occupied.map((r) => ({
+              id: r.id,
+              propertyId: r.propertyId,
+              propertyName: r.propertyName,
+              checkinAtIso: r.checkinAt,
+              checkoutAtIso: r.checkoutAt,
+            }))}
+          />
         </section>
       ) : null}
     </div>
