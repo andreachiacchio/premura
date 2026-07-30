@@ -24,7 +24,7 @@ export function AgentCard({
   return (
     <section
       aria-label="Premura sta lavorando"
-      className="relative mx-5 mt-1 overflow-hidden rounded-[24px] bg-gradient-to-br from-ink to-[#2A4A60] p-6 pb-5 text-paper shadow-lg"
+      className="relative mx-5 mt-1 overflow-hidden rounded-[24px] bg-gradient-to-br from-ink to-[#2A4A60] p-6 pb-5 text-paper shadow-lg md:mx-0"
     >
       {/* Archi decorativi come nel prototipo */}
       <div
@@ -49,7 +49,9 @@ export function AgentCard({
       {status.sub ? <p className="mt-2.5 text-[13px] text-paper/70">{status.sub}</p> : null}
 
       <div className="mt-5 flex items-center justify-between border-t border-paper/10 pt-4">
-        <Stat num={stats.activeGuests} label="Ospiti attivi" />
+        {/* "In casa": stessa semantica e stesso numero della metrica
+            accanto — mai due verita' (bug 30/07: "9 attivi" vs "20"). */}
+        <Stat num={stats.activeGuests} label="In casa" />
         <Stat num={stats.actionsToday} label="Azioni oggi" />
         <Stat num={stats.needsYou} label="Serve te" />
       </div>

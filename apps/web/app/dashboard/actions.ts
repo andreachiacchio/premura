@@ -4,10 +4,13 @@ import { completeBookingManual, skipBookingCompletion, triggerIcalPollNow } from
 import { getCurrentAccessToken, getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getOrCreateDeflectionDraft, markDeflectionSent } from '@/lib/deflection-draft';
+import { composeGuestInvite } from '@/lib/guest-invite';
 import { findOwnership } from '@/lib/repositories/bookings';
 import { findHostWaNumber } from '@/lib/repositories/hosts';
 import { createProperty } from '@/lib/repositories/properties';
 import { approveAndSendReplyDraft, rejectReplyDraft } from '@/lib/repositories/reply-drafts';
+import { bookings, properties } from '@premura/db';
+import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
@@ -264,4 +267,41 @@ export async function rejectReplyDraftAction(draftId: string, reason?: string): 
   const { db } = await getDb();
   await rejectReplyDraft(db, id, hostId, parsedReason);
   revalidatePath('/dashboard');
+}
+
+// L1 del principio di onboarding: quando il numero non c'e', l'host
+// manda lui il primo messaggio nell'inbox Booking/Airbnb. Qui si genera
+// il testo pronto da incollare (zero automazione sulle loro inbox).
+export type GuestInviteResult = { ok: true; message: string } | { ok: false; error: string };
+
+export async function buildGuestInviteAction(bookingId: string): Promise<GuestInviteResult> {
+  try {
+    const id = idSchema.parse(bookingId);
+    await assertOwnership(id);
+    const { db } = await getDb();
+    const [row] = await db
+      .select({
+        guestFirstName: bookings.guestFirstName,
+        guestFullName: bookings.guestFullName,
+        guestLanguage: bookings.guestLanguage,
+        propertyName: properties.name,
+      })
+      .from(bookings)
+      .innerJoin(properties, eq(properties.id, bookings.propertyId))
+      .where(eq(bookings.id, id))
+      .limit(1);
+    if (!row) return { ok: false, error: NOT_FOUND_MESSAGE };
+
+    const message = composeGuestInvite({
+      guestFirstName: row.guestFirstName,
+      guestFullName: row.guestFullName,
+      propertyName: row.propertyName,
+      language: row.guestLanguage,
+      guestAppUrl: process.env.WELCOME_GUEST_APP_URL?.trim() || null,
+    });
+    return { ok: true, message };
+  } catch (err) {
+    console.error('[dashboard] buildGuestInviteAction failed', err);
+    return { ok: false, error: 'Non sono riuscito a generare il messaggio, riprova.' };
+  }
 }

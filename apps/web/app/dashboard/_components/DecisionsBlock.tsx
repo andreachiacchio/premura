@@ -94,7 +94,7 @@ export function DecisionsBlock({
   if (total === 0) return null;
 
   return (
-    <section aria-label="Serve una tua decisione" className="mx-5 mt-5">
+    <section aria-label="Serve una tua decisione" className="mx-5 mt-5 md:mx-0">
       <div className="overflow-hidden rounded-card border border-terracotta-soft bg-paper shadow-sm">
         <header className="bg-gradient-to-br from-peach to-peach-deep px-4 py-4">
           <h2 className="font-serif text-[24px] font-medium leading-tight text-terracotta-2">

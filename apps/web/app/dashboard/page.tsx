@@ -149,7 +149,9 @@ export default async function DashboardPage() {
   // Slice C: counter kit in attesa di approvazione founder.
   const pendingKitsCount = (kitStatusCounts.proposed ?? 0) + (kitStatusCounts.modified ?? 0);
 
-  const hostFirstName = hostRow?.fullName?.trim().split(/\s+/)[0] || 'ospite';
+  // Capitalizzato: nel profilo puo' essere minuscolo ("andrea").
+  const rawFirstName = hostRow?.fullName?.trim().split(/\s+/)[0] || 'ospite';
+  const hostFirstName = rawFirstName.charAt(0).toUpperCase() + rawFirstName.slice(1);
 
   // Blocco decisioni costruito PRIMA del render: il contatore "serve te"
   // dell'agent card e' lo stesso numero, mai due verita' diverse.
@@ -185,73 +187,82 @@ export default async function DashboardPage() {
     // approvare, prenotazioni) a cui le voci del blocco 2 si ancorano.
     // Colonna 480px SEMPRE (mobile-first come il prototipo); su desktop
     // diventa una carta centrata con ombra invece di allargarsi.
-    <main className="mx-auto min-h-screen w-full max-w-[480px] bg-ivory lg:my-8 lg:min-h-0 lg:rounded-[28px] lg:pb-4 lg:shadow-lg lg:ring-1 lg:ring-line-soft">
+    // DUE LAYOUT, non uno responsive (30/07): sotto md la colonna 480px
+    // del prototipo, esattamente com'e'; da md in su un layout suo che
+    // usa la larghezza (fino a ~1200px): agent card + metriche sulla
+    // stessa riga, decisioni a sinistra e feed a destra, liste a griglia.
+    <main className="mx-auto min-h-screen w-full max-w-[480px] bg-ivory md:max-w-[1200px] md:px-6">
       <DashboardHeader hostFirstName={hostFirstName} />
 
-      {/* La voce di Premura: azione corrente vera + contatori. */}
-      <AgentCard
-        status={agentStatus}
-        stats={{
-          activeGuests: summary.metrics.guestsInHouse,
-          actionsToday,
-          needsYou: decisionsCount(decisionsData),
-        }}
-      />
-
-      {/* Metriche: due vere, affiancate, dettaglio al tap. */}
-      <HomeMetricsStrip metrics={summary.metrics} actionsToday={actionsToday} />
-
-      {/* Decisioni in attesa (nascosto se vuoto). Le bozze
-          sono voci di questo blocco, in cima, con la card completa
-          (anteprima + approva/modifica inline) e il tempo di attesa:
-          venerdi' e' la schermata dove vive l'host. */}
-      {/* Navigazione secondaria: tutto il resto sta dietro un click. */}
-      <nav aria-label="Sezioni" className="mx-5 mb-4 flex flex-wrap gap-x-4 gap-y-1">
+      {/* Barra di navigazione vera, sotto il saluto (bug 30/07: i link
+          incastrati sotto le metriche si sovrapponevano). */}
+      <nav
+        aria-label="Sezioni"
+        className="mx-5 mb-5 flex gap-x-5 overflow-x-auto whitespace-nowrap border-y border-line-soft py-2.5 md:mx-0"
+      >
         <Link
           href="/dashboard/upcoming-checkins"
-          className="text-body-sm font-medium text-ink-soft underline-offset-2 hover:text-ink hover:underline"
+          className="text-body-sm font-medium text-ink-soft hover:text-ink"
         >
           Prossimi check-in
         </Link>
         <Link
           href="/dashboard/kits"
-          className="text-body-sm font-medium text-ink-soft underline-offset-2 hover:text-ink hover:underline"
+          className="text-body-sm font-medium text-ink-soft hover:text-ink"
         >
           Kit
         </Link>
         <Link
           href="/dashboard/cleaners"
-          className="text-body-sm font-medium text-ink-soft underline-offset-2 hover:text-ink hover:underline"
+          className="text-body-sm font-medium text-ink-soft hover:text-ink"
         >
           Squadra
         </Link>
-        <Link
-          href="/properties"
-          className="text-body-sm font-medium text-ink-soft underline-offset-2 hover:text-ink hover:underline"
-        >
+        <Link href="/properties" className="text-body-sm font-medium text-ink-soft hover:text-ink">
           Strutture
         </Link>
       </nav>
 
-      <DecisionsBlock data={decisionsData} />
-
-      <div id="prenotazioni" className="scroll-mt-6">
-        <BookingsList
-          bookings={bookings}
-          completeAction={completeBookingAction}
-          skipAction={skipBookingAction}
+      {/* Riga alta desktop: agent card + metriche affiancate. */}
+      <div className="md:grid md:grid-cols-[1fr_340px] md:items-start md:gap-4">
+        <AgentCard
+          status={agentStatus}
+          stats={{
+            activeGuests: summary.metrics.guestsInHouse,
+            actionsToday,
+            needsYou: decisionsCount(decisionsData),
+          }}
         />
+        <HomeMetricsStrip metrics={summary.metrics} actionsToday={actionsToday} />
       </div>
 
-      {/* Blocco 3 — fatto dall'agente */}
-      <AgentFeed
-        items={summary.feed.map((f) => ({
-          at: f.at.toISOString(),
-          line: f.line,
-          kind: f.kind,
-          simulated: f.simulated,
-        }))}
-      />
+      {/* Da md: decisioni a sinistra, feed a destra; le liste sotto a
+          tutta larghezza. Su mobile l'ordine DOM resta quello del
+          prototipo: decisioni -> liste -> feed. */}
+      <div className="md:grid md:grid-cols-2 md:items-start md:gap-4">
+        <div className="md:col-start-1 md:row-start-1">
+          <DecisionsBlock data={decisionsData} />
+        </div>
+
+        <div id="prenotazioni" className="scroll-mt-6 md:col-span-2 md:row-start-2">
+          <BookingsList
+            bookings={bookings}
+            completeAction={completeBookingAction}
+            skipAction={skipBookingAction}
+          />
+        </div>
+
+        <div className="md:col-start-2 md:row-start-1">
+          <AgentFeed
+            items={summary.feed.map((f) => ({
+              at: f.at.toISOString(),
+              line: f.line,
+              kind: f.kind,
+              simulated: f.simulated,
+            }))}
+          />
+        </div>
+      </div>
 
       <div className="h-12" aria-hidden />
     </main>

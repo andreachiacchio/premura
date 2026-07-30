@@ -43,10 +43,9 @@ describe("CompleteBookingDialog", () => {
       />,
     );
 
-    // I 3 input obbligatori partono vuoti: nome e telefono sicuramente,
-    // guestLanguage ha default 'it' quindi lo svuotiamo prima.
-    await user.clear(screen.getByLabelText("Lingua"));
-
+    // Nome e telefono partono vuoti. La lingua e' un menu a tendina
+    // (30/07) e non puo' mai essere vuota: il suo errore di validazione
+    // e' irraggiungibile by design.
     await user.click(
       screen.getByRole("button", { name: /Salva e attiva Premura/i }),
     );
@@ -56,9 +55,6 @@ describe("CompleteBookingDialog", () => {
     ).toBeInTheDocument();
     expect(
       await screen.findByText("Il telefono deve avere almeno 8 caratteri"),
-    ).toBeInTheDocument();
-    expect(
-      await screen.findByText("Codice lingua troppo corto"),
     ).toBeInTheDocument();
 
     expect(completeAction).not.toHaveBeenCalled();
