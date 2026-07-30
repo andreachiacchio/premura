@@ -1,0 +1,46 @@
+# Deploy automatico di apps/api su Fly.io (premura-api-staging).
+#
+# Parte a ogni push su main che tocca l'API o i package condivisi.
+# Il build è remoto (--remote-only): niente Docker sul runner.
+# Lo scale finale è idempotente e garantisce l'invariante del go-live:
+# app=1 (HTTP) e worker=1 (cron + webhook WAHA) SEMPRE accesi — il
+# silenzio di 3 mesi era il worker a zero macchine.
+#
+# Richiede il secret GitHub FLY_API_TOKEN (deploy token dell'app).
+# Le secrets di runtime (WAHA_*, WHATSAPP_*) vivono su Fly, non qui.
+
+name: Deploy API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy premura-api-staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy (build remoto, contesto = root del monorepo)
+        run: flyctl deploy --remote-only --config apps/api/fly.toml --dockerfile apps/api/Dockerfile
+
+      - name: Scale — app e worker sempre a 1
+        run: flyctl scale count app=1 worker=1 --app premura-api-staging --yes

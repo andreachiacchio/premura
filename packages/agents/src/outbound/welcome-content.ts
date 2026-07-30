@@ -11,10 +11,11 @@ import { type AiDisclosureCustom, normalizeLanguage, resolveAiDisclosure } from 
 //     la disclosure e' dovuta e non negoziabile (outbound-guard rifiuta
 //     il corpo se manca).
 //  2. Benvenuto con nome ospite e data di arrivo.
-//  3. Link alla guest app con i servizi — omesso se l'URL non e'
+//  3. Meeting point all'arrivo ("Paolo will meet you at La Moressa") —
+//     da property_knowledge.emergency_contacts, il primo contatto con
+//     meetingPlace. Omesso se assente: mai inventare persone o numeri.
+//  4. Link alla guest app con i servizi — omesso se l'URL non e'
 //     configurato: meglio nessun link che un link rotto.
-//  4. Referente in loco — letto da property_knowledge.emergency_contacts,
-//     omesso se assente: mai inventare un numero.
 //  5. Firma = NOME DELLA STRUTTURA (decisione blindata: l'ospite deve
 //     pensare di parlare con l'host, mai con un brand terzo).
 
@@ -27,8 +28,8 @@ export type BookingWelcomeInput = {
   language: string | null;
   /** URL della guest app (servizi). Da env WELCOME_GUEST_APP_URL. */
   guestAppUrl: string | null;
-  /** Referente in loco, da property_knowledge.emergency_contacts[0]. */
-  contact: { name: string; phone: string } | null;
+  /** Punto d'incontro all'arrivo, da emergency_contacts (meetingPlace). */
+  meetingPoint: { name: string; place: string; phone: string } | null;
   aiDisclosureCustom?: AiDisclosureCustom;
 };
 
@@ -56,36 +57,38 @@ export function composeBookingWelcome(input: BookingWelcomeInput): string {
   const lines: string[] = [disclosure, ''];
 
   if (lang === 'it') {
+    // Niente "Ciao" qui: la disclosure in testa saluta gia', e due
+    // saluti di fila leggono male (correzione Andrea 30/07).
     lines.push(
-      `Ciao ${name}, benvenuto! Siamo felici di accoglierti a ${input.propertyName} da ${date}.`,
+      `${name}, benvenuto! Siamo felici di accoglierti a ${input.propertyName} da ${date}.`,
     );
+    if (input.meetingPoint) {
+      lines.push(
+        '',
+        `All'arrivo ${input.meetingPoint.name} ti aspetta a ${input.meetingPoint.place} — scrivigli per concordare l'orario: ${input.meetingPoint.phone}`,
+      );
+    }
     if (input.guestAppUrl) {
       lines.push(
         '',
         `Qui trovi tutto per il tuo soggiorno — informazioni sulla casa e i nostri servizi (tour in barca, transfer, chef a domicilio): ${input.guestAppUrl}`,
       );
     }
-    if (input.contact) {
-      lines.push(
-        '',
-        `Per qualsiasi cosa sul posto, ${input.contact.name} è il tuo riferimento: ${input.contact.phone}.`,
-      );
-    }
     lines.push('', 'A presto,', input.propertyName);
   } else {
     lines.push(
-      `Hi ${name}, welcome! We're delighted to host you at ${input.propertyName} from ${date}.`,
+      `${name}, welcome! We're delighted to host you at ${input.propertyName} from ${date}.`,
     );
+    if (input.meetingPoint) {
+      lines.push(
+        '',
+        `${input.meetingPoint.name} will meet you at ${input.meetingPoint.place} — message him to arrange the time: ${input.meetingPoint.phone}`,
+      );
+    }
     if (input.guestAppUrl) {
       lines.push(
         '',
         `Here you'll find everything for your stay — house info and our local services (boat tours, transfers, private chef): ${input.guestAppUrl}`,
-      );
-    }
-    if (input.contact) {
-      lines.push(
-        '',
-        `For anything on site, ${input.contact.name} is your contact: ${input.contact.phone}.`,
       );
     }
     lines.push('', 'See you soon,', input.propertyName);

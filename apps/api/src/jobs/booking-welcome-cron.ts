@@ -88,15 +88,21 @@ export async function runBookingWelcomeTick(now: Date = new Date()): Promise<voi
       if (!c.welcomeAutoSend) continue;
       if (nowMin < slotToMinutes(c.welcomeTimeSlot)) continue;
 
-      // Referente in loco dalla knowledge della property (primo contatto).
+      // Punto d'incontro all'arrivo: il primo emergency_contact con
+      // meetingPlace ("Paolo ti aspetta a La Moressa"). Nessuno = la
+      // riga si omette, mai inventare persone o numeri.
       const [knowledge] = await client.db
         .select({ emergencyContacts: propertyKnowledge.emergencyContacts })
         .from(propertyKnowledge)
         .where(eq(propertyKnowledge.propertyId, c.propertyId))
         .limit(1);
-      const firstContact = (knowledge?.emergencyContacts ?? [])[0] as
-        | { name?: string; phone?: string }
-        | undefined;
+      let meetingPoint: { name: string; place: string; phone: string } | null = null;
+      for (const contact of knowledge?.emergencyContacts ?? []) {
+        if (contact.meetingPlace && contact.phone) {
+          meetingPoint = { name: contact.name, place: contact.meetingPlace, phone: contact.phone };
+          break;
+        }
+      }
 
       const body = composeBookingWelcome({
         guestFirstName: c.guestFirstName,
@@ -105,10 +111,7 @@ export async function runBookingWelcomeTick(now: Date = new Date()): Promise<voi
         checkinAt: c.checkinAt,
         language: c.guestLanguage,
         guestAppUrl: process.env.WELCOME_GUEST_APP_URL?.trim() || null,
-        contact:
-          firstContact?.name && firstContact?.phone
-            ? { name: firstContact.name, phone: firstContact.phone }
-            : null,
+        meetingPoint,
         aiDisclosureCustom: c.aiDisclosureCustom,
       });
 
