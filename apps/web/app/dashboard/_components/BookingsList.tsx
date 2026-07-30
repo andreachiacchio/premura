@@ -1,4 +1,5 @@
 import type { OccupiedRange } from '@/lib/occupied-ranges';
+import { propertyColorOrFallback } from '@/lib/property-color';
 import { type BookingForDashboard, isIncompleteDataSource } from '@/lib/types';
 import Link from 'next/link';
 import { BookingRow } from './BookingRow';
@@ -50,7 +51,10 @@ function GroupedRows({
     <div className="mt-3 flex flex-col gap-1.5">
       {[...groups.entries()].map(([propertyName, rows]) => (
         <section key={propertyName}>
-          <h3 className="sticky top-0 z-10 -mx-1 bg-ivory/95 px-1 py-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-ink-mute backdrop-blur-sm">
+          <h3
+            className="sticky top-0 z-10 -mx-1 bg-ivory/95 px-1 py-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] backdrop-blur-sm"
+            style={{ color: propertyColorOrFallback(rows[0]?.propertyColor ?? null, propertyName) }}
+          >
             {propertyName}
           </h3>
           {/* Desktop: griglia 2-3 colonne; mobile: colonna del prototipo. */}
@@ -89,10 +93,13 @@ function SeeAll({ total }: { total: number }) {
 
 export function BookingsList({
   bookings,
+  properties,
   completeAction,
   skipAction,
 }: {
   bookings: BookingForDashboard[];
+  /** Tutte le strutture dell'host (per i segmenti Date occupate). */
+  properties: Array<{ id: string; name: string; color: string | null }>;
   completeAction: CompleteBookingActionFn;
   skipAction: SkipBookingActionFn;
 }) {
@@ -134,10 +141,12 @@ export function BookingsList({
                 id: b.id,
                 propertyId: b.propertyId,
                 propertyName: b.propertyName,
+                propertyColor: b.propertyColor,
                 checkinAtIso: b.checkinAt.toISOString(),
                 checkoutAtIso: b.checkoutAt.toISOString(),
               }),
             )}
+            properties={properties}
             bookingsById={Object.fromEntries(unknownOccupied.map((b) => [b.id, b]))}
             completeAction={completeAction}
             skipAction={skipAction}

@@ -25,6 +25,7 @@ import type { CompleteBookingActionFn, SkipBookingActionFn } from './CompleteBoo
 // Regola data condivisa con la pagina check-in: anno visibile quando
 // non e' l'anno corrente (una prenotazione 2027 senza anno sembra passata).
 import { formatDayMonth } from '@/lib/format-date';
+import { propertyColorOrFallback } from '@/lib/property-color';
 
 type DotKind = 'alert' | 'warn' | 'ok' | 'muted';
 
@@ -125,10 +126,15 @@ export function BookingRow({
   const realName = hasRealName(booking);
   const title = realName ? booking.guestFullName.trim() : booking.propertyName;
   const subtitle = realName ? `${booking.propertyName} · ${dateRange}` : dateRange;
+  // Sistema colori (30/07): la struttura si riconosce senza leggere.
+  const propertyColor = propertyColorOrFallback(booking.propertyColor, booking.propertyName);
 
   const inner = (
     <>
-      <div className="relative mr-3 grid size-10 shrink-0 place-items-center rounded-full border border-line bg-ivory-warm font-serif text-[16px] font-medium text-ink">
+      <div
+        className="relative mr-3 grid size-10 shrink-0 place-items-center rounded-full font-serif text-[16px] font-medium text-paper"
+        style={{ backgroundColor: propertyColor }}
+      >
         {avatarLetter(booking)}
         {flag ? (
           <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-paper px-0.5 py-px text-[13px] leading-none shadow-sm">
@@ -156,6 +162,7 @@ export function BookingRow({
           type="button"
           onClick={() => setDialogOpen(true)}
           className="group flex w-full items-stretch rounded-card border border-terracotta-soft bg-gradient-to-br from-paper to-peach/40 px-3.5 py-2.5 text-left transition-[transform,border-color,box-shadow] duration-200 ease-premura hover:-translate-y-px hover:border-terracotta hover:shadow-md"
+          style={{ borderLeft: `3px solid ${propertyColor}` }}
         >
           {inner}
         </button>
@@ -171,7 +178,10 @@ export function BookingRow({
   }
 
   return (
-    <div className="flex w-full items-stretch rounded-card border border-line-soft bg-paper px-3.5 py-2.5 text-left">
+    <div
+      className="flex w-full items-stretch rounded-card border border-line-soft bg-paper px-3.5 py-2.5 text-left"
+      style={{ borderLeft: `3px solid ${propertyColor}` }}
+    >
       {inner}
     </div>
   );

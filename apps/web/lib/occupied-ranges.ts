@@ -12,6 +12,8 @@ export type OccupiedRange = {
   id: string;
   propertyId: string;
   propertyName: string;
+  /** Colore della struttura (properties.color), per il sottotitolo. */
+  propertyColor: string | null;
   checkinAtIso: string;
   checkoutAtIso: string;
 };
@@ -31,16 +33,27 @@ export function daysUntil(dateIso: string, now: Date): number {
   return Math.round((target.getTime() - today.getTime()) / 86_400_000);
 }
 
-/** Divide per urgenza; ogni gruppo in ordine cronologico. */
+/**
+ * Divide per urgenza; ogni gruppo in ordine cronologico.
+ *
+ * "current" = fascia occupata ADESSO (check-in passato, check-out
+ * futuro): c'e' qualcuno in casa e non sappiamo chi — il caso piu'
+ * urgente della sezione, in evidenza sopra tutto (Andrea 30/07).
+ */
 export function splitByUrgency(
   ranges: OccupiedRange[],
   now: Date,
-): { soon: OccupiedRange[]; later: OccupiedRange[] } {
+): { current: OccupiedRange[]; soon: OccupiedRange[]; later: OccupiedRange[] } {
   const sorted = [...ranges].sort(
     (a, b) => new Date(a.checkinAtIso).getTime() - new Date(b.checkinAtIso).getTime(),
   );
+  const isCurrent = (r: OccupiedRange): boolean =>
+    daysUntil(r.checkinAtIso, now) <= 0 && new Date(r.checkoutAtIso).getTime() > now.getTime();
   return {
-    soon: sorted.filter((r) => daysUntil(r.checkinAtIso, now) <= URGENT_WINDOW_DAYS),
+    current: sorted.filter(isCurrent),
+    soon: sorted.filter(
+      (r) => !isCurrent(r) && daysUntil(r.checkinAtIso, now) <= URGENT_WINDOW_DAYS,
+    ),
     later: sorted.filter((r) => daysUntil(r.checkinAtIso, now) > URGENT_WINDOW_DAYS),
   };
 }

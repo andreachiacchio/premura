@@ -26,6 +26,8 @@ export type BookingForDashboard = {
   id: string;
   propertyId: string;
   propertyName: string;
+  /** Colore della struttura (sistema colori 30/07). */
+  propertyColor: string | null;
   dataSource: DataSource;
   hostSkippedCompletion: boolean;
   guestFullName: string;

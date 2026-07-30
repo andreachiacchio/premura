@@ -1,12 +1,14 @@
 'use server';
 
 import { getCurrentHostId } from '@/lib/auth';
+import { nextPropertyColor } from '@/lib/property-color';
 import { getDb } from '@/lib/db';
 import { geocodeAddress } from '@/lib/geocode';
 import { fetchListingPageText } from '@/lib/listing-page';
 import { upsertPropertyKnowledge } from '@/lib/repositories/property-knowledge';
 import { type ListingImportData, extractListingData } from '@premura/agents';
 import { properties } from '@premura/db';
+import { eq } from 'drizzle-orm';
 import { normalizeLanguage } from '@premura/shared';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -152,12 +154,20 @@ export async function createPropertyFromWizardAction(formData: FormData): Promis
   // il form le invia come hidden field valorizzati dal geocoding.
   const hasCoords = payload.latitude !== undefined && payload.longitude !== undefined;
 
+  // Sistema colori (30/07): primo colore libero della palette.
+  const existingColors = await db
+    .select({ color: properties.color })
+    .from(properties)
+    .where(eq(properties.hostId, hostId));
+  const color = nextPropertyColor(existingColors.map((r) => r.color));
+
   const [inserted] = await db
     .insert(properties)
     .values({
       hostId,
       name: payload.nome,
       city: payload.citta,
+      color,
       addressLine: payload.indirizzo ?? null,
       latitude: hasCoords ? String(payload.latitude) : null,
       longitude: hasCoords ? String(payload.longitude) : null,

@@ -17,6 +17,7 @@ function range(id: string, checkin: string, checkout: string, property = 'Villa 
     id,
     propertyId: 'p1',
     propertyName: property,
+    propertyColor: null,
     checkinAtIso: checkin,
     checkoutAtIso: checkout,
   } satisfies OccupiedRange;
@@ -24,7 +25,7 @@ function range(id: string, checkin: string, checkout: string, property = 'Villa 
 
 describe('splitByUrgency', () => {
   it('entro 30 giorni = "da verificare ora", oltre = "più avanti", ordine cronologico', () => {
-    const { soon, later } = splitByUrgency(
+    const { current, soon, later } = splitByUrgency(
       [
         range('c', '2027-04-01T00:00:00Z', '2027-04-03T00:00:00Z'),
         range('a', '2026-08-20T00:00:00Z', '2026-08-24T00:00:00Z'),
@@ -32,8 +33,21 @@ describe('splitByUrgency', () => {
       ],
       NOW,
     );
+    expect(current).toEqual([]);
     expect(soon.map((r) => r.id)).toEqual(['b', 'a']);
     expect(later.map((r) => r.id)).toEqual(['c']);
+  });
+
+  it('fascia occupata ADESSO finisce in "in corso ora", non fra le altre', () => {
+    const { current, soon } = splitByUrgency(
+      [
+        range('now', '2026-07-28T00:00:00Z', '2026-08-02T00:00:00Z'),
+        range('b', '2026-08-04T00:00:00Z', '2026-08-09T00:00:00Z'),
+      ],
+      NOW,
+    );
+    expect(current.map((r) => r.id)).toEqual(['now']);
+    expect(soon.map((r) => r.id)).toEqual(['b']);
   });
 });
 

@@ -1,3 +1,4 @@
+import { nextPropertyColor } from '@/lib/property-color';
 import { type Database, type IcalSource, properties } from '@premura/db';
 import { asc, eq } from 'drizzle-orm';
 
@@ -14,6 +15,8 @@ export type PropertyRow = {
   id: string;
   name: string;
   city: string;
+  /** Colore fisso della struttura (#RRGGBB) — sistema colori 30/07. */
+  color: string | null;
 };
 
 export async function findByHostId(args: {
@@ -26,6 +29,7 @@ export async function findByHostId(args: {
       id: properties.id,
       name: properties.name,
       city: properties.city,
+      color: properties.color,
     })
     .from(properties)
     .where(eq(properties.hostId, hostId))
@@ -50,12 +54,21 @@ export async function createProperty(args: CreatePropertyArgs): Promise<{
     ? [{ source: 'booking', url: icalBookingUrl }]
     : [];
 
+  // Sistema colori (30/07): alla creazione si assegna il primo colore
+  // libero della palette — la struttura si riconosce senza leggere.
+  const existing = await db
+    .select({ color: properties.color })
+    .from(properties)
+    .where(eq(properties.hostId, hostId));
+  const color = nextPropertyColor(existing.map((r) => r.color));
+
   const inserted = await db
     .insert(properties)
     .values({
       hostId,
       name,
       city,
+      color,
       // addressLine nullable da migration 0008: niente placeholder, l'host
       // completa l'indirizzo in settings page.
       icalSources,

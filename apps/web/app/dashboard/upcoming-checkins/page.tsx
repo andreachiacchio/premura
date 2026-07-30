@@ -27,6 +27,7 @@ export default async function UpcomingCheckinsPage(): Promise<React.JSX.Element>
     guestFirstName: r.guestFirstName,
     propertyId: r.propertyId,
     propertyName: r.propertyName,
+    propertyColor: r.propertyColor,
     checkinAt: r.checkinAt.toISOString(),
     checkoutAt: r.checkoutAt.toISOString(),
     numGuests: r.numGuests,
