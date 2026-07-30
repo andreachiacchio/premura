@@ -39,7 +39,7 @@ const CASES: Case[] = [
   { dataSource: "airbnb_email_parsed", expectedBadge: "Airbnb" },
   { dataSource: "booking_manual_filled", expectedBadge: "Booking · completata" },
   { dataSource: "booking_via_channel_manager", expectedBadge: "Channel manager" },
-  { dataSource: "booking_ical_only", expectedBadge: "Booking · da completare" },
+  { dataSource: "booking_ical_only", expectedBadge: "Date occupate · verifica extranet" },
   { dataSource: "booking_email_only", expectedBadge: "Booking · email" },
   { dataSource: "airbnb_ical_only", expectedBadge: "Airbnb · in attesa" },
   { dataSource: "unknown", expectedBadge: "In attesa" },
@@ -72,7 +72,7 @@ describe("BookingRow badge per data_source", () => {
     );
     expect(screen.getByText("Saltata")).toBeInTheDocument();
     expect(
-      screen.queryByText("Booking · da completare"),
+      screen.queryByText("Date occupate · verifica extranet"),
     ).not.toBeInTheDocument();
   });
 
