@@ -18,7 +18,9 @@ import {
 //  5. desktop a larghezza piena; su mobile le righe diventano schede
 //  6. sotto ogni riga attiva la timeline invii (benvenuto/survey/mid-stay)
 
-const DATE_FMT = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short' });
+// Regola condivisa (lib/format-date): anno solo quando non e' il corrente.
+import { formatDayMonth } from '@/lib/format-date';
+
 const TIME_FMT = new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit' });
 
 export type SurveyStatusUI = 'not_yet' | 'sent' | 'completed' | 'skipped';
@@ -125,7 +127,7 @@ export function buildTimeline(
     items.push({
       label: 'Benvenuto',
       detail: at
-        ? `inviato ${DATE_FMT.format(new Date(at))} ${TIME_FMT.format(new Date(at))}${dry ? ' (simulato)' : ''}`
+        ? `inviato ${formatDayMonth(new Date(at))} ${TIME_FMT.format(new Date(at))}${dry ? ' (simulato)' : ''}`
         : 'inviato',
       done: true,
     });
@@ -134,7 +136,7 @@ export function buildTimeline(
   } else {
     items.push({
       label: 'Benvenuto',
-      detail: `previsto ${DATE_FMT.format(checkin)} ore ${welcomeTimeSlot}`,
+      detail: `previsto ${formatDayMonth(checkin)} ore ${welcomeTimeSlot}`,
       done: false,
     });
   }
@@ -144,14 +146,14 @@ export function buildTimeline(
     const at = row.surveyCompletedAt;
     items.push({
       label: 'Survey',
-      detail: at ? `completata ${DATE_FMT.format(new Date(at))}` : 'completata',
+      detail: at ? `completata ${formatDayMonth(new Date(at))}` : 'completata',
       done: true,
     });
   } else if (row.surveyStatus === 'sent') {
     const at = row.surveySentAt;
     items.push({
       label: 'Survey',
-      detail: at ? `inviata ${DATE_FMT.format(new Date(at))}, in attesa di risposta` : 'inviata',
+      detail: at ? `inviata ${formatDayMonth(new Date(at))}, in attesa di risposta` : 'inviata',
       done: true,
     });
   } else if (row.surveyStatus === 'skipped') {
@@ -164,7 +166,7 @@ export function buildTimeline(
       detail:
         surveyDate.getTime() < now.getTime()
           ? 'in coda al prossimo giro (09:00)'
-          : `prevista ${DATE_FMT.format(surveyDate)} ore 09:00`,
+          : `prevista ${formatDayMonth(surveyDate)} ore 09:00`,
       done: false,
     });
   }
@@ -178,7 +180,7 @@ export function buildTimeline(
       label: 'Mid-stay',
       detail:
         midstay.status === 'sent'
-          ? `inviato${midstay.sentAt ? ` ${DATE_FMT.format(new Date(midstay.sentAt))}` : ''}${midstay.dryRun ? ' (simulato)' : ''}`
+          ? `inviato${midstay.sentAt ? ` ${formatDayMonth(new Date(midstay.sentAt))}` : ''}${midstay.dryRun ? ' (simulato)' : ''}`
           : midstay.status === 'skipped'
             ? 'saltato'
             : midstay.status === 'failed'
@@ -386,7 +388,7 @@ export function UpcomingCheckinsBoard({
               {groupRows.map((r) => {
                 const s = state[r.id] ?? defaultState();
                 const arrival = arrivalLabel(r.checkinAt, r.checkoutAt, now);
-                const dateRange = `${DATE_FMT.format(new Date(r.checkinAt))} – ${DATE_FMT.format(new Date(r.checkoutAt))}`;
+                const dateRange = `${formatDayMonth(new Date(r.checkinAt))} – ${formatDayMonth(new Date(r.checkoutAt))}`;
                 // Lo stato mostrato reagisce subito al salvataggio del
                 // numero (flashSuccess) senza aspettare la revalidate.
                 const shownState: PremuraStateUI =
