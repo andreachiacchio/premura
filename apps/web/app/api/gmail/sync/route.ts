@@ -5,20 +5,20 @@ import { getTokenByHostAndEmail } from '@/lib/repositories/google-tokens';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { googleTokens } from '@premura/db';
 import { eq } from 'drizzle-orm';
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 
 // POST /api/gmail/sync
 //
 // Avvia un sync Gmail in BACKGROUND e ritorna jobId immediatamente.
 // Il client poll-a GET /api/gmail/sync/status?jobId=X per la progress bar.
 //
-// Architettura: Opzione B (M2a.3 Fase 2). NIENTE BullMQ in questa fase.
-// Il job orchestrator gira nel processo Next.js attuale via void
-// promise (fire-and-forget). Limitazione nota su Vercel hobby:
-// function timeout 60s. 50 email × 3-5s Claude = ~3 min, eccede il
-// timeout in cloud. Per il pilot Andrea testa localmente con
-// `next dev` (no timeout). M3 migrerà a worker dedicato.
-// Documentato in docs/KNOWN-LIMITS.md §8.
+// 30/07 sera: il fire-and-forget con `void promise` NON funziona su
+// Vercel — la function viene congelata appena la risposta parte, il
+// sync moriva a zero e la riga gmail_sync_jobs restava 'running' per
+// sempre (visto su 5 tick consecutivi dopo la re-auth di Andrea).
+// `after()` di Next 15 e' il meccanismo giusto: risposta immediata,
+// ma la function resta viva finche' il lavoro post-risposta finisce
+// (entro maxDuration, 300s qui sotto).
 //
 // Body: vuoto. hostId derivato dalla sessione Supabase (slice 6 fase 7).
 // L'email Gmail target è la prima riga google_tokens per quell'host
@@ -53,14 +53,16 @@ async function runMachineSync(req: Request): Promise<NextResponse | null> {
   for (const t of tokens) {
     const job = await createJob(db, t.hostId, t.googleEmail);
     jobIds.push(job.id);
-    void syncGmailForHost(serverClient, t.hostId, t.googleEmail, { reuseJobId: job.id }).catch(
-      (err) => {
+    after(async () => {
+      try {
+        await syncGmailForHost(serverClient, t.hostId, t.googleEmail, { reuseJobId: job.id });
+      } catch (err) {
         console.error('[gmail-sync] orchestrator background error (cron)', {
           jobId: job.id,
           err,
         });
-      },
-    );
+      }
+    });
   }
   return NextResponse.json({ jobIds, hosts: tokens.length }, { status: 202 });
 }
@@ -111,13 +113,15 @@ export async function POST(req: Request): Promise<NextResponse> {
   // L'orchestrator riuserà questo jobId via options.reuseJobId.
   const job = await createJob(db, hostId, googleEmail);
 
-  // 4. Lancia orchestrator in BACKGROUND (fire-and-forget).
-  // L'await sull'errore evita warning Node "unhandled rejection";
-  // l'errore viene comunque scritto in gmail_sync_jobs.fatal_error.
-  void syncGmailForHost(serverClient, hostId, googleEmail, {
-    reuseJobId: job.id,
-  }).catch((err) => {
-    console.error('[gmail-sync] orchestrator background error', { jobId: job.id, err });
+  // 4. Lancia orchestrator DOPO la risposta ma dentro la vita della
+  // function (after(), vedi commento in testa). L'errore viene comunque
+  // scritto in gmail_sync_jobs.fatal_error dall'orchestrator.
+  after(async () => {
+    try {
+      await syncGmailForHost(serverClient, hostId, googleEmail, { reuseJobId: job.id });
+    } catch (err) {
+      console.error('[gmail-sync] orchestrator background error', { jobId: job.id, err });
+    }
   });
 
   // 5. Risposta immediata col jobId. Client polla /status?jobId=...
