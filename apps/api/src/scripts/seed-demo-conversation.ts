@@ -197,6 +197,49 @@ try {
   });
   console.log(`[demo-seed] pipeline: ${JSON.stringify(result)}`);
 
+  // Diagnosi (run 1 del 30/07: 'Anthropic API call failed' in 249ms,
+  // causa non propagata dal wrapper nel risultato della pipeline). Se
+  // la generazione fallisce, richiamiamo il generatore DIRETTAMENTE e
+  // stampiamo la CAUSA della DraftGeneratorError: e' l'errore tipizzato
+  // dell'SDK (401 chiave, 404 modello, errore di connessione...).
+  if (result.status === 'generator_error') {
+    const model = process.env.CLAUDE_MODEL_PRIMARY ?? 'claude-sonnet-4-6';
+    const keySet = Boolean(process.env.ANTHROPIC_API_KEY);
+    console.log(`[demo-seed] diagnosi: model=${model} ANTHROPIC_API_KEY presente=${keySet}`);
+    const { DraftGeneratorError, generateReplyDraft } = await import('@premura/agents');
+    try {
+      const draft = await generateReplyDraft({
+        conversation: [
+          {
+            direction: 'inbound',
+            fromEntity: 'guest',
+            body: lastBody,
+            sentAt: new Date(),
+          },
+        ],
+        voiceProfile: null,
+        guestInsights: null,
+        propertyKnowledge: null,
+        propertyName: property.name,
+        guestFirstName: 'Demo',
+      });
+      console.log(
+        `[demo-seed] chiamata diretta riuscita (confidence=${draft.confidence}): il problema sta nella pipeline, non nell'API`,
+      );
+    } catch (genErr) {
+      const cause = genErr instanceof DraftGeneratorError ? genErr.cause : genErr;
+      const status =
+        typeof cause === 'object' && cause !== null && 'status' in cause
+          ? (cause as { status: unknown }).status
+          : null;
+      const name = cause instanceof Error ? cause.name : typeof cause;
+      const message = cause instanceof Error ? cause.message : String(cause);
+      console.error(
+        `[demo-seed] causa vera del fallimento: status=${status} name=${name} msg=${message}`,
+      );
+    }
+  }
+
   // 5. Numeri della chiamata per il report (modello/token/costo/latenza).
   const [action] = await db
     .select({
