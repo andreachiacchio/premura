@@ -1,5 +1,16 @@
-import { type Database, bookings, messages, pendingDrafts, properties } from '@premura/db';
+import {
+  type Database,
+  bookings,
+  conversations,
+  hosts,
+  messages,
+  pendingDrafts,
+  properties,
+  providers,
+} from '@premura/db';
+import { findForbiddenPhone, needsAiDisclosure, resolveAiDisclosure } from '@premura/shared';
 import { and, desc, eq, gte } from 'drizzle-orm';
+import { guestAppInviteDisclosures } from './outbound/guest-app-invite-content';
 import { logAgentAction } from './agent-action-logger';
 import { getHostVoiceProfile, getPropertyKnowledge } from './context-readers';
 import { type DraftOutput, decideRouting, generateReplyDraft } from './draft-generator';
@@ -38,6 +49,9 @@ export type TriggerDraftGenerationInput = {
   body: string;
   hostId: string;
   guestProfileId?: string | null;
+  /** Conversation del messaggio inbound: serve per sapere se la
+   *  disclosure AI e' gia' stata inviata in questo thread. */
+  conversationId?: string | null;
   // Test injection: override generator (skip Anthropic).
   generator?: typeof generateReplyDraft;
   // Override smart routing options (default: WA non live).
@@ -52,7 +66,10 @@ export type DraftGenerationResult = {
     | 'skipped_recent_outbound'
     | 'skipped_existing_draft'
     | 'skipped_no_property'
-    | 'generator_error';
+    | 'generator_error'
+    // FASE 3 (30/07): bozza scartata perche' conteneva il contatto di
+    // un fornitore interno — mai davanti all'host, mai approvabile.
+    | 'provider_contact_leak';
   draftId?: string;
   routing?: 'auto_send' | 'notify_host' | 'escalate';
   confidence?: number;
@@ -116,6 +133,7 @@ export async function triggerDraftGeneration(
       hostId: properties.hostId,
       guestFirstName: bookings.guestFirstName,
       guestFullName: bookings.guestFullName,
+      guestLanguage: bookings.guestLanguage,
     })
     .from(bookings)
     .innerJoin(properties, eq(bookings.propertyId, properties.id))
@@ -242,6 +260,51 @@ export async function triggerDraftGeneration(
     };
   }
 
+  // FASE 3 (30/07): guardia contatti fornitori ANCHE sulle bozze. Il
+  // numero di Antonio non deve poter comparire in un draft che l'host
+  // approverebbe con un tocco. Qualunque provider 'internal' dell'host
+  // e' vietato, non solo quelli della property: piu' conservativo.
+  const providerPhones = await db
+    .select({ phone: providers.phone })
+    .from(providers)
+    .where(
+      and(eq(providers.hostId, bookingRow.hostId), eq(providers.contactVisibility, 'internal')),
+    );
+  const leakedPhone = findForbiddenPhone(
+    output.draft_body,
+    providerPhones.map((p) => p.phone),
+  );
+  if (leakedPhone) {
+    return {
+      status: 'provider_contact_leak',
+      reason: 'la bozza conteneva il contatto di un fornitore interno: scartata',
+    };
+  }
+
+  // FASE 3 (30/07): disclosure AI nel testo proposto, se questa
+  // conversazione non l'ha ancora ricevuta. Stessa formula per
+  // struttura dell'invito guest app (il default fisso nomina Villa
+  // Cristina); il custom dell'host vince.
+  let draftBody = output.draft_body;
+  if (input.conversationId) {
+    const [conv] = await db
+      .select({ at: conversations.aiDisclosureSentAt })
+      .from(conversations)
+      .where(eq(conversations.id, input.conversationId))
+      .limit(1);
+    if (needsAiDisclosure(conv?.at ?? null)) {
+      const [hostRow] = await db
+        .select({ custom: hosts.aiDisclosureCustom })
+        .from(hosts)
+        .where(eq(hosts.id, bookingRow.hostId))
+        .limit(1);
+      const disclosures = guestAppInviteDisclosures(bookingRow.propertyName, hostRow?.custom);
+      // Lingua: preferenza rilevata dai messaggi, poi quella del booking.
+      const disclosureLanguage = guestInsights?.preferredLanguage ?? bookingRow.guestLanguage;
+      draftBody = `${resolveAiDisclosure(disclosures, disclosureLanguage)}\n\n${draftBody}`;
+    }
+  }
+
   // Smart routing: hardcoded thresholds.
   const routing = decideRouting(output, { waChannelLive: input.waChannelLive ?? false });
 
@@ -255,7 +318,7 @@ export async function triggerDraftGeneration(
       replyToMessageId: input.messageId,
       // messageId legacy (kind='message_reply' originale): non riusato.
       messageId: null,
-      draftResponse: output.draft_body,
+      draftResponse: draftBody,
       reasoning: output.reasoning,
       suggestedAction: output.suggested_action,
       metadata: {
