@@ -89,17 +89,21 @@ function flagEmoji(cc: string | null): string | null {
   );
 }
 
-function avatarLetter(b: BookingForDashboard): string {
-  const name = b.guestFirstName ?? b.guestFullName;
-  const ch = name.trim().charAt(0).toUpperCase();
-  return ch || '?';
+// Nomi segnaposto dell'iCal: un elenco di venti "Ospite" identici non
+// comunica niente (mobile brief 30/07). Quando il nome vero non c'e',
+// il TITOLO della riga e' la struttura e il sottotitolo le date.
+const PLACEHOLDER_NAMES = new Set(['ospite', 'reserved', 'booking guest']);
+
+function hasRealName(b: BookingForDashboard): boolean {
+  if (isIncompleteDataSource(b.dataSource) && !b.hostSkippedCompletion) return false;
+  const name = b.guestFullName?.trim().toLowerCase() ?? '';
+  return name.length > 0 && !PLACEHOLDER_NAMES.has(name);
 }
 
-function displayName(b: BookingForDashboard): string {
-  if (isIncompleteDataSource(b.dataSource) && !b.hostSkippedCompletion) {
-    return 'Ospite';
-  }
-  return b.guestFullName?.trim() || 'Ospite';
+function avatarLetter(b: BookingForDashboard): string {
+  const source = hasRealName(b) ? (b.guestFirstName ?? b.guestFullName) : b.propertyName;
+  const ch = source.trim().charAt(0).toUpperCase();
+  return ch || '?';
 }
 
 export function BookingRow({
@@ -118,26 +122,27 @@ export function BookingRow({
   const badge = badgeFor(booking);
   const flag = flagEmoji(booking.guestCountryCode);
   const dateRange = `${formatDayMonth(booking.checkinAt)} – ${formatDayMonth(booking.checkoutAt)}`;
+  const realName = hasRealName(booking);
+  const title = realName ? booking.guestFullName.trim() : booking.propertyName;
+  const subtitle = realName ? `${booking.propertyName} · ${dateRange}` : dateRange;
 
   const inner = (
     <>
-      <div className="relative mr-3.5 grid size-[46px] shrink-0 place-items-center rounded-full border border-line bg-ivory-warm font-serif text-[18px] font-medium text-ink">
+      <div className="relative mr-3 grid size-10 shrink-0 place-items-center rounded-full border border-line bg-ivory-warm font-serif text-[16px] font-medium text-ink">
         {avatarLetter(booking)}
         {flag ? (
-          <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-paper px-0.5 py-px text-[14px] leading-none shadow-sm">
+          <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-paper px-0.5 py-px text-[13px] leading-none shadow-sm">
             {flag}
           </span>
         ) : null}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+        <div className="flex items-center gap-2 text-[15px] font-semibold leading-tight text-ink">
           <span aria-hidden className={`size-2.5 rounded-full ${dotClass(dotKind)}`} />
-          <span className="truncate">{displayName(booking)}</span>
+          <span className="truncate">{title}</span>
         </div>
-        <div className="mt-0.5 truncate text-[12px] text-ink-mute">
-          {booking.propertyName} · {dateRange}
-        </div>
-        <div className="mt-1.5">
+        <div className="mt-0.5 flex items-center justify-between gap-2">
+          <span className="truncate text-[12px] text-ink-mute">{subtitle}</span>
           <Badge variant={badge.variant}>{badge.label}</Badge>
         </div>
       </div>
@@ -150,7 +155,7 @@ export function BookingRow({
         <button
           type="button"
           onClick={() => setDialogOpen(true)}
-          className="group flex w-full items-stretch rounded-card border border-terracotta-soft bg-gradient-to-br from-paper to-peach/40 px-4 py-3.5 text-left transition-[transform,border-color,box-shadow] duration-200 ease-premura hover:-translate-y-px hover:border-terracotta hover:shadow-md"
+          className="group flex w-full items-stretch rounded-card border border-terracotta-soft bg-gradient-to-br from-paper to-peach/40 px-3.5 py-2.5 text-left transition-[transform,border-color,box-shadow] duration-200 ease-premura hover:-translate-y-px hover:border-terracotta hover:shadow-md"
         >
           {inner}
         </button>
@@ -166,7 +171,7 @@ export function BookingRow({
   }
 
   return (
-    <div className="flex w-full items-stretch rounded-card border border-line-soft bg-paper px-4 py-3.5 text-left">
+    <div className="flex w-full items-stretch rounded-card border border-line-soft bg-paper px-3.5 py-2.5 text-left">
       {inner}
     </div>
   );

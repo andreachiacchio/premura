@@ -63,6 +63,18 @@ function arrivalPhrase(checkinAt: Date, now: Date): string {
   return `arriva ${ARRIVO_FMT.format(checkinAt)}`;
 }
 
+function groupMissingPhoneByProperty(
+  guests: GuestMissingPhoneSoon[],
+): Array<[string, GuestMissingPhoneSoon[]]> {
+  const groups = new Map<string, GuestMissingPhoneSoon[]>();
+  for (const g of guests) {
+    const list = groups.get(g.propertyName) ?? [];
+    list.push(g);
+    groups.set(g.propertyName, list);
+  }
+  return [...groups.entries()];
+}
+
 function Item({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
     <li className="flex flex-col gap-2 border-t border-line-soft px-4 py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between">
@@ -84,8 +96,8 @@ export function DecisionsBlock({
   return (
     <section aria-label="Serve una tua decisione" className="mx-5 mt-5">
       <div className="overflow-hidden rounded-card border border-terracotta-soft bg-paper shadow-sm">
-        <header className="bg-gradient-to-br from-peach to-peach-deep px-4 py-3">
-          <h2 className="font-serif text-h4 leading-tight text-terracotta-2">
+        <header className="bg-gradient-to-br from-peach to-peach-deep px-4 py-4">
+          <h2 className="font-serif text-[24px] font-medium leading-tight text-terracotta-2">
             Serve una tua decisione
           </h2>
         </header>
@@ -99,17 +111,28 @@ export function DecisionsBlock({
             </li>
           ))}
 
-          {data.missingPhoneSoon.map((g) => (
-            <Item key={g.bookingId}>
-              <p className="text-body text-ink">
-                <span className="font-medium">{g.guestFirstName ?? g.guestFullName}</span>{' '}
-                {arrivalPhrase(g.checkinAt, now)} a {g.propertyName} e non ha un numero WhatsApp
+          {groupMissingPhoneByProperty(data.missingPhoneSoon).map(([propertyName, guests]) => (
+            <li key={propertyName}>
+              {/* Raggruppamento per struttura (30/07): intestazione sticky
+                  mentre si scorre, le righe sotto parlano dei suoi ospiti. */}
+              <p className="sticky top-0 z-10 border-t border-line-soft bg-paper/95 px-4 py-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-ink-mute backdrop-blur-sm">
+                {propertyName}
               </p>
-              <InlinePhoneFix
-                bookingId={g.bookingId}
-                guestName={g.guestFirstName ?? g.guestFullName}
-              />
-            </Item>
+              <ul>
+                {guests.map((g) => (
+                  <Item key={g.bookingId}>
+                    <p className="text-body text-ink">
+                      <span className="font-medium">{g.guestFirstName ?? g.guestFullName}</span>{' '}
+                      {arrivalPhrase(g.checkinAt, now)} e non ha un numero WhatsApp
+                    </p>
+                    <InlinePhoneFix
+                      bookingId={g.bookingId}
+                      guestName={g.guestFirstName ?? g.guestFullName}
+                    />
+                  </Item>
+                ))}
+              </ul>
+            </li>
           ))}
 
           {data.pendingKitsCount > 0 ? (

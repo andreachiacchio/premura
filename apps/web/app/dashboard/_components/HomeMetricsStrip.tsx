@@ -1,96 +1,63 @@
 import type { HomeMetrics } from '@/lib/repositories/home-summary';
 
-// Blocco 1 della home — tre metriche in una striscia COMPATTA.
-//
-// Compatta di proposito: il principio di prodotto dice "prima cio' che e'
-// fermo, poi cio' che va bene", e le metriche sono cio' che va bene. Una
-// riga bassa lascia il blocco decisioni visibile senza scroll anche da
-// mobile — il test dei 10 secondi si gioca li'.
-
-const EUR_FMT = new Intl.NumberFormat('it-IT', {
-  style: 'currency',
-  currency: 'EUR',
-  maximumFractionDigits: 0,
-});
-
-const MONTH_FMT = new Intl.DateTimeFormat('it-IT', { month: 'long' });
-
-/** Etichette host-friendly per le categorie servizio. */
-const CATEGORY_LABELS: Record<string, string> = {
-  boat_tour: 'barca',
-  transfer: 'transfer',
-  chef: 'chef',
-  cleaning: 'pulizie',
-  wellness: 'benessere',
-  rental: 'noleggio',
-  food_delivery: 'cibo a casa',
-  other: 'altro',
-};
+// Blocco metriche della home — DUE metriche vere, sempre in colonne
+// affiancate anche su mobile (decisione 30/07: "meglio due metriche
+// vere che tre di cui due vuote"). Numeri grandi, etichette piccole;
+// il dettaglio si apre al tap (<details>, zero JS client) invece di
+// stare sempre in pagina. La terza colonna arrivera' quando avra' un
+// numero vero dietro (extra venduti / recensioni).
 
 function Tile({
   value,
   label,
-  sub,
+  detail,
 }: {
   value: string;
   label: string;
-  sub: string;
+  detail: string;
 }): React.JSX.Element {
   return (
-    <div className="flex-1 rounded-card border border-line bg-paper px-4 py-3 shadow-sm">
-      <p className="font-serif text-[26px] leading-none text-ink">{value}</p>
-      <p className="mt-1 text-[13px] font-medium text-ink-soft">{label}</p>
-      <p className="mt-0.5 text-[12px] text-ink-mute">{sub}</p>
-    </div>
+    <details className="group rounded-card border border-line-soft bg-paper px-3.5 pb-2.5 pt-3 shadow-sm">
+      <summary className="flex cursor-pointer list-none flex-col gap-1 [&::-webkit-details-marker]:hidden">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-mute">
+          {label}
+        </span>
+        <span className="font-serif text-[26px] leading-none text-ink tabular-nums">{value}</span>
+      </summary>
+      <p className="mt-2 border-t border-line-soft pt-2 text-[12px] leading-snug text-ink-soft">
+        {detail}
+      </p>
+    </details>
   );
 }
 
 export function HomeMetricsStrip({
   metrics,
-  now = new Date(),
+  actionsToday,
 }: {
   metrics: HomeMetrics;
-  now?: Date;
+  actionsToday: number;
 }): React.JSX.Element {
-  const month = MONTH_FMT.format(now);
-
   const guestsTotal = metrics.guestsInHouse + metrics.guestsArriving;
-  const topCategories = metrics.extrasByCategory
-    .slice(0, 2)
-    .map((c) => `${c.n} ${CATEGORY_LABELS[c.category] ?? c.category}`)
-    .join(' · ');
 
   return (
-    <section aria-label="Riepilogo" className="mx-5 flex flex-col gap-2.5 sm:flex-row">
+    <section aria-label="Riepilogo" className="mx-5 mt-4 grid grid-cols-2 gap-2.5">
       <Tile
         value={String(guestsTotal)}
         label="Ospiti"
-        sub={
+        detail={
           guestsTotal === 0
-            ? 'Nessuno in casa, nessuno in arrivo'
+            ? 'Nessuno in casa, nessuno in arrivo.'
             : `${metrics.guestsInHouse} in casa · ${metrics.guestsArriving} in arrivo`
         }
       />
       <Tile
-        value={EUR_FMT.format(metrics.extrasMonthEur)}
-        label={`Extra venduti — ${month}`}
-        sub={
-          metrics.extrasMonthCount === 0
-            ? 'Ancora nessuna richiesta questo mese'
-            : `${metrics.extrasMonthCount} ${metrics.extrasMonthCount === 1 ? 'richiesta' : 'richieste'}${topCategories ? ` · ${topCategories}` : ''}`
-        }
-      />
-      <Tile
-        value={
-          metrics.totalMessagesMonth === 0
-            ? '—'
-            : `${metrics.agentMessagesMonth}/${metrics.totalMessagesMonth}`
-        }
-        label={`Messaggi — ${month}`}
-        sub={
-          metrics.totalMessagesMonth === 0
-            ? 'Nessun messaggio questo mese'
-            : `${metrics.agentMessagesMonth} scritti dall'agente, il resto da te`
+        value={String(actionsToday)}
+        label="Agente oggi"
+        detail={
+          actionsToday === 0
+            ? 'Nessuna azione ancora — il dettaglio è nel feed qui sotto.'
+            : `${actionsToday} ${actionsToday === 1 ? 'azione' : 'azioni'} — il dettaglio è nel feed qui sotto.`
         }
       />
     </section>

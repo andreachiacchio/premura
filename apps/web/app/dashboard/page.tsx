@@ -1,18 +1,22 @@
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getOnboardingState, urlForStep } from '@/lib/onboarding';
+import { buildAgentStatus, findNextActiveArrival } from '@/lib/repositories/agent-status';
 import { findByHostId } from '@/lib/repositories/bookings';
 import { getHomeSummary, listGuestsMissingPhoneSoon } from '@/lib/repositories/home-summary';
 import { countKitsByStatusForHost } from '@/lib/repositories/kits';
 import { findByHostId as findPropertiesByHostId } from '@/lib/repositories/properties';
 import { listPendingReplyDraftsForHost } from '@/lib/repositories/reply-drafts';
 import { isIncompleteDataSource } from '@/lib/types';
+import { hosts } from '@premura/db';
+import { eq } from 'drizzle-orm';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { AgentCard } from './_components/AgentCard';
 import { AgentFeed } from './_components/AgentFeed';
 import { BookingsList } from './_components/BookingsList';
 import { DashboardHeader } from './_components/DashboardHeader';
-import { DecisionsBlock } from './_components/DecisionsBlock';
+import { DecisionsBlock, decisionsCount } from './_components/DecisionsBlock';
 import { EmptyOnboardingState } from './_components/EmptyOnboardingState';
 import { HomeMetricsStrip } from './_components/HomeMetricsStrip';
 import { ReplyDraftCard } from './_components/ReplyDraftCard';
@@ -81,44 +85,62 @@ export default async function DashboardPage() {
 
   // HOTFIX: ogni query e' isolata. Una fail non rompe le altre.
   // Defaults garantiscono empty-state UI graziosa.
-  const [bookings, replyDrafts, kitStatusCounts, summary, missingPhoneSoon] = await Promise.all([
-    safeQuery<Awaited<ReturnType<typeof findByHostId>>>(
-      'findByHostId',
-      () => findByHostId({ db, hostId }),
-      [],
-    ),
-    safeQuery<Awaited<ReturnType<typeof listPendingReplyDraftsForHost>>>(
-      'listPendingReplyDraftsForHost',
-      () => listPendingReplyDraftsForHost(db, hostId),
-      [],
-    ),
-    safeQuery<Record<string, number>>(
-      'countKitsByStatusForHost',
-      () => countKitsByStatusForHost(db, hostId),
-      {},
-    ),
-    safeQuery<Awaited<ReturnType<typeof getHomeSummary>>>(
-      'getHomeSummary',
-      () => getHomeSummary(db, hostId),
-      {
-        metrics: {
-          guestsInHouse: 0,
-          guestsArriving: 0,
-          extrasMonthEur: 0,
-          extrasMonthCount: 0,
-          extrasByCategory: [],
-          agentMessagesMonth: 0,
-          totalMessagesMonth: 0,
+  const [bookings, replyDrafts, kitStatusCounts, summary, missingPhoneSoon, hostRow, nextArrival] =
+    await Promise.all([
+      safeQuery<Awaited<ReturnType<typeof findByHostId>>>(
+        'findByHostId',
+        () => findByHostId({ db, hostId }),
+        [],
+      ),
+      safeQuery<Awaited<ReturnType<typeof listPendingReplyDraftsForHost>>>(
+        'listPendingReplyDraftsForHost',
+        () => listPendingReplyDraftsForHost(db, hostId),
+        [],
+      ),
+      safeQuery<Record<string, number>>(
+        'countKitsByStatusForHost',
+        () => countKitsByStatusForHost(db, hostId),
+        {},
+      ),
+      safeQuery<Awaited<ReturnType<typeof getHomeSummary>>>(
+        'getHomeSummary',
+        () => getHomeSummary(db, hostId),
+        {
+          metrics: {
+            guestsInHouse: 0,
+            guestsArriving: 0,
+            extrasMonthEur: 0,
+            extrasMonthCount: 0,
+            extrasByCategory: [],
+            agentMessagesMonth: 0,
+            totalMessagesMonth: 0,
+          },
+          feed: [],
         },
-        feed: [],
-      },
-    ),
-    safeQuery<Awaited<ReturnType<typeof listGuestsMissingPhoneSoon>>>(
-      'listGuestsMissingPhoneSoon',
-      () => listGuestsMissingPhoneSoon(db, hostId),
-      [],
-    ),
-  ]);
+      ),
+      safeQuery<Awaited<ReturnType<typeof listGuestsMissingPhoneSoon>>>(
+        'listGuestsMissingPhoneSoon',
+        () => listGuestsMissingPhoneSoon(db, hostId),
+        [],
+      ),
+      safeQuery<{ fullName: string | null } | null>(
+        'hostFullName',
+        async () => {
+          const [row] = await db
+            .select({ fullName: hosts.fullName })
+            .from(hosts)
+            .where(eq(hosts.id, hostId))
+            .limit(1);
+          return row ?? null;
+        },
+        null,
+      ),
+      safeQuery<Awaited<ReturnType<typeof findNextActiveArrival>>>(
+        'findNextActiveArrival',
+        () => findNextActiveArrival(db, hostId),
+        null,
+      ),
+    ]);
 
   const incompleteToCompleteCount = bookings.filter(
     (b) => isIncompleteDataSource(b.dataSource) && !b.hostSkippedCompletion,
@@ -126,6 +148,31 @@ export default async function DashboardPage() {
 
   // Slice C: counter kit in attesa di approvazione founder.
   const pendingKitsCount = (kitStatusCounts.proposed ?? 0) + (kitStatusCounts.modified ?? 0);
+
+  const hostFirstName = hostRow?.fullName?.trim().split(/\s+/)[0] || 'ospite';
+
+  // Blocco decisioni costruito PRIMA del render: il contatore "serve te"
+  // dell'agent card e' lo stesso numero, mai due verita' diverse.
+  const decisionsData = {
+    draftItems: replyDrafts.map((d) => ({
+      key: d.id,
+      waitingLabel: waitingSince(d.createdAt),
+      card: <ReplyDraftCard draft={d} />,
+    })),
+    missingPhoneSoon,
+    incompleteCount: incompleteToCompleteCount,
+    pendingKitsCount,
+  };
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const actionsToday = summary.feed.filter((f) => f.at >= startOfToday).length;
+
+  const agentStatus = buildAgentStatus({
+    pendingDraftsCount: replyDrafts.length,
+    oldestDraftGuestName: replyDrafts[0]?.guestFullName ?? null,
+    nextArrival,
+  });
 
   return (
     // HOME = RIEPILOGO, tre blocchi (Andrea, 29/07):
@@ -136,9 +183,28 @@ export default async function DashboardPage() {
     //   3. "Fatto dall'agente — oggi" — feed, ieri dietro un click
     // Sotto i blocchi restano le sezioni operative (risposte da
     // approvare, prenotazioni) a cui le voci del blocco 2 si ancorano.
-    <main className="mx-auto min-h-screen w-full max-w-md bg-ivory lg:max-w-5xl xl:max-w-[1400px] xl:px-6">
-      <DashboardHeader hostFirstName="Andrea" />
+    // Colonna 480px SEMPRE (mobile-first come il prototipo); su desktop
+    // diventa una carta centrata con ombra invece di allargarsi.
+    <main className="mx-auto min-h-screen w-full max-w-[480px] bg-ivory lg:my-8 lg:min-h-0 lg:rounded-[28px] lg:pb-4 lg:shadow-lg lg:ring-1 lg:ring-line-soft">
+      <DashboardHeader hostFirstName={hostFirstName} />
 
+      {/* La voce di Premura: azione corrente vera + contatori. */}
+      <AgentCard
+        status={agentStatus}
+        stats={{
+          activeGuests: summary.metrics.guestsInHouse,
+          actionsToday,
+          needsYou: decisionsCount(decisionsData),
+        }}
+      />
+
+      {/* Metriche: due vere, affiancate, dettaglio al tap. */}
+      <HomeMetricsStrip metrics={summary.metrics} actionsToday={actionsToday} />
+
+      {/* Decisioni in attesa (nascosto se vuoto). Le bozze
+          sono voci di questo blocco, in cima, con la card completa
+          (anteprima + approva/modifica inline) e il tempo di attesa:
+          venerdi' e' la schermata dove vive l'host. */}
       {/* Navigazione secondaria: tutto il resto sta dietro un click. */}
       <nav aria-label="Sezioni" className="mx-5 mb-4 flex flex-wrap gap-x-4 gap-y-1">
         <Link
@@ -167,25 +233,15 @@ export default async function DashboardPage() {
         </Link>
       </nav>
 
-      {/* Blocco 1 — metriche */}
-      <HomeMetricsStrip metrics={summary.metrics} />
+      <DecisionsBlock data={decisionsData} />
 
-      {/* Blocco 2 — decisioni in attesa (nascosto se vuoto). Le bozze
-          sono voci di questo blocco, in cima, con la card completa
-          (anteprima + approva/modifica inline) e il tempo di attesa:
-          venerdi' e' la schermata dove vive l'host. */}
-      <DecisionsBlock
-        data={{
-          draftItems: replyDrafts.map((d) => ({
-            key: d.id,
-            waitingLabel: waitingSince(d.createdAt),
-            card: <ReplyDraftCard draft={d} />,
-          })),
-          missingPhoneSoon,
-          incompleteCount: incompleteToCompleteCount,
-          pendingKitsCount,
-        }}
-      />
+      <div id="prenotazioni" className="scroll-mt-6">
+        <BookingsList
+          bookings={bookings}
+          completeAction={completeBookingAction}
+          skipAction={skipBookingAction}
+        />
+      </div>
 
       {/* Blocco 3 — fatto dall'agente */}
       <AgentFeed
@@ -196,14 +252,6 @@ export default async function DashboardPage() {
           simulated: f.simulated,
         }))}
       />
-
-      <div id="prenotazioni" className="scroll-mt-6">
-        <BookingsList
-          bookings={bookings}
-          completeAction={completeBookingAction}
-          skipAction={skipBookingAction}
-        />
-      </div>
 
       <div className="h-12" aria-hidden />
     </main>
