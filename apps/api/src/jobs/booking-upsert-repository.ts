@@ -1,7 +1,87 @@
 import { type Database, bookings } from '@premura/db';
 import { isRichDataSource } from '@premura/shared';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, ne, notInArray, sql } from 'drizzle-orm';
 import type { IcalBookingShell } from './ical-event-mapper';
+
+// ─── Dedup fasce anonime (Andrea 30/07, PARTE A) ────────────────────
+//
+// Il feed Booking esporta fasce contigue come UN evento "CLOSED": su
+// Villa Cristina la fascia 30/7-8/8 era Krzysztof + Julian, gia'
+// presenti con nome e codice. Un evento ANONIMO interamente coperto
+// dall'unione di prenotazioni con nome sulla stessa property e' rumore
+// e non va creato; se esiste gia', al poll successivo diventa blocco
+// calendario (sparisce dalle viste ospite, resta tracciabile).
+
+const ANON_SOURCES = ['booking_ical_only', 'airbnb_ical_only'];
+const ANON_NAMES = new Set(['booking guest', 'reserved', 'ospite']);
+
+function isAnonymousShell(shell: IcalBookingShell): boolean {
+  return (
+    ANON_SOURCES.includes(shell.dataSource) &&
+    ANON_NAMES.has(shell.guestFullName.trim().toLowerCase())
+  );
+}
+
+function dayUtc(d: Date): number {
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+/** La fascia [checkin, checkout) e' coperta dall'unione degli
+ *  intervalli? Confronto per GIORNO; la copertura puo' venire da PIU'
+ *  prenotazioni contigue, non solo da una. */
+export function isRangeCoveredByIntervals(
+  range: { checkinAt: Date; checkoutAt: Date },
+  intervals: Array<{ checkinAt: Date; checkoutAt: Date }>,
+): boolean {
+  const start = dayUtc(range.checkinAt);
+  const end = dayUtc(range.checkoutAt);
+  if (end <= start) return true;
+  const sorted = intervals
+    .map((k) => ({ s: dayUtc(k.checkinAt), e: dayUtc(k.checkoutAt) }))
+    .filter((k) => k.e > k.s)
+    .sort((a, b) => a.s - b.s);
+  let cursor = start;
+  for (const k of sorted) {
+    if (k.s > cursor) break;
+    if (k.e > cursor) cursor = k.e;
+    if (cursor >= end) return true;
+  }
+  return cursor >= end;
+}
+
+/** Prenotazione con nome che copre (in parte) la fascia anonima —
+ *  materiale per il log di soppressione. */
+export type CoveringBooking = {
+  id: string;
+  guestFullName: string;
+  checkinAt: Date;
+  checkoutAt: Date;
+};
+
+async function findCoveringNamedBookings(
+  db: Database,
+  shell: IcalBookingShell,
+): Promise<CoveringBooking[] | null> {
+  const named = await db
+    .select({
+      id: bookings.id,
+      guestFullName: bookings.guestFullName,
+      checkinAt: bookings.checkinAt,
+      checkoutAt: bookings.checkoutAt,
+    })
+    .from(bookings)
+    .where(
+      and(
+        eq(bookings.propertyId, shell.propertyId),
+        notInArray(bookings.dataSource, ANON_SOURCES),
+        eq(bookings.isCalendarBlock, false),
+        ne(bookings.status, 'cancelled'),
+        sql`${bookings.checkinAt} < ${shell.checkoutAt.toISOString()}::timestamptz`,
+        sql`${bookings.checkoutAt} > ${shell.checkinAt.toISOString()}::timestamptz`,
+      ),
+    );
+  return isRangeCoveredByIntervals(shell, named) ? named : null;
+}
 
 /**
  * Esito di un upsert iCal su bookings.
@@ -24,6 +104,21 @@ export type UpsertBookingShellResult = {
   bookingId: string;
   skipped: boolean;
   reason?: string;
+  /**
+   * Valorizzato quando una fascia anonima e' stata soppressa perche'
+   * coperta da prenotazioni con nome (PARTE A, 30/07). MAI sopprimere
+   * in silenzio: finche' i feed sono incrociati, un evento di un'altra
+   * casa puo' risultare "coperto" per sbaglio — il log del chiamante
+   * e' l'unico modo per sapere cosa e' stato scartato e recuperarlo
+   * dopo la rimappatura dei feed.
+   */
+  suppressedCoverage?: {
+    propertyId: string;
+    platformBookingRef: string;
+    checkinAt: Date;
+    checkoutAt: Date;
+    coveredBy: CoveringBooking[];
+  };
 };
 
 /**
@@ -101,6 +196,27 @@ export async function upsertBookingShell(
   db: Database,
   shell: IcalBookingShell,
 ): Promise<UpsertBookingShellResult> {
+  // Dedup fasce anonime (PARTE A): un evento senza nome interamente
+  // coperto da prenotazioni con nome NON si crea proprio.
+  if (isAnonymousShell(shell)) {
+    const coveredBy = await findCoveringNamedBookings(db, shell);
+    if (coveredBy) {
+      return {
+        inserted: false,
+        bookingId: '',
+        skipped: true,
+        reason: 'anonymous range covered by named bookings',
+        suppressedCoverage: {
+          propertyId: shell.propertyId,
+          platformBookingRef: shell.platformBookingRef,
+          checkinAt: shell.checkinAt,
+          checkoutAt: shell.checkoutAt,
+          coveredBy,
+        },
+      };
+    }
+  }
+
   // Guardia anti-doppione cross-feed / manuale. Va PRIMA dell'insert:
   // l'unique index copre solo (platform, platform_booking_ref) e non
   // intercetta lo stesso soggiorno arrivato con un UID diverso.
@@ -187,6 +303,33 @@ export async function upsertBookingShell(
       skipped: true,
       reason: 'date changed - handled in slice 3.2',
     };
+  }
+
+  // Stessa logica in AGGIORNAMENTO (PARTE A): se la riga anonima
+  // esistente risulta ora coperta da prenotazioni con nome (arrivate
+  // dopo), diventa blocco calendario — sparisce dalle viste ospite,
+  // resta tracciabile (stessa semantica della bonifica 30/07).
+  if (isAnonymousShell(shell)) {
+    const coveredBy = await findCoveringNamedBookings(db, shell);
+    if (coveredBy) {
+      await db
+        .update(bookings)
+        .set({ isCalendarBlock: true, updatedAt: sql`NOW()` })
+        .where(eq(bookings.id, existing.id));
+      return {
+        inserted: false,
+        bookingId: existing.id,
+        skipped: true,
+        reason: 'anonymous range now covered by named bookings - marked as block',
+        suppressedCoverage: {
+          propertyId: shell.propertyId,
+          platformBookingRef: shell.platformBookingRef,
+          checkinAt: shell.checkinAt,
+          checkoutAt: shell.checkoutAt,
+          coveredBy,
+        },
+      };
+    }
   }
 
   await db.update(bookings).set({ updatedAt: sql`NOW()` }).where(eq(bookings.id, existing.id));
