@@ -1,0 +1,49 @@
+# Ping di verifica Fly -> Tailscale -> WAHA -> WhatsApp: esegue il
+# sendText di test DAL worker (send-test-message.ts passa dal transport,
+# quindi rispetta kill switch e dry-run — non puo' aggirare i paracadute).
+#
+# Si lancia in due modi:
+#  - workflow_dispatch (bottone "Run workflow" per Andrea)
+#  - push su main che tocca .github/fly-ping-request.txt (la via della
+#    sessione Claude, che non ha il permesso di dispatch: bump del file
+#    in un PR, il merge fa partire il ping)
+#
+# Il retry copre il caso "merge che fa ripartire anche il deploy":
+# durante il rollout le macchine si riavviano e ssh puo' fallire.
+
+name: Fly ping WAHA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/fly-ping-request.txt']
+
+concurrency:
+  group: fly-ping
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    name: ping dal worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: sendText "Premura è online" al founder
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if flyctl ssh console --app premura-api-staging --process-group worker -C "pnpm exec tsx src/scripts/send-test-message.ts +393383963307 Premura è online"; then
+              exit 0
+            fi
+            echo "tentativo ${attempt} fallito (deploy in corso?), riprovo tra 45s"
+            sleep 45
+          done
+          exit 1
+
+      - name: Log recenti del worker (evidenza cron e webhook)
+        if: always()
+        run: flyctl logs --app premura-api-staging --no-tail
