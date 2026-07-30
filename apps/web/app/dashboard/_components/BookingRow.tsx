@@ -64,7 +64,8 @@ function badgeFor(b: BookingForDashboard): {
     case 'booking_via_channel_manager':
       return { label: 'Channel manager', variant: 'ok' };
     case 'booking_ical_only':
-      return { label: 'Booking · da completare', variant: 'warn' };
+      // L'iCal Booking non dice chi arriva: fascia occupata, non ospite.
+      return { label: 'Date occupate · verifica extranet', variant: 'warn' };
     case 'booking_email_only':
       return { label: 'Booking · email', variant: 'warn' };
     case 'airbnb_ical_only':

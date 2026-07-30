@@ -130,7 +130,7 @@ describeBlocks('filtro blocchi calendario', () => {
     expectBlocks(isCalendarBlockSummary(undefined)).toBe(false);
   });
 
-  itBlocks('un VEVENT di blocco non diventa una prenotazione', () => {
+  itBlocks('Booking CLOSED sopra le 30 notti = blocco certo, scartato', () => {
     const shell = mapForBlocks(
       {
         type: 'VEVENT',
@@ -142,6 +142,41 @@ describeBlocks('filtro blocchi calendario', () => {
       } as any,
       'prop-1',
       'booking',
+    );
+    expectBlocks(shell).toBeNull();
+  });
+
+  itBlocks('Booking CLOSED sotto le 30 notti = occupato sorgente ignota, IMPORTATO', () => {
+    // Booking esporta anche le prenotazioni vere come "CLOSED - Not
+    // available": sotto le 30 notti e' un probabile ospite, mai nascosto.
+    const shell = mapForBlocks(
+      {
+        type: 'VEVENT',
+        uid: 'f2412e6dc354df3b6bab777047fe5648@booking.com',
+        summary: 'CLOSED - Not available',
+        start: new Date('2026-07-30'),
+        end: new Date('2026-08-08'),
+        // biome-ignore lint/suspicious/noExplicitAny: fixture VEvent minima
+      } as any,
+      'prop-1',
+      'booking',
+    );
+    expectBlocks(shell?.guestFullName).toBe('Booking Guest');
+    expectBlocks(shell?.dataSource).toBe('booking_ical_only');
+  });
+
+  itBlocks('Airbnb (Not available) = blocco certo anche se breve', () => {
+    const shell = mapForBlocks(
+      {
+        type: 'VEVENT',
+        uid: '7f662ec65913-356af5fe29d6dd1d6766a20670631bef@airbnb.com',
+        summary: 'Airbnb (Not available)',
+        start: new Date('2027-04-24'),
+        end: new Date('2027-04-26'),
+        // biome-ignore lint/suspicious/noExplicitAny: fixture VEvent minima
+      } as any,
+      'prop-1',
+      'airbnb',
     );
     expectBlocks(shell).toBeNull();
   });

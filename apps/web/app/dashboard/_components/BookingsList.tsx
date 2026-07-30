@@ -4,19 +4,23 @@ import type { CompleteBookingActionFn, SkipBookingActionFn } from './CompleteBoo
 
 // Lista verticale di prenotazioni operative (in corso o future con
 // check-in da oggi - 2gg in avanti, filtro applicato in
-// findByHostId), raggruppate in due gruppi:
-//  1. "Da completare" (data_source incomplete, non skipped)
-//  2. "Prossimi ospiti" (skipped + RICH + airbnb_ical_only)
+// findByHostId), raggruppate in TRE gruppi (decisione 30/07):
+//  1. "Da completare" (data_source incomplete non-iCal, non skipped)
+//  2. "Date occupate" (booking_ical_only): l'iCal Booking esporta ogni
+//     fascia occupata senza dire chi arriva — prenotazione vera o
+//     chiusura, non si sa. Etichetta propria, MAI mescolate al resto:
+//     "verifica chi arriva sull'extranet".
+//  3. "Prossimi ospiti" (skipped + RICH + airbnb_ical_only)
 //
-// Il gruppo 2 mostra anche le skipped con badge "Saltata": l'host puo
-// sempre tornare e cliccarle per completarle, ma in slice 5 le righe
-// non sono cliccabili (BookingRow apre il dialog solo per INCOMPLETE
-// non skipped). Sara' rifinito quando avremo dettaglio ospite (M3).
 // L'archivio (prenotazioni passate) non ha ancora una vista dedicata,
 // vedi KNOWN-LIMITS sezione 20.
 
+function isUnknownOccupied(b: BookingForDashboard): boolean {
+  return b.dataSource === 'booking_ical_only' && !b.hostSkippedCompletion;
+}
+
 function isToComplete(b: BookingForDashboard): boolean {
-  return isIncompleteDataSource(b.dataSource) && !b.hostSkippedCompletion;
+  return isIncompleteDataSource(b.dataSource) && !b.hostSkippedCompletion && !isUnknownOccupied(b);
 }
 
 export function BookingsList({
@@ -29,7 +33,8 @@ export function BookingsList({
   skipAction: SkipBookingActionFn;
 }) {
   const toComplete = bookings.filter(isToComplete);
-  const others = bookings.filter((b) => !isToComplete(b));
+  const unknownOccupied = bookings.filter(isUnknownOccupied);
+  const others = bookings.filter((b) => !isToComplete(b) && !isUnknownOccupied(b));
 
   return (
     <div className="px-5 pt-6">
@@ -41,6 +46,26 @@ export function BookingsList({
           />
           <ul className="mt-3 flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:items-start xl:grid-cols-3">
             {toComplete.map((b) => (
+              <li key={b.id}>
+                <BookingRow booking={b} completeAction={completeAction} skipAction={skipAction} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {unknownOccupied.length > 0 ? (
+        <section className="mb-6">
+          <SectionHeader
+            title="Date occupate"
+            eyebrow={`${unknownOccupied.length} ${unknownOccupied.length === 1 ? 'fascia' : 'fasce'}`}
+          />
+          <p className="mt-1 text-body-sm text-ink-mute">
+            Il calendario Booking dice solo che queste date sono occupate, non chi arriva — verifica
+            sull'extranet e completa i dati dell'ospite.
+          </p>
+          <ul className="mt-3 flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:items-start xl:grid-cols-3">
+            {unknownOccupied.map((b) => (
               <li key={b.id}>
                 <BookingRow booking={b} completeAction={completeAction} skipAction={skipAction} />
               </li>
