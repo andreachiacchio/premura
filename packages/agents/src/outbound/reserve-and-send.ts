@@ -4,8 +4,11 @@ import {
   conversationHandover,
   guestConsentEvents,
   outboundSends,
+  properties,
+  providers,
 } from '@premura/db';
 import { checkNumberOnWhatsapp, isKillSwitchOn, sendImage, sendText } from '@premura/integrations';
+import { findForbiddenPhone } from '@premura/shared';
 import { and, desc, eq, gte, sql } from 'drizzle-orm';
 
 // Prenotazione dello slot di invio + invio. Nessun messaggio automatico a
@@ -58,7 +61,8 @@ export type SkipReason =
   | 'handover_active'
   | 'daily_cap_reached'
   | 'phone_not_on_whatsapp'
-  | 'kill_switch';
+  | 'kill_switch'
+  | 'provider_contact_leak';
 
 export type ReserveAndSendResult =
   | { status: 'sent'; outboundSendId: string; providerMessageId: string | null; dryRun: boolean }
@@ -138,6 +142,7 @@ export async function reserveAndSend(
     .select({
       guestPhone: bookings.guestPhone,
       premuraActiveAt: bookings.premuraActiveAt,
+      propertyId: bookings.propertyId,
     })
     .from(bookings)
     .where(eq(bookings.id, bookingId))
@@ -147,6 +152,25 @@ export async function reserveAndSend(
     return { status: 'skipped', reason: 'no_phone', outboundSendId: null };
   }
   const phoneE164 = booking.guestPhone;
+
+  // REGOLA DI BUSINESS: i contatti dei fornitori non escono MAI verso
+  // l'ospite (se ha il numero, ci scavalca — Premura E' il coordinatore).
+  // Qualunque cosa abbia composto il testo — cron, bozza approvata,
+  // codice futuro — se contiene il numero di un provider 'internal',
+  // l'invio muore qui. Prima dello slot: quando il testo viene corretto,
+  // il trigger deve poter ripartire.
+  const providerPhones = await db
+    .select({ phone: providers.phone })
+    .from(providers)
+    .innerJoin(properties, eq(properties.hostId, providers.hostId))
+    .where(and(eq(properties.id, booking.propertyId), eq(providers.contactVisibility, 'internal')));
+  const leakedPhone = findForbiddenPhone(
+    input.body,
+    providerPhones.map((p) => p.phone),
+  );
+  if (leakedPhone) {
+    return { status: 'skipped', reason: 'provider_contact_leak', outboundSendId: null };
+  }
 
   if (CONSENT_REQUIRED[trigger] && !(await hasActiveConsent(db, bookingId))) {
     return { status: 'skipped', reason: 'no_consent', outboundSendId: null };

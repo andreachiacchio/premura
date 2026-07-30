@@ -41,6 +41,19 @@ export const providers = pgTable(
     // prima di avere il numero, ma senza numero non è instradabile.
     phone: varchar('phone', { length: 32 }),
 
+    // REGOLA DI BUSINESS (30/07): i contatti dei fornitori non escono
+    // MAI verso l'ospite — se l'ospite ha il numero, ci scavalca.
+    // 'internal' (default) = il numero è un dato interno: la guardia
+    // in reserveAndSend blocca ogni messaggio in uscita che lo
+    // contiene. Un valore diverso va deciso esplicitamente, mai
+    // assunto.
+    contactVisibility: varchar('contact_visibility', { length: 16 }).notNull().default('internal'),
+
+    // Come chiamare il fornitore DAVANTI all'ospite: il ruolo, mai il
+    // nome ("il nostro skipper", non "Antonio" — nome + paese si
+    // ritrovano su Google in due minuti).
+    publicLabel: varchar('public_label', { length: 80 }),
+
     status: providerStatusEnum('status').notNull().default('active'),
 
     serviceTags: serviceCategoryEnum('service_tags').array().notNull().default([]),
