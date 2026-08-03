@@ -1,10 +1,14 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it } from 'vitest';
 import {
   CLASSIFICATION_VALUES,
   type DraftOutput,
+  DraftGeneratorError,
   type GenerateDraftInput,
   buildUserContent,
   decideRouting,
+  describeApiError,
+  generateReplyDraft,
 } from '../src/draft-generator';
 
 // Test prompt builder + decisore routing (slice 11). Niente mock
@@ -229,5 +233,64 @@ describe('decideRouting - smart routing', () => {
         waChannelLive: true,
       }),
     ).toBe('notify_host');
+  });
+});
+
+// 03/08 (Andrea): l'error handler della chiamata Anthropic deve
+// registrare status HTTP + corpo della risposta in error_message.
+// Il 401 del go-live e' rimasto invisibile per due run perche' il
+// catch scartava la causa. Questi test inchiodano il formato.
+describe('describeApiError - status e corpo nel messaggio', () => {
+  // Costruiamo l'APIError via prototype: il costruttore reale dell'SDK
+  // e' fragile nei test (firma cambiata piu' volte tra versioni).
+  const apiError = (status: number, name: string, message: string) => {
+    const e = Object.create(Anthropic.APIError.prototype) as Anthropic.APIError & {
+      status: number;
+      name: string;
+      message: string;
+    };
+    e.status = status;
+    e.name = name;
+    e.message = message;
+    return e;
+  };
+
+  it('Anthropic.APIError -> HTTP status + nome + messaggio (corpo risposta)', () => {
+    const got = describeApiError(
+      apiError(401, 'AuthenticationError', '401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}'),
+    );
+    expect(got).toContain('HTTP 401');
+    expect(got).toContain('AuthenticationError');
+    expect(got).toContain('invalid x-api-key');
+  });
+
+  it('Error generico (rete/DNS) -> nome + messaggio', () => {
+    const got = describeApiError(new TypeError('fetch failed'));
+    expect(got).toBe('TypeError — fetch failed');
+  });
+
+  it('valore non-Error -> String()', () => {
+    expect(describeApiError('boom')).toBe('boom');
+  });
+
+  it('generateReplyDraft: il 401 finisce nel messaggio del DraftGeneratorError', async () => {
+    const cause = apiError(
+      401,
+      'AuthenticationError',
+      '401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}',
+    );
+    const fakeClient = {
+      messages: { create: () => Promise.reject(cause) },
+    } as unknown as Anthropic;
+
+    const err = await generateReplyDraft(baseInput(), { client: fakeClient }).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(DraftGeneratorError);
+    const der = err as DraftGeneratorError;
+    expect(der.message).toContain('Anthropic API call failed: HTTP 401 AuthenticationError');
+    expect(der.message).toContain('invalid x-api-key');
+    expect(der.cause).toBe(cause);
   });
 });
