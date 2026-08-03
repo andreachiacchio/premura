@@ -12,6 +12,19 @@ import { z } from 'zod';
 // output ~250 token).
 // ─────────────────────────────────────────────────────────────
 
+/** Descrizione compatta di un errore dell'SDK Anthropic: status HTTP +
+ *  tipo + messaggio (che per gli APIError contiene il corpo della
+ *  risposta). Per errori non-API (rete, DNS) resta nome + messaggio. */
+export function describeApiError(err: unknown): string {
+  if (err instanceof Anthropic.APIError) {
+    return `HTTP ${err.status} ${err.name} — ${err.message}`;
+  }
+  if (err instanceof Error) {
+    return `${err.name} — ${err.message}`;
+  }
+  return String(err);
+}
+
 export class DraftGeneratorError extends Error {
   constructor(
     message: string,
@@ -205,7 +218,11 @@ export async function generateReplyDraft(
       messages: [{ role: 'user', content: userContent }],
     });
   } catch (err) {
-    throw new DraftGeneratorError('Anthropic API call failed', err);
+    // 03/08 (Andrea): status HTTP e corpo della risposta DEVONO finire
+    // nel messaggio — e' quello che agent_actions.error_message registra.
+    // Il 401 del go-live e' rimasto invisibile per due run perche' qui
+    // si scartava la causa.
+    throw new DraftGeneratorError(`Anthropic API call failed: ${describeApiError(err)}`, err);
   }
 
   const toolUse = response.content.find((c) => c.type === 'tool_use');
