@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   bookings,
   properties,
@@ -104,8 +104,38 @@ export async function ingestBookingEvent(
 
   const code = classified.bookingExternalCode;
 
-  // ─── Cross-ref: cerca booking per host + platform=booking + code. ───
-  const matched = await findBookingForHost(db, hostId, code);
+  // ─── Cross-ref in due passi (Blocco 3, 03/08). ───
+  // 1. Per CODICE: funziona solo se una email precedente l'ha gia'
+  //    timbrato sulla riga (gli UID iCal Booking sono hash opachi, il
+  //    codice non arriva mai dal feed).
+  // 2. Per DATA di check-in (dal subject): match con le fasce iCal
+  //    dell'host. UNA sola candidata → match e PROMOZIONE (il codice
+  //    viene timbrato sulla riga). Piu' candidate → unmatched esplicito:
+  //    mai indovinare a quale struttura appartiene la prenotazione.
+  let matched = await findBookingForHost(db, hostId, code);
+  let matchedBy: 'code' | 'date' | null = matched ? 'code' : null;
+
+  if (!matched && classified.checkinDateIso) {
+    const candidates = await findBookingsByCheckinDate(db, hostId, classified.checkinDateIso);
+    if (candidates.length === 1) {
+      matched = candidates[0]!;
+      matchedBy = 'date';
+    } else if (candidates.length > 1) {
+      const reason = `match per data ambiguo: ${candidates.length} fasce con check-in ${classified.checkinDateIso}`;
+      await insertBookingEmailEvent(db, {
+        hostId,
+        bookingId: null,
+        eventType: classified.eventType,
+        bookingExternalCode: code,
+        rawSubject: classified.rawSubject,
+        rawEmailId: emailId,
+        emailReceivedAt,
+        ingestionStatus: 'unmatched',
+        ingestionReason: reason,
+      });
+      return { status: 'unmatched', bookingId: null, reason };
+    }
+  }
 
   if (!matched) {
     await insertBookingEmailEvent(db, {
@@ -128,13 +158,17 @@ export async function ingestBookingEvent(
 
   const now = new Date();
 
+  // Timbro del codice in OGNI branch: e' la promozione che rende i
+  // match futuri diretti (per codice) anche quando la data cambiera'
+  // (modifiche) o la fascia sparira' dal feed (cancellazioni).
   // ─── Branch per event type. ───
   if (classified.eventType === 'new_booking') {
     // Booking esiste già (creato da iCal o sync precedente). Aggiorniamo
-    // solo i marker email-side.
+    // i marker email-side + il codice.
     await db
       .update(bookings)
       .set({
+        bookingExternalCode: code,
         rawEmailId: emailId,
         lastEmailSyncedAt: now,
         updatedAt: now,
@@ -149,16 +183,22 @@ export async function ingestBookingEvent(
       rawEmailId: emailId,
       emailReceivedAt,
       ingestionStatus: 'matched',
-      ingestionReason: null,
+      ingestionReason: `matched_by_${matchedBy}`,
     });
     return { status: 'updated', bookingId: matched.bookingId, reason: null };
   }
 
   if (classified.eventType === 'cancellation') {
+    // L'email di cancellazione e' conferma AUTORITATIVA: status cancelled
+    // e azzeramento del sospetto 2-poll (feed_missing_count /
+    // possible_cancellation_at) — la decisione non serve piu' all'host.
     await db
       .update(bookings)
       .set({
         status: 'cancelled',
+        bookingExternalCode: code,
+        possibleCancellationAt: null,
+        feedMissingCount: 0,
         rawEmailId: emailId,
         lastEmailSyncedAt: now,
         updatedAt: now,
@@ -173,16 +213,17 @@ export async function ingestBookingEvent(
       rawEmailId: emailId,
       emailReceivedAt,
       ingestionStatus: 'matched',
-      ingestionReason: 'booking cancelled by Booking.com',
+      ingestionReason: `booking cancelled by Booking.com (matched_by_${matchedBy})`,
     });
     return { status: 'updated', bookingId: matched.bookingId, reason: null };
   }
 
-  // modification: aggiorna solo i marker (lo stato resta invariato).
+  // modification: aggiorna i marker + codice (lo stato resta invariato).
   // Il dato vero arriva al prossimo iCal poll che riallinea date/guest.
   await db
     .update(bookings)
     .set({
+      bookingExternalCode: code,
       rawEmailId: emailId,
       lastEmailSyncedAt: now,
       updatedAt: now,
@@ -229,4 +270,29 @@ async function findBookingForHost(
     .limit(1);
   if (rows.length === 0) return null;
   return { bookingId: rows[0]!.id };
+}
+
+// Fasce Booking dell'host con check-in nel giorno indicato (data Roma:
+// le righe iCal sono a mezzanotte UTC, i completamenti manuali hanno
+// orari veri — il confronto sul GIORNO locale copre entrambi). Limit 3:
+// basta per distinguere "una", "nessuna", "ambiguo".
+async function findBookingsByCheckinDate(
+  db: Database,
+  hostId: string,
+  checkinDateIso: string,
+): Promise<Array<{ bookingId: string }>> {
+  const rows = await db
+    .select({ id: bookings.id })
+    .from(bookings)
+    .innerJoin(properties, eq(bookings.propertyId, properties.id))
+    .where(
+      and(
+        eq(properties.hostId, hostId),
+        eq(bookings.platform, 'booking'),
+        eq(bookings.isCalendarBlock, false),
+        sql`(${bookings.checkinAt} at time zone 'Europe/Rome')::date = ${checkinDateIso}::date`,
+      ),
+    )
+    .limit(3);
+  return rows.map((r) => ({ bookingId: r.id }));
 }
