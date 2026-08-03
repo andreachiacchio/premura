@@ -1,2 +1,2 @@
 Richiesta seed demo Conversazioni (Fase 5 weekend).
-Bump di questo file su main = esegui il seed. run: 3 (rilancio post-fix error_message #87 — ordine Andrea 03/08 punto 4)
+Bump di questo file su main = esegui il seed. run: 4 (chiave ANTHROPIC_API_KEY sostituita da Andrea — prima bozza vera attesa)
