@@ -46,7 +46,7 @@ const THRESHOLDS = [
 
 export function HowItDecides() {
   return (
-    <section className="py-20 md:py-28">
+    <section className="py-12 md:py-24">
       <Container>
         <Eyebrow>Come decide</Eyebrow>
         <Heading level={2} className="mt-3 max-w-2xl">
@@ -56,7 +56,7 @@ export function HowItDecides() {
           Quattro livelli di iniziativa, dal silenzio operoso al passaggio totale a te.
         </p>
 
-        <ol className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <ol className="mt-10 md:mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {LEVELS.map((level) => (
             <li key={level.n}>
               <Card padding="loose" className="h-full">

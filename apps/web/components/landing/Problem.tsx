@@ -10,7 +10,7 @@ const MOMENTS = [
 
 export function Problem() {
   return (
-    <section className="py-20 md:py-28">
+    <section className="py-12 md:py-24">
       <Container variant="tight">
         <Eyebrow>Il problema</Eyebrow>
         <Heading level={2} className="mt-3">
@@ -23,7 +23,7 @@ export function Problem() {
           </em>
         </Heading>
 
-        <ul className="mt-12 space-y-6">
+        <ul className="mt-10 space-y-6">
           {MOMENTS.map((line, i) => (
             <li key={i} className="flex gap-5 border-t border-line-soft pt-6 first:border-t-0 first:pt-0">
               <span
@@ -37,7 +37,7 @@ export function Problem() {
           ))}
         </ul>
 
-        <p className="mt-12 text-body-lg text-ink-soft">
+        <p className="mt-10 text-body-lg text-ink-soft">
           Premura prepara le risposte al posto tuo, firmate col nome della tua
           struttura. E lo dice chiaramente: l&apos;ospite sa che a scrivere è un
           assistente AI. La differenza la fa la cura, non il trucco.

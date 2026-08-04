@@ -24,7 +24,7 @@ const NEVERS = [
 
 export function NeverList() {
   return (
-    <section className="py-20 md:py-28 bg-paper-deep">
+    <section className="py-12 md:py-24 bg-paper-deep">
       <Container>
         <Eyebrow>Fiducia</Eyebrow>
         <Heading level={2} className="mt-3 max-w-2xl">
@@ -34,7 +34,7 @@ export function NeverList() {
           </em>
         </Heading>
 
-        <ul className="mt-14 grid gap-4 md:grid-cols-3">
+        <ul className="mt-10 md:mt-14 grid gap-4 md:grid-cols-3">
           {NEVERS.map((item) => (
             <li key={item.title}>
               <Card padding="loose" className="h-full">

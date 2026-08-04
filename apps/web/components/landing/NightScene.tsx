@@ -2,8 +2,10 @@ import { Container } from '@/components/Container';
 import { Eyebrow } from '@/components/Eyebrow';
 import { Heading } from '@/components/Heading';
 
-// Brief "missione" 04/08, punto 2: la scena che definisce il prodotto.
-// Raccontata come storia col ritmo temporale, non come elenco feature.
+// Brief "missione" 04/08, punto 2 + correzione ordine (post-review):
+// occhiello -> titolo -> SUBITO la timeline -> paragrafo di senso ->
+// chiusa in fondo. "Tu non hai mai aperto WhatsApp" e' il punto di
+// arrivo, non l'introduzione.
 
 const BEATS = [
   {
@@ -40,60 +42,55 @@ const BEATS = [
 
 export function NightScene() {
   return (
-    <section className="py-20 md:py-28 bg-paper-deep">
+    <section className="py-12 md:py-24 bg-paper-deep">
       <Container>
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
-          <div>
-            <Eyebrow>Notte 1</Eyebrow>
-            <Heading level={2} className="mt-3">
-              «C’è troppo{' '}
-              <em
-                className="not-italic text-terracotta"
-                style={{ fontVariationSettings: '"SOFT" 100' }}
-              >
-                rumore.
-              </em>
-              »
-            </Heading>
-            <p className="mt-6 max-w-xl text-body-lg text-ink-soft">
-              È questo il lavoro di Premura: stare accanto all’ospite quando succede qualcosa,
-              capire cosa serve, e muoversi. A te resta una sola cosa da fare — dire sì a 4 euro.
-            </p>
-            <p className="mt-4 text-body-lg font-semibold text-ink">
-              Tu non hai mai aperto WhatsApp.
-            </p>
-          </div>
+        <Eyebrow>Notte 1</Eyebrow>
+        <Heading level={2} className="mt-3">
+          «C’è troppo{' '}
+          <em
+            className="not-italic text-terracotta"
+            style={{ fontVariationSettings: '"SOFT" 100' }}
+          >
+            rumore.
+          </em>
+          »
+        </Heading>
 
-          <ol className="space-y-0">
-            {BEATS.map((beat, i) => (
-              <li key={beat.time} className="relative flex gap-5 pb-8 last:pb-0 md:gap-8">
-                <div className="flex flex-col items-center">
-                  <span
-                    className="font-serif text-h4 leading-none text-terracotta tabular-nums"
-                    style={{ fontVariationSettings: '"SOFT" 50' }}
-                  >
-                    {beat.time}
-                  </span>
-                  {i < BEATS.length - 1 ? (
-                    <span aria-hidden="true" className="mt-2 w-px flex-1 bg-line" />
-                  ) : null}
-                </div>
-                <div className="pb-2">
-                  <p className="text-eyebrow font-semibold uppercase text-ink-mute">{beat.label}</p>
-                  <p
-                    className={
-                      beat.kind === 'narration'
-                        ? 'mt-1.5 max-w-lg text-body-lg text-ink-soft'
-                        : 'mt-1.5 max-w-lg text-body-lg text-ink'
-                    }
-                  >
-                    {beat.text}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </div>
+        <ol className="mt-10 md:mt-14 max-w-2xl">
+          {BEATS.map((beat, i) => (
+            <li key={beat.time} className="relative flex gap-5 pb-7 last:pb-0 md:gap-8">
+              <div className="flex flex-col items-center">
+                <span
+                  className="font-serif text-h4 leading-none text-terracotta tabular-nums"
+                  style={{ fontVariationSettings: '"SOFT" 50' }}
+                >
+                  {beat.time}
+                </span>
+                {i < BEATS.length - 1 ? (
+                  <span aria-hidden="true" className="mt-2 w-px flex-1 bg-line" />
+                ) : null}
+              </div>
+              <div className="pb-2">
+                <p className="text-eyebrow font-semibold uppercase text-ink-mute">{beat.label}</p>
+                <p
+                  className={
+                    beat.kind === 'narration'
+                      ? 'mt-1.5 max-w-lg text-body-lg text-ink-soft'
+                      : 'mt-1.5 max-w-lg text-body-lg text-ink'
+                  }
+                >
+                  {beat.text}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        <p className="mt-10 max-w-2xl text-body-lg text-ink-soft">
+          È questo il lavoro di Premura: stare accanto all’ospite quando succede qualcosa, capire
+          cosa serve, e muoversi. A te resta una sola cosa da fare — dire sì a 4 euro.
+        </p>
+        <p className="mt-4 text-body-lg font-semibold text-ink">Tu non hai mai aperto WhatsApp.</p>
       </Container>
     </section>
   );

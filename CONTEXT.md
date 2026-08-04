@@ -296,7 +296,8 @@ Mai notifiche su 🟢.
   - €9.99 / mese — 1 struttura
   - €7.99 / mese — 2-5 strutture
   - €5.99 / mese — 6+ strutture
-- **Trial:** 30 giorni gratis **SENZA carta richiesta**
+- **Trial:** gratis fino al primo ospite servito (finisce al check-out
+  del primo ospite, non a scadenza di calendario) — **SENZA carta richiesta**
 
 ### Kit fisico
 - **Kit:** al costo + €0.75 service fee + €2 cleaner + €1 biglietto.
