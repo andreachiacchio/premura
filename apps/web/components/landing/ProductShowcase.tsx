@@ -110,7 +110,7 @@ function ConversationScreen() {
 
 export function ProductShowcase() {
   return (
-    <section className="py-20 md:py-28 bg-paper-deep">
+    <section className="py-12 md:py-24 bg-paper-deep">
       <Container>
         <Eyebrow>Il prodotto</Eyebrow>
         <Heading level={2} className="mt-3 max-w-2xl">
@@ -121,7 +121,7 @@ export function ProductShowcase() {
           approvare. Il resto lo tiene Premura.
         </p>
 
-        <div className="mt-14 grid gap-10 md:grid-cols-2 md:gap-8 lg:mx-auto lg:max-w-4xl">
+        <div className="mt-10 md:mt-14 grid gap-10 md:grid-cols-2 md:gap-8 lg:mx-auto lg:max-w-4xl">
           <PhoneFrame label="I prossimi arrivi, con lo stato di ognuno.">
             <CheckinScreen />
           </PhoneFrame>

@@ -53,7 +53,7 @@ const CrossIcon = (
 
 export function ForWhom() {
   return (
-    <section className="py-20 md:py-28">
+    <section className="py-12 md:py-24">
       <Container>
         <Eyebrow>Onestà prima di tutto</Eyebrow>
         <Heading level={2} className="mt-3 max-w-2xl">

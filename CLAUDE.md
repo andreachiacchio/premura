@@ -14,7 +14,7 @@ Premura è un agente AI concierge per host italiani di affitti brevi.
 - **Posizionamento**: Livello 1. Il primo tool che l'host compra. Non compete
   con Smoobu/Hostaway/Guesty/Hospitable (Livello 2, per 10+ strutture).
 - **Prezzi**: €9,99 / mese (1 struttura), €7,99 / mese (2-5), €5,99 / mese (6+).
-  Trial 30 giorni gratis senza carta.
+  Trial gratis fino al primo ospite servito, senza carta.
 
 Per ogni prenotazione l'agente esegue 5 fasi automatiche:
 

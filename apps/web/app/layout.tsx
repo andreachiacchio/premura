@@ -15,14 +15,17 @@ const fraunces = Fraunces({
   display: "swap",
 });
 
+// Metadati di sito allineati alla landing "missione" (04/08). Sono il
+// default per ogni pagina: niente beta privata, niente posti limitati.
 export const metadata: Metadata = {
-  title: "Premura — Il concierge per host italiani",
+  metadataBase: new URL("https://premura.it"),
+  title: "Premura — Un host AI accanto a ogni ospite",
   description:
-    "Premura è l'agente AI che si prende cura degli ospiti al posto tuo. Studia, scrive, intercetta i problemi prima che diventino recensioni. Per host di affitti brevi in Italia. In beta privata — entra nella waitlist.",
+    "Un host AI accanto a ogni ospite, per tutto il soggiorno: ascolta, capisce, agisce — anche alle due di notte. Tu intervieni solo per le decisioni di soldi. Ogni messaggio si dichiara assistente AI.",
   openGraph: {
-    title: "Premura — Il concierge per host italiani",
+    title: "Premura — Un host AI accanto a ogni ospite",
     description:
-      "L'agente AI che si prende cura degli ospiti al posto tuo. Per host di affitti brevi in Italia.",
+      "Ascolta, capisce, agisce — anche alle due di notte. Tu approvi solo le decisioni di soldi.",
     type: "website",
     locale: "it_IT",
     siteName: "Premura",

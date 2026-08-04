@@ -26,7 +26,7 @@ const TIERS: Tier[] = [
 
 export function Pricing() {
   return (
-    <section className="py-20 md:py-28">
+    <section className="py-12 md:py-24">
       <Container>
         <Eyebrow>Prezzi</Eyebrow>
         <Heading level={2} className="mt-3 max-w-2xl">
@@ -37,7 +37,7 @@ export function Pricing() {
           setup, nessun contratto annuale.
         </p>
 
-        <div className="mt-14 grid gap-4 md:grid-cols-3">
+        <div className="mt-10 md:mt-14 grid gap-4 md:grid-cols-3">
           {TIERS.map((tier) => (
             <Card
               key={tier.label}
