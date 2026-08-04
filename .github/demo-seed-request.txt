@@ -1,2 +1,2 @@
 Richiesta seed demo Conversazioni (Fase 5 weekend).
-Bump di questo file su main = esegui il seed. run: 5 (chiave distribuita davvero — il run 4 girava sulla macchina con la vecchia)
+Bump di questo file su main = esegui il seed. run: 6 (verifica correzioni prompt #92: no conferme senza fonte, no tempi promessi — con telemetria #91)
