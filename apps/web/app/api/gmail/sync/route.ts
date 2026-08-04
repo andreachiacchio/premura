@@ -2,9 +2,9 @@ import { getDb } from '@/lib/db';
 import { syncGmailForHost } from '@/lib/gmail-sync-orchestrator';
 import { createJob } from '@/lib/repositories/gmail-sync-jobs';
 import { getTokenByHostAndEmail } from '@/lib/repositories/google-tokens';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { googleTokens } from '@premura/db';
 import { eq } from 'drizzle-orm';
+import { getCurrentHostId } from '@/lib/auth';
 import { NextResponse, after } from 'next/server';
 
 // POST /api/gmail/sync
@@ -74,14 +74,14 @@ export async function POST(req: Request): Promise<NextResponse> {
   // Slice 6 fase 7: hostId dalla sessione Supabase. Il middleware non
   // intercetta /api/* (lascia passare le route handler che decidono
   // l'auth interna), quindi qui facciamo il check authoritativo.
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  // Parte A: hosts.id non e' piu' l'id Supabase — si passa dall'helper
+  // (che garantisce anche la riga hosts al primo accesso).
+  let hostId: string;
+  try {
+    hostId = await getCurrentHostId();
+  } catch {
     return NextResponse.json({ error: 'Non autenticato' }, { status: 401 });
   }
-  const hostId = user.id;
 
   const serverClient = await getDb();
   const { db } = serverClient;

@@ -37,8 +37,10 @@ const POINTS = [
 ];
 
 export default async function ConnectGmailPage() {
-  const hostId = await getCurrentHostId();
-  const startHref = `/api/auth/google/start?hostId=${encodeURIComponent(hostId)}`;
+  // Parte A (A4): l'hostId lo deriva la route dalla sessione. Il
+  // getCurrentHostId qui resta solo per garantire la riga hosts (ensure).
+  await getCurrentHostId();
+  const startHref = '/api/auth/google/start';
 
   return (
     <main className="flex min-h-dvh items-start justify-center bg-ivory px-5 py-10 md:items-center">

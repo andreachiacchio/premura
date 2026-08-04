@@ -85,6 +85,18 @@ describe("middleware", () => {
     expect(res.headers.get("location")).toBeNull();
   });
 
+  // Parte A (04/08): /properties era fuori dal middleware e un anonimo
+  // prendeva un 500 dal throw di getCurrentHostId invece del login.
+  it("user null + path /properties/new -> redirect /login con redirectTo", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null } });
+    const res = await middleware(
+      makeRequest("https://premura.it/properties/new"),
+    );
+    const location = res.headers.get("location");
+    expect(location).toContain("/login");
+    expect(location).toContain("redirectTo=%2Fproperties%2Fnew");
+  });
+
   it("user null + path /connect-gmail -> redirect /login con redirectTo", async () => {
     mocks.getUser.mockResolvedValue({ data: { user: null } });
     const res = await middleware(

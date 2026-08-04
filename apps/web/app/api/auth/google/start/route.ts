@@ -1,28 +1,29 @@
-import { NextResponse } from 'next/server';
+import { getCurrentHost } from '@/lib/auth';
 import { buildAuthUrl } from '@/lib/google-oauth';
+import { NextResponse } from 'next/server';
 
-// GET /api/auth/google/start?hostId=<uuid>
+// GET /api/auth/google/start
 //
 // Redirect 302 a Google consent screen con state CSRF firmato.
-// In M2a.3 Fase 1 il hostId arriva via query string (chi visita
-// /connect-gmail è Andrea durante dev). In M2a.2 verrà letto dalla
-// session auth e la query sarà ignorata/rimossa.
+// Parte A (04/08, A4): l'hostId deriva SEMPRE dalla sessione Supabase.
+// La query string non viene letta: prima bastava un link con l'hostId
+// di un altro per far finire i token Gmail sull'account sbagliato.
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function isValidUuid(s: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
-}
-
 export async function GET(request: Request): Promise<NextResponse> {
-  const url = new URL(request.url);
-  const hostId = url.searchParams.get('hostId');
+  const origin = new URL(request.url).origin;
 
-  if (!hostId || !isValidUuid(hostId)) {
-    return NextResponse.json(
-      { error: 'hostId mancante o non valido (atteso uuid)' },
-      { status: 400 },
+  let hostId: string;
+  try {
+    const host = await getCurrentHost();
+    hostId = host.id;
+  } catch {
+    // Nessuna sessione: si passa dal login e si torna qui.
+    return NextResponse.redirect(
+      `${origin}/login?redirectTo=${encodeURIComponent('/connect-gmail')}`,
+      302,
     );
   }
 

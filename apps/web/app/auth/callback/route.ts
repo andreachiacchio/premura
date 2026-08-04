@@ -1,9 +1,12 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { ensureHostForAuthUser } from "@/lib/auth";
+import { getDb } from "@/lib/db";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { NextResponse, type NextRequest } from "next/server";
 
-// Handler GET del magic link: Supabase reindirizza qui dopo che
-// l'utente ha cliccato il link nell'email, con ?code=<otp_code>.
-// Lo scambiamo in sessione (set-cookie via @supabase/ssr) e
+// Handler GET del login: Supabase reindirizza qui sia dal magic link
+// sia dal flusso OAuth Google (PKCE), con ?code=. Lo scambiamo in
+// sessione (set-cookie via @supabase/ssr), garantiamo la riga hosts
+// (Parte A: ensure idempotente — primo accesso = host creato qui) e
 // reindirizziamo al path richiesto (?next=) o a /dashboard.
 //
 // In caso di errore (code mancante o exchange fallito), redirect
@@ -39,10 +42,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
     return NextResponse.redirect(`${origin}/login?error=exchange_failed`);
+  }
+
+  // La riga hosts nasce QUI al primo accesso (idempotente: un secondo
+  // login non duplica ne' sovrascrive). Best-effort: se il DB e'
+  // irraggiungibile, getCurrentHostId() la ricrea alla prima pagina.
+  if (data?.user) {
+    try {
+      const { db } = await getDb();
+      await ensureHostForAuthUser(db, data.user);
+    } catch (err) {
+      console.error("[auth-callback] ensure host fallito (riprovera' lazy)", err);
+    }
   }
 
   return NextResponse.redirect(`${origin}${next}`);
