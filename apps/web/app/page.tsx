@@ -2,23 +2,32 @@ import { BetaAccessCTA } from '@/components/landing/BetaAccessCTA';
 import { Footer } from '@/components/landing/Footer';
 import { ForWhom } from '@/components/landing/ForWhom';
 import { Hero } from '@/components/landing/Hero';
-import { HowItWorks } from '@/components/landing/HowItWorks';
-import { InAction } from '@/components/landing/InAction';
+import { HowItDecides } from '@/components/landing/HowItDecides';
+import { NeverList } from '@/components/landing/NeverList';
+import { NightScene } from '@/components/landing/NightScene';
 import { Pricing } from '@/components/landing/Pricing';
 import { Problem } from '@/components/landing/Problem';
+import { ProductShowcase } from '@/components/landing/ProductShowcase';
 import type { Metadata } from 'next';
 
+// Riscrittura 04/08, brief "missione": la pagina racconta cosa sara'
+// Premura (host AI ombra), una cosa alla volta. Ordine dal brief:
+// Hero -> Scena tappi -> Come decide -> Problema -> Dashboard in
+// grande -> Cosa non fa mai -> Onesta' -> Prezzi -> Form (non piu'
+// CTA primario). Vincolo AI Act art. 50: nessun copy che suggerisca
+// che l'ospite ignori di parlare con un'AI.
+
 export const metadata: Metadata = {
-  title: 'Premura — Il concierge che non dorme mai per host indipendenti',
+  title: 'Premura — Un host AI accanto a ogni ospite',
   description:
-    "L'agente AI che si prende cura degli ospiti al posto tuo. Studia ogni prenotazione, scrive messaggi su misura, prepara un pensiero in casa e intercetta i problemi prima che diventino recensioni. Beta privata aperta a host italiani con 1-5 strutture.",
+    'Premura ascolta gli ospiti per tutto il soggiorno, risponde alle due di notte e agisce da sola sotto soglia. Tu intervieni solo quando c’è una decisione di soldi. Ogni messaggio si dichiara assistente AI. Beta privata per host italiani con 1-5 strutture.',
   alternates: {
     canonical: 'https://premura.it',
   },
   openGraph: {
-    title: 'Premura — Il concierge che non dorme mai',
+    title: 'Premura — Un host AI accanto a ogni ospite',
     description:
-      'Per host italiani indipendenti con 1-5 strutture. Recensioni da 10 senza rinunciare al tempo. Beta privata aperta su richiesta.',
+      'Ascolta, capisce, agisce — anche alle due di notte. Tu approvi solo le decisioni di soldi. Beta privata per host italiani con 1-5 strutture.',
     type: 'website',
     locale: 'it_IT',
     siteName: 'Premura',
@@ -26,8 +35,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Premura — Il concierge che non dorme mai',
-    description: 'Per host italiani con 1-5 strutture. Beta privata su richiesta.',
+    title: 'Premura — Un host AI accanto a ogni ospite',
+    description:
+      'Ascolta, capisce, agisce — anche alle due di notte. Tu approvi solo le decisioni di soldi.',
   },
 };
 
@@ -36,10 +46,12 @@ export default function Home() {
     <>
       <main>
         <Hero />
+        <NightScene />
+        <HowItDecides />
         <Problem />
-        <HowItWorks />
+        <ProductShowcase />
+        <NeverList />
         <ForWhom />
-        <InAction />
         <Pricing />
         <BetaAccessCTA />
       </main>

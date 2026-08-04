@@ -79,16 +79,14 @@ export function Pricing() {
         <Card padding="loose" className="mt-6 border-terracotta-soft">
           <Eyebrow variant="terracotta">Zero markup sul kit</Eyebrow>
           <p className="mt-3 text-body-lg text-ink leading-relaxed">
-            Il kit fisico è al costo vivo{" "}
-            <span className="whitespace-nowrap">+ €0,75</span> di servizio
-            <span className="whitespace-nowrap"> + €2</span> per la cleaner
-            <span className="whitespace-nowrap"> + €1</span> di biglietto.
-            Zero margine per noi. Non è una promo: è un pilastro.
+            Quando arriverà il kit fisico, sarà al costo. Zero margine per noi. Non è una promo: è
+            un pilastro.
           </p>
         </Card>
 
         <p className="mt-8 text-body text-ink-mute">
-          30 giorni gratis al lancio, senza carta. Cancelli quando vuoi.
+          Gratis fino al primo ospite servito: la prova finisce al check-out del tuo primo ospite,
+          non a scadenza di calendario. Nessuna carta richiesta. Cancelli quando vuoi.
         </p>
       </Container>
     </section>
