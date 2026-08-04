@@ -18,7 +18,7 @@ export function BetaAccessCTA() {
             className="not-italic text-terracotta"
             style={{ fontVariationSettings: '"SOFT" 100' }}
           >
-            10 posti, accesso su richiesta.
+            Accesso su richiesta.
           </em>
         </Heading>
 

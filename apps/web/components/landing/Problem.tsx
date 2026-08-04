@@ -38,8 +38,9 @@ export function Problem() {
         </ul>
 
         <p className="mt-12 text-body-lg text-ink-soft">
-          Premura fa tutto questo al posto tuo. Firmato col nome della tua
-          struttura. L&apos;ospite pensa di parlare con te.
+          Premura prepara le risposte al posto tuo, firmate col nome della tua
+          struttura. E lo dice chiaramente: l&apos;ospite sa che a scrivere è un
+          assistente AI. La differenza la fa la cura, non il trucco.
         </p>
       </Container>
     </section>
