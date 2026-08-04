@@ -36,7 +36,9 @@
   --color-muted: #8a98a5;
 
   --color-ok: #4e7a57;
+  --color-ok-deep: #3f6347;
   --color-warn: #c9a35b;
+  --color-warn-deep: #7d5f2e;
   --color-alert: #c65d3a;
 
   /* ─ Tipografia ─ */
@@ -66,7 +68,7 @@
   --text-h2--line-height: 1.15;
   --text-h2--letter-spacing: -0.01em;
 
-  --text-h1: 52px;
+  --text-h1: clamp(34px, 8.5vw, 52px);
   --text-h1--line-height: 1.05;
   --text-h1--letter-spacing: -0.025em;
 

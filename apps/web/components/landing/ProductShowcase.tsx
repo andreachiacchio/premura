@@ -12,7 +12,7 @@ function PhoneFrame({ children, label }: { children: ReactNode; label: string })
   return (
     <figure className="mx-auto w-full max-w-[340px]">
       <div className="rounded-[36px] border border-line bg-ink p-2 shadow-lg">
-        <div className="overflow-hidden rounded-[28px] bg-ivory">
+        <div aria-hidden="true" className="overflow-hidden rounded-[28px] bg-ivory">
           <div className="flex items-center justify-between px-5 pt-3 pb-1">
             <span className="text-[11px] font-semibold text-ink tabular-nums">9:41</span>
             <span aria-hidden="true" className="h-[10px] w-16 rounded-full bg-ink/10" />
@@ -20,7 +20,7 @@ function PhoneFrame({ children, label }: { children: ReactNode; label: string })
           {children}
         </div>
       </div>
-      <figcaption className="mt-4 text-center text-body-sm text-ink-mute">{label}</figcaption>
+      <figcaption className="mt-4 text-center text-body-sm text-ink-soft">{label}</figcaption>
     </figure>
   );
 }
@@ -34,7 +34,7 @@ function CheckinScreen() {
           <div className="flex items-center gap-2">
             <span aria-hidden="true" className="h-2 w-2 rounded-full bg-terracotta" />
             <p className="text-body-sm font-semibold text-ink">Casa Vista Mare</p>
-            <span className="ml-auto rounded-full bg-ok/10 px-2 py-0.5 text-[11px] font-semibold text-ok">
+            <span className="ml-auto rounded-full bg-ok/10 px-2 py-0.5 text-[11px] font-semibold text-ok-deep">
               Tutto pronto
             </span>
           </div>
@@ -45,7 +45,7 @@ function CheckinScreen() {
           <div className="flex items-center gap-2">
             <span aria-hidden="true" className="h-2 w-2 rounded-full bg-gold-deep" />
             <p className="text-body-sm font-semibold text-ink">Mansarda del Corso</p>
-            <span className="ml-auto rounded-full bg-warn/10 px-2 py-0.5 text-[11px] font-semibold text-gold-deep">
+            <span className="ml-auto rounded-full bg-warn/10 px-2 py-0.5 text-[11px] font-semibold text-warn-deep">
               Manca il numero
             </span>
           </div>
@@ -85,11 +85,11 @@ function ConversationScreen() {
             Bozza pronta
           </p>
           <p className="mt-1 text-body-sm text-ink">
-            Ciao Sofia! Ti risponde l&apos;assistente automatico di Casa Vista Mare. Ho girato la
-            richiesta all&apos;host, ti risponde appena possibile…
+            Ciao Sofia! Ti risponde l’assistente automatico di Casa Vista Mare. Ho girato la
+            richiesta all’host, ti risponde appena possibile…
           </p>
         </div>
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           <span className="flex-1 rounded-full bg-ink px-3 py-1.5 text-center text-[12px] font-semibold text-paper">
             Approva
           </span>
@@ -101,7 +101,7 @@ function ConversationScreen() {
           </span>
         </div>
       </div>
-      <p className="mt-3 text-center text-[12px] text-ink-mute">
+      <p className="mt-3 text-center text-[12px] text-ink-soft">
         Niente parte senza il tuo tocco.
       </p>
     </div>
@@ -117,7 +117,7 @@ export function ProductShowcase() {
           Tutta la tua giornata, in due schermate.
         </Heading>
         <p className="mt-6 max-w-2xl text-body-lg text-ink-soft">
-          Niente timeline, niente log, niente task list. Chi arriva, cosa serve, cosa c&apos;è da
+          Niente timeline, niente log, niente task list. Chi arriva, cosa serve, cosa c’è da
           approvare. Il resto lo tiene Premura.
         </p>
 

@@ -37,8 +37,8 @@ const GoogleG = (
 function ConversationDemo() {
   return (
     <div
+      aria-hidden="true"
       className="rounded-[24px] border border-line bg-paper p-5 shadow-md md:p-6"
-      aria-label="Esempio: l'ospite scrive di notte, Premura prepara la risposta, l'host la approva al mattino"
     >
       <div className="flex items-center gap-2 border-b border-line-soft pb-4">
         <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-terracotta" />
@@ -47,11 +47,11 @@ function ConversationDemo() {
       </div>
 
       <p className="mt-4 text-eyebrow font-semibold uppercase text-ink-mute">
-        23:47 · l&apos;ospite scrive
+        23:47 · l’ospite scrive
       </p>
       <div className="mt-2 max-w-[85%] rounded-[16px] rounded-tl-[4px] bg-ivory-warm px-4 py-3">
         <p className="text-body text-ink">
-          A che ora possiamo entrare domani? E c&apos;è un parcheggio vicino?
+          A che ora possiamo entrare domani? E c’è un parcheggio vicino?
         </p>
       </div>
 
@@ -60,7 +60,7 @@ function ConversationDemo() {
       </p>
       <div className="ml-auto mt-2 max-w-[85%] rounded-[16px] rounded-tr-[4px] border border-terracotta-soft bg-paper-deep px-4 py-3">
         <p className="text-body-sm text-ink-mute">
-          Ciao! Ti risponde l&apos;assistente automatico de La Goccia di San Gennaro.
+          Ciao! Ti risponde l’assistente automatico de La Goccia di San Gennaro.
         </p>
         <p className="mt-1.5 text-body text-ink">
           Benvenuti! Potete entrare dalle 15:00 — codici e parcheggio sono nella guida della casa,
@@ -113,9 +113,9 @@ export function Hero() {
             </Heading>
 
             <p className="mt-8 max-w-2xl text-body-lg text-ink-soft">
-              Ascolta, capisce, agisce — anche alle due di notte. Tu intervieni solo quando c&apos;è
-              una decisione di soldi. Non finge di essere te: l&apos;ospite sa che è
-              l&apos;assistente della casa, e scrive lo stesso, perché ottiene risposta subito.
+              Ascolta, capisce, agisce — anche alle due di notte. Tu intervieni solo quando c’è
+              una decisione di soldi. Non finge di essere te: l’ospite sa che è
+              l’assistente della casa, e scrive lo stesso, perché ottiene risposta subito.
             </p>
 
             <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -124,7 +124,7 @@ export function Hero() {
               </Button>
               <Link
                 href="/login"
-                className="text-body-sm text-ink-mute underline decoration-line underline-offset-4 transition-colors hover:text-ink hover:decoration-ink"
+                className="text-body-sm text-ink-soft underline decoration-line underline-offset-4 transition-colors hover:text-ink hover:decoration-ink"
               >
                 Sei già host Premura? Accedi
               </Link>

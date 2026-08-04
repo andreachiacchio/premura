@@ -14,7 +14,7 @@ const BEATS = [
   },
   {
     time: '23:13',
-    label: 'Premura legge, capisce, propone',
+    label: 'premura — l’assistente della casa — propone',
     text: '«Posso farti arrivare dei tappi in 30 minuti, 4 euro. Vuoi?»',
     kind: 'premura' as const,
   },
@@ -46,7 +46,7 @@ export function NightScene() {
           <div>
             <Eyebrow>Notte 1</Eyebrow>
             <Heading level={2} className="mt-3">
-              «C&apos;è troppo{' '}
+              «C’è troppo{' '}
               <em
                 className="not-italic text-terracotta"
                 style={{ fontVariationSettings: '"SOFT" 100' }}
@@ -56,7 +56,7 @@ export function NightScene() {
               »
             </Heading>
             <p className="mt-6 max-w-xl text-body-lg text-ink-soft">
-              È questo il lavoro di Premura: stare accanto all&apos;ospite quando succede qualcosa,
+              È questo il lavoro di Premura: stare accanto all’ospite quando succede qualcosa,
               capire cosa serve, e muoversi. A te resta una sola cosa da fare — dire sì a 4 euro.
             </p>
             <p className="mt-4 text-body-lg font-semibold text-ink">

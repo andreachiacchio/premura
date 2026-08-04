@@ -19,7 +19,7 @@ const TIERS: Tier[] = [
     unit: "€ / mese",
     label: "2–5 strutture",
     highlighted: true,
-    badge: "Più scelto",
+    badge: "Consigliato",
   },
   { price: "5,99", unit: "€ / mese", label: "6+ strutture" },
 ];
@@ -84,7 +84,7 @@ export function Pricing() {
           </p>
         </Card>
 
-        <p className="mt-8 text-body text-ink-mute">
+        <p className="mt-8 text-body text-ink-soft">
           Gratis fino al primo ospite servito: la prova finisce al check-out del tuo primo ospite,
           non a scadenza di calendario. Nessuna carta richiesta. Cancelli quando vuoi.
         </p>
