@@ -273,6 +273,50 @@ describe('describeApiError - status e corpo nel messaggio', () => {
     expect(describeApiError('boom')).toBe('boom');
   });
 
+  it('generateReplyDraft: onUsage riceve i token della risposta (task #18)', async () => {
+    const fakeClient = {
+      messages: {
+        create: () =>
+          Promise.resolve({
+            content: [
+              {
+                type: 'tool_use',
+                name: 'generate_reply_draft',
+                input: {
+                  draft_body: 'Ciao!',
+                  confidence: 0.9,
+                  reasoning: 'r',
+                  classification: 'small_talk',
+                  suggested_action: 'auto_send',
+                },
+              },
+            ],
+            usage: {
+              input_tokens: 1234,
+              output_tokens: 256,
+              cache_creation_input_tokens: 2000,
+              cache_read_input_tokens: null,
+            },
+          }),
+      },
+    } as unknown as Anthropic;
+
+    let captured: unknown;
+    const draft = await generateReplyDraft(baseInput(), {
+      client: fakeClient,
+      onUsage: (u) => {
+        captured = u;
+      },
+    });
+    expect(draft.draft_body).toBe('Ciao!');
+    expect(captured).toEqual({
+      input_tokens: 1234,
+      output_tokens: 256,
+      cache_creation_input_tokens: 2000,
+      cache_read_input_tokens: undefined,
+    });
+  });
+
   it('generateReplyDraft: il 401 finisce nel messaggio del DraftGeneratorError', async () => {
     const cause = apiError(
       401,

@@ -13,7 +13,12 @@ import { and, desc, eq, gte } from 'drizzle-orm';
 import { guestAppInviteDisclosures } from './outbound/guest-app-invite-content';
 import { logAgentAction } from './agent-action-logger';
 import { getHostVoiceProfile, getPropertyKnowledge } from './context-readers';
-import { type DraftOutput, decideRouting, generateReplyDraft } from './draft-generator';
+import {
+  type DraftOutput,
+  type DraftUsage,
+  decideRouting,
+  generateReplyDraft,
+} from './draft-generator';
 
 // ─────────────────────────────────────────────────────────────
 // Slice 11 — Draft Generator pipeline.
@@ -227,28 +232,39 @@ export async function triggerDraftGeneration(
         has_guest_insights: Boolean(guestInsights),
       },
       fn: async () => {
-        const draft = await generator({
-          conversation: conversationHistory,
-          voiceProfile: voiceProfile
-            ? {
-                avgSentenceLength: voiceProfile.avgSentenceLength,
-                formalityScore: voiceProfile.formalityScore,
-                emojiUsageRate: voiceProfile.emojiUsageRate,
-                commonPhrases: voiceProfile.commonPhrases,
-                greetingPatterns: voiceProfile.greetingPatterns,
-                closingPatterns: voiceProfile.closingPatterns,
-                voiceConfidence: voiceProfile.voiceConfidence,
-              }
-            : null,
-          guestInsights,
-          propertyKnowledge,
-          propertyName: bookingRow.propertyName,
-          guestFirstName,
-        });
+        // task #18 (04/08): usage catturata via callback — il logger la
+        // trasforma in input/output_tokens + cost_usd sulla riga success.
+        let usage: DraftUsage | undefined;
+        const draft = await generator(
+          {
+            conversation: conversationHistory,
+            voiceProfile: voiceProfile
+              ? {
+                  avgSentenceLength: voiceProfile.avgSentenceLength,
+                  formalityScore: voiceProfile.formalityScore,
+                  emojiUsageRate: voiceProfile.emojiUsageRate,
+                  commonPhrases: voiceProfile.commonPhrases,
+                  greetingPatterns: voiceProfile.greetingPatterns,
+                  closingPatterns: voiceProfile.closingPatterns,
+                  voiceConfidence: voiceProfile.voiceConfidence,
+                }
+              : null,
+            guestInsights,
+            propertyKnowledge,
+            propertyName: bookingRow.propertyName,
+            guestFirstName,
+          },
+          {
+            onUsage: (u) => {
+              usage = u;
+            },
+          },
+        );
         return {
           output: draft as unknown as Record<string, unknown>,
           reasoning: draft.reasoning,
           model: process.env.CLAUDE_MODEL_PRIMARY ?? 'claude-sonnet-4-6',
+          usage,
         };
       },
     });
