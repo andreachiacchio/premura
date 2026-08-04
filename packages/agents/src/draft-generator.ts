@@ -183,9 +183,18 @@ export type GenerateDraftInput = {
   guestFirstName?: string;
 };
 
+/** Usage della risposta Anthropic, nel formato che agent-action-logger
+ *  usa per calcolare cost_usd. */
+export type DraftUsage = {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+};
+
 export async function generateReplyDraft(
   input: GenerateDraftInput,
-  options: { client?: Anthropic; model?: string } = {},
+  options: { client?: Anthropic; model?: string; onUsage?: (usage: DraftUsage) => void } = {},
 ): Promise<DraftOutput> {
   if (input.conversation.length === 0) {
     throw new DraftGeneratorError('No conversation provided');
@@ -224,6 +233,15 @@ export async function generateReplyDraft(
     // si scartava la causa.
     throw new DraftGeneratorError(`Anthropic API call failed: ${describeApiError(err)}`, err);
   }
+
+  // 04/08 (task #18): senza questo, agent_actions restava con token e
+  // costo NULL anche sulle chiamate riuscite.
+  options.onUsage?.({
+    input_tokens: response.usage.input_tokens,
+    output_tokens: response.usage.output_tokens,
+    cache_creation_input_tokens: response.usage.cache_creation_input_tokens ?? undefined,
+    cache_read_input_tokens: response.usage.cache_read_input_tokens ?? undefined,
+  });
 
   const toolUse = response.content.find((c) => c.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') {
