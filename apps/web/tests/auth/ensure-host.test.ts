@@ -15,8 +15,13 @@ function makeDb(opts: {
 }) {
   const inserted: Row[] = [];
   const updated: Row[] = [];
+  const executed: unknown[] = [];
   let selectCount = 0;
   const db = {
+    execute: (q: unknown) => {
+      executed.push(q);
+      return Promise.resolve([]);
+    },
     select: () => ({
       from: () => ({
         where: () => ({
@@ -46,7 +51,7 @@ function makeDb(opts: {
       }),
     }),
   } as unknown as Database;
-  return { db, inserted, updated };
+  return { db, inserted, updated, executed };
 }
 
 const USER = {
@@ -101,19 +106,31 @@ describe('ensureHostForAuthUser', () => {
     expect(updated).toEqual([{ authUserId: 'auth-user-1' }]);
   });
 
-  it('email gia collegata a un ALTRO utente auth -> throw, mai sovrascrivere', async () => {
-    const { db } = makeDb({
+  it('email di una riga COLLEGATA ad altro utente -> host NUOVO, mai takeover', async () => {
+    // Sicurezza (ordine Andrea 04/08): chi si registra con l'email di
+    // un host esistente NON deve prenderne l'account. La riga altrui
+    // non viene mai ricollegata; si riallinea solo la sua email stale
+    // (via SQL con auth.users) e si crea un host nuovo.
+    const { db, inserted, updated, executed } = makeDb({
       byAuthId: [],
       byEmail: [
         {
-          id: 'host-x',
+          id: 'host-altrui',
           authUserId: 'altro-utente',
-          onboardingCompleted: false,
-          onboardingStep: 'welcome',
+          onboardingCompleted: true,
+          onboardingStep: 'completed',
         },
       ],
+      afterInsert: [{ id: 'host-nuovo', onboardingCompleted: false, onboardingStep: 'welcome' }],
     });
-    await expect(ensureHostForAuthUser(db, USER)).rejects.toThrow('intervento manuale');
+    const got = await ensureHostForAuthUser(db, USER);
+    expect(got.id).toBe('host-nuovo');
+    // La riga altrui non e' MAI stata ricollegata via update Drizzle.
+    expect(updated.length).toBe(0);
+    // Il riallineamento email stale e' partito (raw SQL su auth.users).
+    expect(executed.length).toBe(1);
+    // E l'host nuovo appartiene all'utente che ha fatto login.
+    expect(inserted[0]).toMatchObject({ authUserId: 'auth-user-1', email: 'nuovo@esempio.it' });
   });
 
   it('utente senza email -> throw (mai host anonimi)', async () => {

@@ -2,7 +2,7 @@ import { getDb } from '@/lib/db';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { type Database, hosts } from '@premura/db';
 import type { User } from '@supabase/supabase-js';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 // Helper auth: risolve l'host dell'utente Supabase corrente.
 //
@@ -88,20 +88,33 @@ export async function ensureHostForAuthUser(
     .from(hosts)
     .where(eq(hosts.email, email))
     .limit(1);
-  if (byEmail[0]) {
-    if (byEmail[0].authUserId && byEmail[0].authUserId !== user.id) {
-      throw new Error(
-        `[auth] email ${email} gia' collegata a un altro utente auth: intervento manuale necessario`,
-      );
-    }
-    if (!byEmail[0].authUserId) {
-      await db.update(hosts).set({ authUserId: user.id }).where(eq(hosts.id, byEmail[0].id));
-    }
+  if (byEmail[0] && !byEmail[0].authUserId) {
+    // Adozione: riga storica mai collegata. Solo il collegamento, mai
+    // sovrascritture.
+    await db.update(hosts).set({ authUserId: user.id }).where(eq(hosts.id, byEmail[0].id));
     return {
       id: byEmail[0].id,
       onboardingCompleted: byEmail[0].onboardingCompleted,
       onboardingStep: byEmail[0].onboardingStep,
     };
+  }
+
+  if (byEmail[0]?.authUserId && byEmail[0].authUserId !== user.id) {
+    // SICUREZZA (ordine Andrea 04/08): la riga appartiene a un ALTRO
+    // utente auth. MAI adottarla — sarebbe account takeover: chiunque
+    // si registri con l'email di un host esistente ne prenderebbe i
+    // dati. Si crea un host NUOVO. La email della riga altrui e' per
+    // forza stale (auth.users.email e' unico): la si riallinea alla
+    // email vera del SUO utente auth, cosi' l'insert sotto non collide
+    // con l'unique su hosts.email.
+    await db.execute(sql`
+      UPDATE hosts SET email = lower(u.email), updated_at = now()
+      FROM auth.users u
+      WHERE hosts.id = ${byEmail[0].id}
+        AND u.id = hosts.auth_user_id
+        AND u.email IS NOT NULL
+        AND lower(u.email) <> ${email}
+    `);
   }
 
   await db

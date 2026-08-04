@@ -190,19 +190,26 @@ CREATE POLICY "bookings_update_own" ON "bookings" FOR UPDATE TO authenticated
 DROP POLICY IF EXISTS "bookings_delete_own" ON "bookings";--> statement-breakpoint
 CREATE POLICY "bookings_delete_own" ON "bookings" FOR DELETE TO authenticated
   USING ("property_id" IN (SELECT "id" FROM "properties" WHERE "host_id" = public.premura_host_id()));--> statement-breakpoint
-DROP POLICY IF EXISTS "property_knowledge_base_select_own" ON "property_knowledge_base";--> statement-breakpoint
-CREATE POLICY "property_knowledge_base_select_own" ON "property_knowledge_base" FOR SELECT TO authenticated
-  USING ("property_id" IN (SELECT "id" FROM "properties" WHERE "host_id" = public.premura_host_id()));--> statement-breakpoint
-DROP POLICY IF EXISTS "property_knowledge_base_insert_own" ON "property_knowledge_base";--> statement-breakpoint
-CREATE POLICY "property_knowledge_base_insert_own" ON "property_knowledge_base" FOR INSERT TO authenticated
-  WITH CHECK ("property_id" IN (SELECT "id" FROM "properties" WHERE "host_id" = public.premura_host_id()));--> statement-breakpoint
-DROP POLICY IF EXISTS "property_knowledge_base_update_own" ON "property_knowledge_base";--> statement-breakpoint
-CREATE POLICY "property_knowledge_base_update_own" ON "property_knowledge_base" FOR UPDATE TO authenticated
+-- property_knowledge_base: presente negli ambienti creati da 0000,
+-- ASSENTE in produzione (drift storico, migration 0008-0015 a mano).
+-- Guardia to_regclass: senza, il file fallirebbe sul DB drifted.
+DO $pkb$ BEGIN
+  IF to_regclass('public.property_knowledge_base') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS "property_knowledge_base_select_own" ON "property_knowledge_base"';
+    EXECUTE 'CREATE POLICY "property_knowledge_base_select_own" ON "property_knowledge_base" FOR SELECT TO authenticated
+  USING ("property_id" IN (SELECT "id" FROM "properties" WHERE "host_id" = public.premura_host_id()))';
+    EXECUTE 'DROP POLICY IF EXISTS "property_knowledge_base_insert_own" ON "property_knowledge_base"';
+    EXECUTE 'CREATE POLICY "property_knowledge_base_insert_own" ON "property_knowledge_base" FOR INSERT TO authenticated
+  WITH CHECK ("property_id" IN (SELECT "id" FROM "properties" WHERE "host_id" = public.premura_host_id()))';
+    EXECUTE 'DROP POLICY IF EXISTS "property_knowledge_base_update_own" ON "property_knowledge_base"';
+    EXECUTE 'CREATE POLICY "property_knowledge_base_update_own" ON "property_knowledge_base" FOR UPDATE TO authenticated
   USING ("property_id" IN (SELECT "id" FROM "properties" WHERE "host_id" = public.premura_host_id()))
-  WITH CHECK ("property_id" IN (SELECT "id" FROM "properties" WHERE "host_id" = public.premura_host_id()));--> statement-breakpoint
-DROP POLICY IF EXISTS "property_knowledge_base_delete_own" ON "property_knowledge_base";--> statement-breakpoint
-CREATE POLICY "property_knowledge_base_delete_own" ON "property_knowledge_base" FOR DELETE TO authenticated
-  USING ("property_id" IN (SELECT "id" FROM "properties" WHERE "host_id" = public.premura_host_id()));--> statement-breakpoint
+  WITH CHECK ("property_id" IN (SELECT "id" FROM "properties" WHERE "host_id" = public.premura_host_id()))';
+    EXECUTE 'DROP POLICY IF EXISTS "property_knowledge_base_delete_own" ON "property_knowledge_base"';
+    EXECUTE 'CREATE POLICY "property_knowledge_base_delete_own" ON "property_knowledge_base" FOR DELETE TO authenticated
+  USING ("property_id" IN (SELECT "id" FROM "properties" WHERE "host_id" = public.premura_host_id()))';
+  END IF;
+END $pkb$;--> statement-breakpoint
 DROP POLICY IF EXISTS "conversations_select_own" ON "conversations";--> statement-breakpoint
 CREATE POLICY "conversations_select_own" ON "conversations" FOR SELECT TO authenticated
   USING ("booking_id" IN (
