@@ -1,4 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { hosts } from '@premura/db';
+import type { Database } from '@premura/db';
+import { eq } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 // Slice 6.5.2: JWT validation Fastify per chiamate dirette ad apps/api.
@@ -35,9 +38,37 @@ export type JwtAuthOptions = {
   // Path patterns da escludere dalla auth. Default: /health, /webhooks/*.
   // Match prefix-based.
   excludePaths?: string[];
+  // Parte A (04/08): resolver auth.users.id -> hosts.id. Obbligatorio
+  // in produzione (index.ts passa il db); i test possono iniettarne
+  // uno finto. Se assente, il vecchio comportamento (hostId = sub)
+  // resta come fallback SOLO per non rompere i test legacy.
+  resolveHostId?: (authUserId: string) => Promise<string | null>;
 };
 
 const DEFAULT_EXCLUDE = ['/health', '/webhooks/'];
+
+// Mini-cache sub -> hostId: il mapping e' immutabile una volta creato
+// (auth_user_id unique), il TTL serve solo a non tenere per sempre
+// mapping di utenti cancellati.
+const HOST_CACHE_TTL_MS = 5 * 60_000;
+const hostCache = new Map<string, { hostId: string; expiresAt: number }>();
+
+export function makeDbHostResolver(db: Database): (authUserId: string) => Promise<string | null> {
+  return async (authUserId: string) => {
+    const cached = hostCache.get(authUserId);
+    if (cached && cached.expiresAt > Date.now()) return cached.hostId;
+    const rows = await db
+      .select({ id: hosts.id })
+      .from(hosts)
+      .where(eq(hosts.authUserId, authUserId))
+      .limit(1);
+    const hostId = rows[0]?.id ?? null;
+    if (hostId) {
+      hostCache.set(authUserId, { hostId, expiresAt: Date.now() + HOST_CACHE_TTL_MS });
+    }
+    return hostId;
+  };
+}
 
 // Attacca l'hook JWT sull'app passata. NON e' un plugin Fastify
 // (encapsulated): vogliamo che l'hook si applichi a TUTTE le route
@@ -75,8 +106,8 @@ export function attachJwtAuth(app: FastifyInstance, opts: JwtAuthOptions = {}): 
     }
 
     const claims = verified.claims;
-    // Supabase mette user.id in `sub`. Per Premura host_id == user.id
-    // Supabase (vedi seed-goccia-user.ts).
+    // Supabase mette user.id in `sub`. Parte A (04/08): hosts.id e'
+    // chiave propria, quindi il sub va risolto via hosts.auth_user_id.
     const sub = typeof claims.sub === 'string' ? claims.sub : null;
     if (!sub) {
       req.log.warn({ event: 'jwt.no_sub', url }, 'JWT missing sub claim');
@@ -84,6 +115,20 @@ export function attachJwtAuth(app: FastifyInstance, opts: JwtAuthOptions = {}): 
       return;
     }
     const email = typeof claims.email === 'string' ? claims.email : null;
+
+    if (opts.resolveHostId) {
+      const hostId = await opts.resolveHostId(sub);
+      if (!hostId) {
+        // Utente auth valido ma senza riga hosts collegata: per l'API
+        // e' un forbidden (la riga nasce dal flusso web, non da qui).
+        req.log.warn({ event: 'jwt.no_host', url }, 'auth user senza host collegato');
+        reply.code(403).send({ error: 'no_host' });
+        return;
+      }
+      req.user = { hostId, email };
+      return;
+    }
+
     req.user = { hostId: sub, email };
   });
 }

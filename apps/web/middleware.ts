@@ -22,7 +22,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const isProtected =
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/connect-gmail') ||
-    pathname.startsWith('/onboarding');
+    pathname.startsWith('/onboarding') ||
+    // Parte A (04/08): /properties chiamava getCurrentHostId() senza
+    // protezione middleware — un anonimo prendeva un 500, non il login.
+    pathname.startsWith('/properties');
   if (isProtected && !user) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/login';

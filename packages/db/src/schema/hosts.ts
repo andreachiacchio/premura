@@ -16,6 +16,12 @@ export const hosts = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
 
+    // 0036 (Punto 2 Parte A): hosts.id e' chiave propria, il legame con
+    // Supabase Auth passa da qui. UNIQUE; FK verso auth.users nel SQL
+    // (auth.* non e' modellato in Drizzle). NULL = host non collegato
+    // (righe storiche orfane).
+    authUserId: uuid('auth_user_id').unique(),
+
     // Identità
     email: varchar('email', { length: 255 }).notNull().unique(),
     fullName: varchar('full_name', { length: 255 }),

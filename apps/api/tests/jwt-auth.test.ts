@@ -98,7 +98,12 @@ describe('jwtAuthPlugin (Fastify integration)', () => {
     delete process.env.SUPABASE_JWT_SECRET;
   });
 
-  async function buildApp(opts: { excludePaths?: string[] } = {}) {
+  async function buildApp(
+    opts: {
+      excludePaths?: string[];
+      resolveHostId?: (authUserId: string) => Promise<string | null>;
+    } = {},
+  ) {
     const app = Fastify({ logger: false });
     attachJwtAuth(app, opts);
     app.get('/secret', async (req) => {
@@ -137,6 +142,34 @@ describe('jwtAuthPlugin (Fastify integration)', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ user: { hostId: 'host-42', email: 'a@b.com' } });
+  });
+
+  // Parte A (04/08): il sub e' auth.users.id, l'hostId si risolve via
+  // hosts.auth_user_id. Questi test pinnano il nuovo contratto.
+  it('con resolveHostId: req.user.hostId = hosts.id risolto, non il sub', async () => {
+    const app = await buildApp({
+      resolveHostId: async (sub) => (sub === 'auth-user-1' ? 'host-vero-9' : null),
+    });
+    const token = makeJwt({ sub: 'auth-user-1', email: 'a@b.com', exp: futureExp() });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/secret',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ user: { hostId: 'host-vero-9', email: 'a@b.com' } });
+  });
+
+  it('con resolveHostId: utente auth valido ma senza host collegato -> 403 no_host', async () => {
+    const app = await buildApp({ resolveHostId: async () => null });
+    const token = makeJwt({ sub: 'auth-user-sconosciuto', exp: futureExp() });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/secret',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: 'no_host' });
   });
 
   it('GET /secret con Bearer token scaduto -> 401', async () => {

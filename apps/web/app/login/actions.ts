@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -62,4 +63,42 @@ export async function signInWithMagicLink(
     };
   }
   return { ok: true };
+}
+
+// Parte A (04/08, A1): login con Google via Supabase Auth, flusso PKCE
+// server-side. signInWithOauth con il client @supabase/ssr scrive il
+// code-verifier nei cookie e ci da' l'URL del consent: il redirect
+// riporta a /auth/callback (lo stesso del magic link), che scambia il
+// code, GARANTISCE la riga hosts (ensure idempotente) e atterra su
+// next/dashboard. Richiede il provider Google abilitato su Supabase.
+export async function signInWithGoogle(redirectTo?: string): Promise<SignInResult> {
+  const headerList = await headers();
+  const origin =
+    headerList.get("origin") ??
+    `https://${headerList.get("host") ?? "premura.it"}`;
+
+  const callbackUrl = redirectTo
+    ? `${origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`
+    : `${origin}/auth/callback`;
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: callbackUrl,
+      queryParams: {
+        // refresh affidabile anche se l'utente aveva gia' consentito
+        access_type: "offline",
+        prompt: "select_account",
+      },
+    },
+  });
+
+  if (error || !data?.url) {
+    return {
+      ok: false,
+      error: `Login Google non disponibile: ${error?.message ?? "URL mancante"}`,
+    };
+  }
+  redirect(data.url);
 }

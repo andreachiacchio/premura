@@ -14,7 +14,7 @@ import { whatsappWebhookRoutes } from './api/webhooks/whatsapp';
 import { draftGenerationQueue } from './jobs/draft-generation-queue';
 import { icalPollQueue } from './jobs/queues';
 import { surveyQueue } from './jobs/survey-queue';
-import { attachJwtAuth } from './plugins/jwt-auth';
+import { attachJwtAuth, makeDbHostResolver } from './plugins/jwt-auth';
 
 const app = Fastify({
   logger: {
@@ -61,7 +61,12 @@ const apiClient = createServerClient();
 // (non plugin: deve agire sul context root) intercetta tutte le route
 // registrate DOPO. Esclude /health* e /webhooks/* dove la sicurezza
 // e' delegata a signature verify (es. WhatsApp HMAC).
-attachJwtAuth(app, { excludePaths: ['/health', '/webhooks/'] });
+attachJwtAuth(app, {
+  excludePaths: ['/health', '/webhooks/'],
+  // Parte A (04/08): il sub del JWT e' auth.users.id, l'hostId vero
+  // si risolve via hosts.auth_user_id (mini-cache nel plugin).
+  resolveHostId: makeDbHostResolver(apiClient.db),
+});
 
 // Routes M2a.4: completion form Booking + skip.
 await app.register(bookingsRoutes, { prefix: '/api/bookings', db: apiClient.db });

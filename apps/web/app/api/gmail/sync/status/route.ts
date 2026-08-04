@@ -1,30 +1,20 @@
-import { NextResponse } from 'next/server';
-import { createServerClient, type ServerClient } from '@premura/db';
+import { getCurrentHostId } from '@/lib/auth';
+import { getDb } from '@/lib/db';
 import { getJob } from '@/lib/repositories/gmail-sync-jobs';
+import { NextResponse } from 'next/server';
 
 // GET /api/gmail/sync/status?jobId=<uuid>
 //
 // Ritorna lo stato corrente del sync job. Pollato dal componente
 // frontend GmailSyncProgress ogni 1.5s.
 //
-// Response shape:
-//   {
-//     jobId, status, totalEmails, processedEmails,
-//     enrichedCount, createdCount, skippedPast, skippedNoMatch,
-//     skippedNotConfirmation, cancelledCount,
-//     guestProfilesCreated, guestProfilesUpdated,
-//     errorLog: [], fatalError: string | null,
-//     startedAt, completedAt
-//   }
+// Parte A (04/08): la route era senza auth ne' ownership — con un
+// jobId qualsiasi restituiva il job di chiunque. Ora: sessione
+// obbligatoria e job visibile solo al suo host (404 per gli altri:
+// non riveliamo nemmeno l'esistenza).
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-let clientPromise: Promise<ServerClient> | null = null;
-function getClient(): Promise<ServerClient> {
-  if (!clientPromise) clientPromise = Promise.resolve(createServerClient());
-  return clientPromise;
-}
 
 export async function GET(request: Request): Promise<NextResponse> {
   const url = new URL(request.url);
@@ -33,9 +23,16 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'jobId query param mancante' }, { status: 400 });
   }
 
-  const { db } = await getClient();
+  let hostId: string;
+  try {
+    hostId = await getCurrentHostId();
+  } catch {
+    return NextResponse.json({ error: 'Non autenticato' }, { status: 401 });
+  }
+
+  const { db } = await getDb();
   const job = await getJob(db, jobId);
-  if (!job) {
+  if (!job || job.hostId !== hostId) {
     return NextResponse.json({ error: 'Job non trovato' }, { status: 404 });
   }
 
