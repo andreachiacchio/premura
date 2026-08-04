@@ -5,6 +5,7 @@ import {
   type DraftOutput,
   DraftGeneratorError,
   type GenerateDraftInput,
+  SYSTEM_PROMPT,
   buildUserContent,
   decideRouting,
   describeApiError,
@@ -233,6 +234,35 @@ describe('decideRouting - smart routing', () => {
         waChannelLive: true,
       }),
     ).toBe('notify_host');
+  });
+});
+
+// 04/08 (ordine Andrea, post prima bozza 7e70581e): il prompt e' il
+// codice piu' critico (CLAUDE.md) e queste regole sono nate da un bug
+// reale — la bozza confermava un servizio non in knowledge e prometteva
+// "entro qualche minuto". I test inchiodano il TESTO delle regole: se
+// qualcuno le ammorbidisce, il test fallisce. La verifica comportamentale
+// vera e' il seed demo (ogni run rigenera la bozza con la stessa
+// richiesta di servizio non in knowledge).
+describe('SYSTEM_PROMPT - regole anti-conferma e anti-promesse (04/08)', () => {
+  it('regola 4: vieta conferme di servizi senza fonte nella knowledge', () => {
+    expect(SYSTEM_PROMPT).toContain('Fatti SOLO dalla property knowledge');
+    expect(SYSTEM_PROMPT).toContain('NON confermare e NON negare');
+    expect(SYSTEM_PROMPT).toContain('inoltrato la richiesta all\'host');
+    expect(SYSTEM_PROMPT).toContain('VIETATO dire "si\', si puo\'"');
+  });
+
+  it('regola 7: vieta promesse sui tempi di risposta dell\'host', () => {
+    expect(SYSTEM_PROMPT).toContain('MAI promettere tempi di risposta dell\'host');
+    expect(SYSTEM_PROMPT).toContain('vietato "entro qualche minuto"');
+    expect(SYSTEM_PROMPT).toContain('l\'host ti risponde appena possibile');
+  });
+
+  it('la vecchia istruzione che INSEGNAVA la promessa di tempi non esiste piu\'', () => {
+    // Regola 4 pre-04/08: 'scrivi "Ti rispondo entro qualche minuto"'.
+    // Era la CAUSA del bug: il modello obbediva al prompt.
+    expect(SYSTEM_PROMPT).not.toContain('scrivi "Ti rispondo entro qualche minuto"');
+    expect(SYSTEM_PROMPT).not.toContain('Ti rispondo entro');
   });
 });
 

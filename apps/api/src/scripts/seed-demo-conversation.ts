@@ -185,8 +185,18 @@ try {
   if (!lastMessageId) throw new Error('nessun messaggio inbound demo');
 
   // 4. Bozza generata DAVVERO (chiamata Claude reale via pipeline,
-  //    stesse guardie di produzione). Idempotente: la pipeline stessa
-  //    salta se esiste gia' una bozza per questo messaggio.
+  //    stesse guardie di produzione). La pipeline salta se esiste gia'
+  //    una bozza per questo messaggio: per far si' che OGNI run sia un
+  //    test comportamentale fresco (04/08: verifica correzioni prompt),
+  //    la bozza DEMO precedente viene rimossa prima. Tocca solo righe
+  //    del booking demo — mai bozze di ospiti reali.
+  const stale = await db
+    .delete(pendingDrafts)
+    .where(and(eq(pendingDrafts.bookingId, bookingId), eq(pendingDrafts.kind, 'reply_draft')))
+    .returning({ id: pendingDrafts.id });
+  if (stale.length > 0) {
+    console.log(`[demo-seed] bozza demo precedente rimossa: ${stale.map((s) => s.id).join(', ')}`);
+  }
   console.log('[demo-seed] genero la bozza (chiamata Claude reale)...');
   const result = await triggerDraftGeneration(db, {
     messageId: lastMessageId,
