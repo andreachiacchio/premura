@@ -1,5 +1,5 @@
 import { type Database, bookings } from '@premura/db';
-import { isRichDataSource } from '@premura/shared';
+import { ANONYMOUS_ICAL_SOURCES, isRichDataSource } from '@premura/shared';
 import { and, eq, ne, notInArray, sql } from 'drizzle-orm';
 import type { IcalBookingShell } from './ical-event-mapper';
 
@@ -12,7 +12,11 @@ import type { IcalBookingShell } from './ical-event-mapper';
 // e non va creato; se esiste gia', al poll successivo diventa blocco
 // calendario (sparisce dalle viste ospite, resta tracciabile).
 
-const ANON_SOURCES = ['booking_ical_only', 'airbnb_ical_only'];
+// Fonte unica condivisa con apps/web (05/08): l'assorbimento della
+// fascia da parte di una prenotazione inserita a mano deve usare
+// ESATTAMENTE lo stesso elenco, o le due parti divergono al primo
+// valore nuovo.
+const ANON_SOURCES: string[] = [...ANONYMOUS_ICAL_SOURCES];
 const ANON_NAMES = new Set(['booking guest', 'reserved', 'ospite']);
 
 function isAnonymousShell(shell: IcalBookingShell): boolean {

@@ -1,5 +1,6 @@
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import { hasRealGuestName } from '@/lib/guest-name';
 import { getOnboardingState, urlForStep } from '@/lib/onboarding';
 import { startTimer, timed } from '@/lib/perf';
 import {
@@ -19,6 +20,7 @@ import { hosts } from '@premura/db';
 import { eq } from 'drizzle-orm';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { AddBookingButton } from './_components/AddBookingButton';
 import { AgentCard } from './_components/AgentCard';
 import { AgentFeed } from './_components/AgentFeed';
 import { BookingsList } from './_components/BookingsList';
@@ -27,7 +29,12 @@ import { DecisionsBlock, decisionsCount } from './_components/DecisionsBlock';
 import { EmptyOnboardingState } from './_components/EmptyOnboardingState';
 import { HomeGuests } from './_components/HomeGuests';
 import { ReplyDraftCard } from './_components/ReplyDraftCard';
-import { completeBookingAction, createPropertyAction, skipBookingAction } from './actions';
+import {
+  completeBookingAction,
+  createDirectBookingAction,
+  createPropertyAction,
+  skipBookingAction,
+} from './actions';
 
 // Server component: render server-side, fetch via repository drizzle
 // diretto (vedi commit precedente per la decisione architetturale).
@@ -201,6 +208,11 @@ export default async function DashboardPage() {
   // quando c'e' qualcosa in sospeso o il calendario non e' stato letto.
   const needsYouCount = decisionsCount(decisionsData);
 
+  // "Prenotazione con nome" ha una definizione precisa: i segnaposto
+  // dei feed ("Booking Guest", "Reserved", "ospite") non contano.
+  const hasAnyNamedBooking = bookings.some((b) => hasRealGuestName(b.guestFullName));
+  const propertyOptions = hostProperties.map((p) => ({ id: p.id, name: p.name }));
+
   const agentStatus = buildAgentStatus({
     pendingDraftsCount: replyDrafts.length,
     oldestDraftGuestName: replyDrafts[0]?.guestFullName ?? null,
@@ -302,6 +314,30 @@ export default async function DashboardPage() {
               skipAction={skipBookingAction}
             />
           </div>
+          {/* 05/08: quando non c'e' NESSUNA prenotazione con un nome
+              vero, questa colonna resta vuota — HomeGuests ritorna
+              null e BookingsList non ha sezioni. E' il momento in cui
+              un host che lavora in diretto non ha nulla da fare, e
+              l'unica azione sensata e' inserire la prima. */}
+          {!hasAnyNamedBooking && (
+            <div className="rounded-card border border-line-soft bg-paper px-5 py-6 text-center shadow-sm">
+              <p className="font-serif text-h4 leading-tight text-ink">
+                Non ho ancora nessun ospite con un nome.
+              </p>
+              <p className="mt-2 text-body-sm text-ink-soft">
+                Se hai preso una prenotazione al telefono o via email, aggiungila: con il numero
+                me ne occupo io.
+              </p>
+              <div className="mt-5 flex justify-center">
+                <AddBookingButton
+                  properties={propertyOptions}
+                  createAction={createDirectBookingAction}
+                  variant="primary"
+                  label="Aggiungi una prenotazione"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="md:col-start-2 md:row-start-2">

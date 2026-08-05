@@ -56,7 +56,7 @@ export type UpcomingCheckinRow = {
   checkinAt: Date;
   checkoutAt: Date;
   numGuests: number;
-  platform: 'booking' | 'airbnb' | 'direct';
+  platform: 'booking' | 'airbnb' | 'direct' | 'altro';
   guestPhone: string | null;
   premuraActiveAt: Date | null;
   guestPhoneSource: string | null;

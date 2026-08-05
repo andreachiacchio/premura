@@ -48,7 +48,7 @@ export type UpcomingCheckinCardData = {
   checkinAt: string; // ISO string (server -> client)
   checkoutAt: string;
   numGuests: number;
-  platform: 'booking' | 'airbnb' | 'direct';
+  platform: 'booking' | 'airbnb' | 'direct' | 'altro';
   guestPhone: string | null;
   premuraActiveAt: string | null;
   premuraState: PremuraStateUI;
@@ -269,6 +269,9 @@ const PLATFORM_LABELS: Record<UpcomingCheckinCardData['platform'], string> = {
   booking: 'Booking',
   airbnb: 'Airbnb',
   direct: 'Diretta',
+  // Vrbo, Expedia, Agoda: canali che non leggiamo, tenuti distinti
+  // dalla diretta perche' li' l'host paga comunque commissioni.
+  altro: 'Altro canale',
 };
 
 function reasonToMessage(reason: SetPhoneActionResult & { ok: false }): string {
