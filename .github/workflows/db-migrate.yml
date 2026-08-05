@@ -1,0 +1,98 @@
+# Applica le migration pendenti dal runner GitHub (05/08).
+#
+# Perche' esiste (ordine Andrea): e' la terza volta che una migration
+# arriva in main senza essere applicata. La causa non e' un bug singolo,
+# e' che NULLA obbliga qualcuno ad applicarla: sta a chi merga
+# ricordarsene, da una macchina locale dove `pnpm db:migrate` fallisce
+# con ERR_MODULE_NOT_FOUND non riproducibile altrove.
+#
+# Questo workflow toglie di mezzo l'ambiente locale: il migrator gira
+# sul runner, con DATABASE_URL dai secrets. Stessa forma di fly-diag,
+# ical-diag e demo-seed — un bottone, nessun terminale.
+#
+# SICUREZZA
+#  - Solo workflow_dispatch: non parte mai da solo, nemmeno su push a
+#    main. Applicare uno schema e' una decisione, non un effetto
+#    collaterale di un merge.
+#  - Il default e' il DRY RUN: si vede cosa succederebbe prima di
+#    toccare qualcosa. Per applicare davvero bisogna scrivere
+#    "applica" nel campo conferma.
+#  - Target esplicito staging | production, senza default su
+#    production, piu' la conferma PREMURA_CONFIRM_PROD che
+#    scripts/migrate.ts pretende gia' per i target remoti.
+#  - Il migrator di Drizzle e' append-only e non droppa mai dati; ogni
+#    file gira dentro una transazione.
+#
+# Prima di applicare, il workflow ricontrolla la coerenza del journal:
+# applicare partendo da un journal incoerente e' il modo piu' veloce
+# per saltare silenziosamente una migration.
+
+name: Applica migration database
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Database di destinazione'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      conferma:
+        description: 'Scrivi "applica" per applicare davvero. Vuoto = dry run (nessuna scrittura).'
+        required: false
+        default: ''
+        type: string
+
+concurrency:
+  group: db-migrate-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: ${{ inputs.conferma == 'applica' && 'applica' || 'dry run' }} su ${{ inputs.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Stessa guardia della CI: se il journal e i file .sql divergono,
+      # meglio fermarsi qui che applicare un elenco incompleto.
+      - name: Journal coerente con i file .sql
+        run: node scripts/check-migrations-journal.mjs
+
+      - name: Dry run — cosa risulta pendente
+        env:
+          DATABASE_URL: ${{ inputs.target == 'production' && secrets.DATABASE_URL_PRODUCTION || secrets.DATABASE_URL_STAGING }}
+        run: pnpm db:migrate -- --dry-run
+
+      - name: Applica le migration pendenti
+        if: ${{ inputs.conferma == 'applica' }}
+        env:
+          DATABASE_URL: ${{ inputs.target == 'production' && secrets.DATABASE_URL_PRODUCTION || secrets.DATABASE_URL_STAGING }}
+          PREMURA_DB_TARGET: ${{ inputs.target }}
+          PREMURA_CONFIRM_PROD: 'yes'
+        run: pnpm db:migrate
+
+      - name: Riepilogo
+        if: always()
+        run: |
+          if [ "${{ inputs.conferma }}" = "applica" ]; then
+            echo "Migration APPLICATE su ${{ inputs.target }}."
+          else
+            echo "Solo dry run su ${{ inputs.target }}: nessuna scrittura."
+            echo "Per applicare davvero, rilancia scrivendo 'applica' nel campo conferma."
+          fi

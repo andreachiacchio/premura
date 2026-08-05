@@ -34,6 +34,15 @@ jobs:
       - name: Vitest (full suite)
         run: pnpm test
 
+      - name: Migration registrate nel journal Drizzle
+        # 05/08: il migrator itera sul journal, non sulla cartella. Un
+        # .sql senza voce non viene applicato e nessuno se ne accorge —
+        # e' successo tre volte, l'ultima con 0037 mentre il form di
+        # prenotazione diretta era gia' live. Node puro, nessuna
+        # dipendenza: questa guardia non deve poter fallire per gli
+        # stessi motivi per cui fallisce `pnpm db:migrate` in locale.
+        run: node scripts/check-migrations-journal.mjs
+
       - name: Static check — no inline closures su form action
         # Catches il bug RSC fixato in slice 7a.5: inline arrow functions
         # come <form action={() => ...}> non sono server-action references
