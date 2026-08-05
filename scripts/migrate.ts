@@ -100,21 +100,35 @@ async function dryRunReport(sqlClient: ReturnType<typeof postgres>): Promise<voi
     console.log('[migrate dry-run] tabella __drizzle_migrations non trovata (DB vergine).');
   }
 
-  // Drizzle stora "hash" che e' diverso dal "tag", ma per il report
-  // testuale basta enumerare i tag locali e dire "X applicate, Y pending".
-  // Per essere precisi servirebbe leggere migrations.json che ha gli
-  // hash. Per il dry-run e' sufficiente come output informativo.
+  // ATTENZIONE — questo report NON e' affidabile, e lo dice.
+  //
+  // Confronta due cose diverse: i TAG del journal locale contro gli
+  // HASH della tabella sul DB, e ne sottrae i conteggi. Quindi:
+  //  - una migration presente su un lato ma non sull'altro sparisce
+  //    dal calcolo se i numeri per caso tornano;
+  //  - un .sql non registrato nel journal e' invisibile a entrambi.
+  //
+  // E' esattamente cosi' che il 05/08 ha risposto "0 pending" mentre
+  // 0036 e 0037 non erano tracciate sul database.
+  //
+  // Decisione Andrea: NON correggerlo, perche' il percorso buono e' il
+  // workflow db-migrate.yml. Ma deve dichiararsi inaffidabile invece di
+  // dire "allineati" — un numero di cui non ci si puo' fidare, se
+  // presentato come certo, e' peggio di nessun numero.
   const totalLocal = localTags.size;
   const totalApplied = appliedTags.size;
-  const pending = totalLocal - totalApplied;
+  const differenza = totalLocal - totalApplied;
 
   console.log(`[migrate dry-run] journal locale: ${totalLocal} migration`);
-  console.log(`[migrate dry-run] DB applied:    ${totalApplied} migration`);
-  console.log(`[migrate dry-run] pending:       ${pending} migration`);
-  if (pending > 0) {
-    console.log('[migrate dry-run] applica con `pnpm db:migrate` (senza --dry-run).');
-  } else {
-    console.log('[migrate dry-run] DB e migrations folder allineati.');
+  console.log(`[migrate dry-run] righe sul DB:   ${totalApplied}`);
+  console.log(`[migrate dry-run] differenza:     ${differenza}`);
+  console.log('');
+  console.log('[migrate dry-run] STIMA NON AFFIDABILE: confronta tag locali con hash del');
+  console.log('[migrate dry-run] DB e ne sottrae i conteggi, quindi puo tacere una');
+  console.log('[migrate dry-run] migration mancante. Per sapere davvero cosa e pendente usa');
+  console.log('[migrate dry-run] il workflow "Applica migration database" su GitHub Actions.');
+  if (differenza > 0) {
+    console.log(`[migrate dry-run] almeno ${differenza} migration NON risultano applicate.`);
   }
 }
 
