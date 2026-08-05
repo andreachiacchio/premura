@@ -1,7 +1,11 @@
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getOnboardingState, urlForStep } from '@/lib/onboarding';
-import { buildAgentStatus, findNextActiveArrival } from '@/lib/repositories/agent-status';
+import {
+  buildAgentStatus,
+  findNextActiveArrival,
+  getCalendarStateForHost,
+} from '@/lib/repositories/agent-status';
 import { findByHostId } from '@/lib/repositories/bookings';
 import { listGuestsArrivingSoon, listGuestsInHouse } from '@/lib/repositories/home-guests';
 import { getHomeSummary, listGuestsMissingPhoneSoon } from '@/lib/repositories/home-summary';
@@ -147,11 +151,17 @@ export default async function DashboardPage() {
   // Home desktop (30/07): ospiti in casa e in arrivo, stessi predicati
   // della metrica dell'agent card ("mai due verita'").
   const now = new Date();
-  const [guestsInHouseRows, guestsArrivingRows, possibleCancellations] = await Promise.all([
-    safeQuery('listGuestsInHouse', () => listGuestsInHouse(db, hostId, now), []),
-    safeQuery('listGuestsArrivingSoon', () => listGuestsArrivingSoon(db, hostId, now), []),
-    safeQuery('listPossibleCancellations', () => listPossibleCancellations(db, hostId), []),
-  ]);
+  const [guestsInHouseRows, guestsArrivingRows, possibleCancellations, calendars] =
+    await Promise.all([
+      safeQuery('listGuestsInHouse', () => listGuestsInHouse(db, hostId, now), []),
+      safeQuery('listGuestsArrivingSoon', () => listGuestsArrivingSoon(db, hostId, now), []),
+      safeQuery('listPossibleCancellations', () => listPossibleCancellations(db, hostId), []),
+      safeQuery('getCalendarStateForHost', () => getCalendarStateForHost(db, hostId), {
+        feedsTotali: 0,
+        feedsLetti: 0,
+        feedsInErrore: 0,
+      }),
+    ]);
 
   const incompleteToCompleteCount = bookings.filter(
     (b) => isIncompleteDataSource(b.dataSource) && !b.hostSkippedCompletion,
@@ -182,10 +192,17 @@ export default async function DashboardPage() {
   startOfToday.setHours(0, 0, 0, 0);
   const actionsToday = summary.feed.filter((f) => f.at >= startOfToday).length;
 
+  // 05/08: la card e il contatore "Serve te" leggono lo STESSO numero,
+  // e lo stato dei calendari entra nella frase: mai "tutto tranquillo"
+  // quando c'e' qualcosa in sospeso o il calendario non e' stato letto.
+  const needsYouCount = decisionsCount(decisionsData);
+
   const agentStatus = buildAgentStatus({
     pendingDraftsCount: replyDrafts.length,
     oldestDraftGuestName: replyDrafts[0]?.guestFullName ?? null,
     nextArrival,
+    needsYouCount,
+    calendars,
   });
 
   return (
@@ -256,7 +273,7 @@ export default async function DashboardPage() {
         stats={{
           activeGuests: summary.metrics.guestsInHouse,
           actionsToday,
-          needsYou: decisionsCount(decisionsData),
+          needsYou: needsYouCount,
         }}
       />
 

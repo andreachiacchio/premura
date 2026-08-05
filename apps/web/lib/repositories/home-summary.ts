@@ -87,6 +87,10 @@ export async function getHomeSummary(
   }
 
   // ─── Metrica 1: ospiti attivi ───────────────────────────────────
+  // 05/08: le fasce Booking anonime sono escluse anche qui — la card
+  // conta persone, e di una fascia booking_ical_only non sappiamo se
+  // ci sia qualcuno ne' quanti siano. Stessi predicati di
+  // listGuestsInHouse: mai due verita'.
   const guests = await section('ospiti', { inHouse: 0, arriving: 0 }, async () => {
     const [inHouseRow] = await db
       .select({ n: sql<number>`coalesce(sum(${bookings.numGuests}), 0)::int` })
@@ -97,6 +101,7 @@ export async function getHomeSummary(
           eq(properties.hostId, hostId),
           ne(bookings.status, 'cancelled'),
           eq(bookings.isCalendarBlock, false),
+          ne(bookings.dataSource, 'booking_ical_only'),
           lte(bookings.checkinAt, now),
           gt(bookings.checkoutAt, now),
         ),
@@ -111,6 +116,7 @@ export async function getHomeSummary(
           eq(properties.hostId, hostId),
           ne(bookings.status, 'cancelled'),
           eq(bookings.isCalendarBlock, false),
+          ne(bookings.dataSource, 'booking_ical_only'),
           gt(bookings.checkinAt, now),
           lte(bookings.checkinAt, arrivingEnd),
         ),

@@ -37,7 +37,7 @@ export const completeBookingFormSchema = z.object({
   guestLanguage: z
     .string()
     .trim()
-    .min(2, 'Codice lingua troppo corto')
+    .min(2, 'Scegli la lingua: senza, il messaggio parte nella lingua sbagliata')
     .max(8, 'Codice lingua troppo lungo'),
   numGuests: z.coerce
     .number()
@@ -80,8 +80,13 @@ const COUNTRY_TO_LANGUAGE: Record<string, string> = {
   AR: 'es',
 };
 
+// 05/08 (Andrea): su una casa in costiera la maggioranza degli ospiti
+// non e' italiana. Un default sbagliato e' peggio di nessun default:
+// nessuno lo cambia e parte un messaggio nella lingua errata. Si deduce
+// SOLO dalla nazionalita' quando c'e'; altrimenti resta vuoto e l'host
+// sceglie.
 function defaultLanguageFor(countryCode: string | null): string {
-  if (!countryCode) return 'it';
+  if (!countryCode) return '';
   return COUNTRY_TO_LANGUAGE[countryCode.toUpperCase()] ?? 'en';
 }
 
@@ -233,20 +238,32 @@ export function CompleteBookingDialog({
               )}
             />
 
-            {/* L1: senza numero, il primo messaggio lo manda l'host
-                nell'inbox della piattaforma — testo pronto da copiare. */}
-            <div className="rounded-card border border-line-soft bg-ivory/60 px-3 py-2.5">
+            {/* 05/08 (Andrea): questa e' la via che risolve il problema
+                alla radice — l'ospite lascia il numero da solo e la
+                lingua la deduciamo da come scrive. Promossa ad azione
+                consigliata; compilare a mano resta possibile, ma non e'
+                il percorso suggerito. */}
+            <div className="rounded-card border border-terracotta-soft bg-peach/40 px-3 py-3">
               {inviteMessage === null ? (
-                <button
-                  type="button"
-                  onClick={onGenerateInvite}
-                  disabled={inviteLoading}
-                  className="text-body-sm font-medium text-terracotta-2 underline-offset-2 hover:underline disabled:opacity-60"
-                >
-                  {inviteLoading
-                    ? 'Preparo il messaggio…'
-                    : "Non ho il numero — manda il link all'ospite"}
-                </button>
+                <div className="flex flex-col gap-2">
+                  <p className="text-body-sm font-semibold text-ink">
+                    Non ce l&apos;hai? Fattelo dare dall&apos;ospite.
+                  </p>
+                  <p className="text-[12px] text-ink-soft">
+                    Prepariamo noi il messaggio da incollare nell&apos;inbox Booking o Airbnb:
+                    l&apos;ospite risponde col suo numero e non ricopi niente.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="accent"
+                    size="sm"
+                    className="self-start"
+                    onClick={onGenerateInvite}
+                    disabled={inviteLoading}
+                  >
+                    {inviteLoading ? 'Preparo il messaggio…' : "Manda il link all'ospite"}
+                  </Button>
+                </div>
               ) : (
                 <div className="flex flex-col gap-2">
                   <p className="text-[12px] text-ink-mute">
@@ -284,6 +301,7 @@ export function CompleteBookingDialog({
                       name={field.name}
                       ref={field.ref}
                     >
+                      <option value="">Seleziona…</option>
                       {LANGUAGE_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>
                           {opt.label}
@@ -291,7 +309,10 @@ export function CompleteBookingDialog({
                       ))}
                     </select>
                   </FormControl>
-                  <FormDescription>La lingua dei messaggi che l'ospite riceverà.</FormDescription>
+                  <FormDescription>
+                    La lingua dei messaggi che l&apos;ospite riceverà. Se non la sai, chiedila
+                    all&apos;ospite col link qui sopra: la deduciamo da come scrive.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -339,8 +360,13 @@ export function CompleteBookingDialog({
               >
                 {skipping ? 'Salto…' : 'Salta per ora'}
               </Button>
-              <Button type="submit" variant="accent" size="md" disabled={submitting || skipping}>
-                {submitting ? 'Salvo…' : 'Salva e attiva Premura'}
+              <Button
+                type="submit"
+                variant="ink"
+                size="md"
+                disabled={submitting || skipping}
+              >
+                {submitting ? 'Salvo…' : 'Salva'}
               </Button>
             </DialogFooter>
           </form>
