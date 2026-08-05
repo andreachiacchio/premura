@@ -8,10 +8,13 @@ import { and, asc, eq, gt, lte, ne } from 'drizzle-orm';
 // COERENZA COI CONTEGGI ("mai due verita'"): i predicati di
 // listGuestsInHouse sono GLI STESSI della metrica guestsInHouse in
 // home-summary (checkin <= now < checkout, non cancellata, non blocco).
-// Se il contatore dell'agent card dice 9, qui ci sono le stesse
-// prenotazioni. Le fasce iCal Booking senza ospite noto restano incluse
-// e si presentano come "Un ospite" — qualcuno in casa c'e', anche se
-// non sappiamo chi.
+//
+// 05/08 (Andrea): le fasce Booking anonime NON sono persone. Una fascia
+// booking_ical_only e' una data occupata di origine ignota: mostrarla
+// come "Un ospite" e' inventare una persona che non sappiamo esista.
+// Vivono nella loro sezione ("Date occupate"), con l'azione che le
+// risolve. Appena l'host completa i dati il data_source cambia e la
+// prenotazione rientra qui, con il suo nome.
 
 export type HomeGuestRow = {
   id: string;
@@ -59,6 +62,7 @@ export async function listGuestsInHouse(
         eq(properties.hostId, hostId),
         ne(bookings.status, 'cancelled'),
         eq(bookings.isCalendarBlock, false),
+        ne(bookings.dataSource, 'booking_ical_only'),
         lte(bookings.checkinAt, now),
         gt(bookings.checkoutAt, now),
       ),
@@ -84,6 +88,7 @@ export async function listGuestsArrivingSoon(
         eq(properties.hostId, hostId),
         ne(bookings.status, 'cancelled'),
         eq(bookings.isCalendarBlock, false),
+        ne(bookings.dataSource, 'booking_ical_only'),
         gt(bookings.checkinAt, now),
         lte(bookings.checkinAt, windowEnd),
       ),

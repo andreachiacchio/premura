@@ -24,7 +24,12 @@ import type { CompleteBookingActionFn, SkipBookingActionFn } from './CompleteBoo
 //
 // Sulla home le righe restano cliccabili (dialog di completamento).
 
-const LATER_COLLAPSED_COUNT = 3;
+// 05/08 (Andrea): dieci righe identiche, una nel 2027, sono dati grezzi
+// presentati come contenuto principale. La dashboard mostra cio' su cui
+// si puo' agire — il calendario in se' l'host ce l'ha gia' su Booking.
+// Si vedono le prossime, il resto sta dietro un "vedi tutte".
+const SOON_COLLAPSED_COUNT = 3;
+const LATER_COLLAPSED_COUNT = 0;
 const FILTER_STORAGE_KEY = 'premura.occupied.propertyFilter';
 
 export type OccupiedRangesSectionProps = {
@@ -45,6 +50,7 @@ export function OccupiedRangesSection({
   skipAction,
 }: OccupiedRangesSectionProps): React.JSX.Element | null {
   const [showAllLater, setShowAllLater] = useState(false);
+  const [showAllSoon, setShowAllSoon] = useState(false);
   const [openRangeId, setOpenRangeId] = useState<string | null>(null);
   // Filtro persistente (stessa regola dei check-in): letto DOPO il
   // mount per non rompere l'hydration.
@@ -72,6 +78,7 @@ export function OccupiedRangesSection({
   const visible = filter === 'all' ? ranges : ranges.filter((r) => r.propertyId === filter);
   const { current, soon, later } = splitByUrgency(visible, now);
   const laterVisible = showAllLater ? later : later.slice(0, LATER_COLLAPSED_COUNT);
+  const soonVisible = showAllSoon ? soon : soon.slice(0, SOON_COLLAPSED_COUNT);
 
   const clickable = Boolean(bookingsById && completeAction && skipAction);
   const openBooking = openRangeId ? bookingsById?.[openRangeId] : undefined;
@@ -181,17 +188,35 @@ export function OccupiedRangesSection({
         ? group(`In corso ora · ${current.length}`, 'text-terracotta-2', current, true)
         : null}
 
-      {soon.length > 0
-        ? group(
+      {soon.length > 0 ? (
+        <div>
+          {group(
             `Da verificare ora · prossimi 30 giorni · ${soon.length}`,
             'text-gold-deep',
-            soon,
-          )
-        : null}
+            soonVisible,
+          )}
+          {soon.length > SOON_COLLAPSED_COUNT && !showAllSoon ? (
+            <button
+              type="button"
+              onClick={() => setShowAllSoon(true)}
+              className="mt-2 text-body-sm font-medium text-terracotta-2 underline-offset-2 hover:underline"
+            >
+              Vedi tutte ({soon.length})
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {later.length > 0 ? (
         <div>
-          {group(`Più avanti · ${later.length}`, 'text-ink-mute', laterVisible)}
+          {showAllLater ? (
+            group(`Più avanti · ${later.length}`, 'text-ink-mute', laterVisible)
+          ) : (
+            <p className="text-body-sm text-ink-soft">
+              Più avanti ci sono altre {later.length}{' '}
+              {later.length === 1 ? 'data occupata' : 'date occupate'}: niente da fare adesso.
+            </p>
+          )}
           {later.length > LATER_COLLAPSED_COUNT && !showAllLater ? (
             <button
               type="button"

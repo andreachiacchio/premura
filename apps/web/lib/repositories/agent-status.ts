@@ -59,16 +59,59 @@ export async function findNextActiveArrival(
   return row ?? null;
 }
 
+/** Stato dei calendari dell'host, letto da properties.ical_sources
+ *  (il worker ci scrive lastCheckedAt / lastResult a ogni poll). */
+export type CalendarState = {
+  feedsTotali: number;
+  /** Almeno un poll andato a buon fine. */
+  feedsLetti: number;
+  /** Ultimo poll fallito: l'host deve ricollegarlo. */
+  feedsInErrore: number;
+};
+
+export async function getCalendarStateForHost(
+  db: Database,
+  hostId: string,
+): Promise<CalendarState> {
+  const rows = await db
+    .select({ icalSources: properties.icalSources })
+    .from(properties)
+    .where(and(eq(properties.hostId, hostId), eq(properties.isActive, true)));
+
+  let feedsTotali = 0;
+  let feedsLetti = 0;
+  let feedsInErrore = 0;
+  for (const row of rows) {
+    for (const feed of row.icalSources ?? []) {
+      feedsTotali += 1;
+      if (feed.lastResult === 'error') feedsInErrore += 1;
+      else if (feed.lastOkAt) feedsLetti += 1;
+    }
+  }
+  return { feedsTotali, feedsLetti, feedsInErrore };
+}
+
 /**
  * Regole in ordine di priorita':
  *  1. bozze in attesa -> e' l'unica cosa tra un ospite e la risposta
- *  2. prossimo arrivo attivo -> il benvenuto e' in preparazione
- *  3. niente in corso -> la verita', senza inventare
+ *  2. calendario rotto -> l'host deve ricollegarlo, o non arriva nulla
+ *  3. nessun calendario / mai letto -> lo stato vero della lettura
+ *  4. prossimo arrivo attivo -> il benvenuto e' in preparazione
+ *  5. altre cose che aspettano l'host -> MAI "tutto tranquillo"
+ *  6. letto e niente in programma -> la verita', senza inventare
+ *
+ * 05/08 (Andrea): "Tutto tranquillo" accanto a "SERVE TE: 1" e' una
+ * contraddizione, e "tranquillo" quando il calendario non e' ancora
+ * stato letto e' peggio: e' il momento in cui l'host conclude che il
+ * prodotto non fa niente. Un solo punto di verita'.
  */
 export function buildAgentStatus(input: {
   pendingDraftsCount: number;
   oldestDraftGuestName: string | null;
   nextArrival: NextArrival | null;
+  /** Contatore "Serve te" della card: stessa fonte, mai due verita'. */
+  needsYouCount?: number;
+  calendars?: CalendarState;
   now?: Date;
 }): AgentStatus {
   const now = input.now ?? new Date();
@@ -82,6 +125,31 @@ export function buildAgentStatus(input: {
           : `Ho pronte ${input.pendingDraftsCount} risposte — serve il tuo via.`,
       sub: 'La trovi qui sotto, con approva e modifica.',
     };
+  }
+
+  const cal = input.calendars;
+  if (cal) {
+    if (cal.feedsInErrore > 0) {
+      return {
+        action:
+          cal.feedsInErrore === 1
+            ? 'Un calendario non risponde più.'
+            : `${cal.feedsInErrore} calendari non rispondono più.`,
+        sub: 'Vanno ricollegati: finché sono fermi, le nuove date non arrivano.',
+      };
+    }
+    if (cal.feedsTotali === 0) {
+      return {
+        action: 'Non ho ancora un calendario da leggere.',
+        sub: 'Collega Airbnb o Booking: da lì arrivano gli ospiti.',
+      };
+    }
+    if (cal.feedsLetti === 0) {
+      return {
+        action: 'Sto leggendo il tuo calendario…',
+        sub: 'Ci vuole meno di un minuto: ricarica tra poco.',
+      };
+    }
   }
 
   if (input.nextArrival) {
@@ -99,6 +167,24 @@ export function buildAgentStatus(input: {
     return {
       action: `Sto preparando l'arrivo di ${nome}, ${giorno}.`,
       sub: `Benvenuto in programma alle ${slot} del giorno di arrivo.`,
+    };
+  }
+
+  const needsYou = input.needsYouCount ?? 0;
+  if (needsYou > 0) {
+    return {
+      action:
+        needsYou === 1
+          ? 'C’è una cosa che aspetta te.'
+          : `Ci sono ${needsYou} cose che aspettano te.`,
+      sub: 'Le trovi qui sotto, una alla volta.',
+    };
+  }
+
+  if (cal && cal.feedsLetti > 0) {
+    return {
+      action: 'Calendario letto, nessun arrivo in programma.',
+      sub: 'Appena entra una prenotazione me ne occupo io.',
     };
   }
 

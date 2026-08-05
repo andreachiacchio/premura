@@ -43,11 +43,11 @@ describe("CompleteBookingDialog", () => {
       />,
     );
 
-    // Nome e telefono partono vuoti. La lingua e' un menu a tendina
-    // (30/07) e non puo' mai essere vuota: il suo errore di validazione
-    // e' irraggiungibile by design.
+    // Nome e telefono partono vuoti. Dal 05/08 anche la lingua parte
+    // vuota quando la nazionalita' non si conosce: un default italiano
+    // sbagliato fa partire il messaggio nella lingua errata.
     await user.click(
-      screen.getByRole("button", { name: /Salva e attiva Premura/i }),
+      screen.getByRole("button", { name: /^Salva$/i }),
     );
 
     expect(
@@ -55,6 +55,11 @@ describe("CompleteBookingDialog", () => {
     ).toBeInTheDocument();
     expect(
       await screen.findByText("Il telefono deve avere almeno 8 caratteri"),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "Scegli la lingua: senza, il messaggio parte nella lingua sbagliata",
+      ),
     ).toBeInTheDocument();
 
     expect(completeAction).not.toHaveBeenCalled();
@@ -80,9 +85,11 @@ describe("CompleteBookingDialog", () => {
 
     await user.type(screen.getByLabelText("Nome dell'ospite"), "Mario Rossi");
     await user.type(screen.getByLabelText("Telefono"), "+393331234567");
+    // La lingua va scelta: senza nazionalita' nota non c'e' default.
+    await user.selectOptions(screen.getByLabelText("Lingua"), "it");
 
     await user.click(
-      screen.getByRole("button", { name: /Salva e attiva Premura/i }),
+      screen.getByRole("button", { name: /^Salva$/i }),
     );
 
     await waitFor(() => {
