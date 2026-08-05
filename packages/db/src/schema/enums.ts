@@ -9,7 +9,11 @@ import { pgEnum } from 'drizzle-orm/pg-core';
 // ─────────────────────────────────────────────────────────────
 
 // Piattaforma origine di una prenotazione
-export const platformEnum = pgEnum('platform', ['booking', 'airbnb', 'direct']);
+// 'direct' = l'host possiede la relazione col cliente e non paga
+// commissioni. 'altro' = ogni altro canale (Vrbo, Expedia, Agoda...):
+// tenuto separato di proposito, perche' chiamarlo "diretta"
+// distruggerebbe il significato commerciale del campo (migration 0037).
+export const platformEnum = pgEnum('platform', ['booking', 'airbnb', 'direct', 'altro']);
 
 // Ciclo di vita di una prenotazione
 export const bookingStatusEnum = pgEnum('booking_status', [

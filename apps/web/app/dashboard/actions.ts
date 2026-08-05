@@ -9,7 +9,10 @@ import {
 } from '@/lib/repositories/possible-cancellations';
 import { getOrCreateDeflectionDraft, markDeflectionSent } from '@/lib/deflection-draft';
 import { composeGuestInvite } from '@/lib/guest-invite';
+import { normalizeEuroAmount } from '@/lib/euro-amount';
+import { normalizePhone } from '@/lib/phone-normalize';
 import { findOwnership } from '@/lib/repositories/bookings';
+import { createDirectBooking } from '@/lib/repositories/direct-bookings';
 import { findHostWaNumber } from '@/lib/repositories/hosts';
 import { createProperty } from '@/lib/repositories/properties';
 import { approveAndQueueReplyDraft, rejectReplyDraft } from '@/lib/repositories/reply-drafts';
@@ -321,4 +324,135 @@ export async function dismissCancellationAction(
   const result = await dismissCancellation(db, hostId, parsed.data);
   revalidatePath('/dashboard');
   return { ok: result.ok };
+}
+
+// ─── Prenotazione inserita dall'host (05/08) ────────────────────────
+//
+// "La diretta va trattata come il caso migliore, non come fallback."
+// L'action ritorna un risultato tipizzato invece di lanciare: il
+// dialog e' un client component con useTransition e deve poter
+// mostrare all'host cosa e' successo (assorbita? Premura attiva?
+// sovrapposizioni parziali?), non un errore generico.
+
+const directBookingSchema = z.object({
+  propertyId: z.string().uuid('Scegli la struttura'),
+  platform: z.enum(['direct', 'booking', 'airbnb', 'altro']),
+  // I max riflettono le colonne: varchar(255) su nome ed email,
+  // varchar(32) sul telefono. Senza, l'errore arrivava da Postgres.
+  guestFullName: z
+    .string()
+    .trim()
+    .min(2, 'Il nome deve avere almeno 2 caratteri')
+    .max(255, 'Nome troppo lungo'),
+  guestPhone: z.string().trim().max(32, 'Numero troppo lungo').optional(),
+  guestEmail: z
+    .string()
+    .trim()
+    .max(255, 'Email troppo lunga')
+    .optional()
+    .refine((v) => !v || z.string().email().safeParse(v).success, {
+      message: 'Email non valida',
+    }),
+  guestLanguage: z.string().trim().min(2, 'Scegli la lingua').max(8).optional(),
+  numGuests: z.coerce.number().int().min(1, 'Almeno 1 ospite').max(20, 'Troppi ospiti'),
+  checkinDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data di arrivo mancante'),
+  checkoutDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data di partenza mancante'),
+  priceTotal: z.string().trim().optional(),
+  hostNotes: z.string().trim().max(2000).optional(),
+});
+
+export type CreateDirectBookingActionResult =
+  | {
+      ok: true;
+      absorbed: boolean;
+      premuraActivated: boolean;
+      partialOverlapCount: number;
+    }
+  | { ok: false; error: string };
+
+/** YYYY-MM-DD -> mezzanotte UTC (stessa convenzione di parseIsoDate). */
+function isoToUtcMidnight(yyyymmdd: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(yyyymmdd);
+  if (!m) throw new Error(`isoToUtcMidnight: formato non valido "${yyyymmdd}"`);
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+}
+
+export async function createDirectBookingAction(
+  formData: FormData,
+): Promise<CreateDirectBookingActionResult> {
+  const parsed = directBookingSchema.safeParse({
+    propertyId: formData.get('propertyId'),
+    platform: formData.get('platform'),
+    guestFullName: formData.get('guestFullName'),
+    guestPhone: formData.get('guestPhone') ?? undefined,
+    guestEmail: formData.get('guestEmail') ?? undefined,
+    guestLanguage: formData.get('guestLanguage') ?? undefined,
+    numGuests: formData.get('numGuests') ?? 1,
+    checkinDate: formData.get('checkinDate'),
+    checkoutDate: formData.get('checkoutDate'),
+    priceTotal: formData.get('priceTotal') ?? undefined,
+    hostNotes: formData.get('hostNotes') ?? undefined,
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Dati non validi' };
+  }
+  const p = parsed.data;
+
+  // Il telefono va normalizzato come ovunque: senza E.164 l'agente non
+  // riesce a scrivere, e un numero salvato male e' peggio di assente.
+  let phone: string | null = null;
+  if (p.guestPhone) {
+    const norm = normalizePhone(p.guestPhone);
+    if (!norm.ok) {
+      return { ok: false, error: 'Numero non valido: scrivilo con il prefisso, es. +39 333…' };
+    }
+    phone = norm.e164;
+  }
+
+  // "1.234,50" e' come un host italiano scrive milleduecentotrentaquattro
+  // e cinquanta. Un replace(',', '.') secco lo avrebbe salvato come
+  // 1,234 euro: il prezzo pilota il budget del kit, quindi sbagliarlo
+  // di mille volte non e' un dettaglio.
+  const prezzo = p.priceTotal ? normalizeEuroAmount(p.priceTotal) : null;
+  if (p.priceTotal && prezzo === null) {
+    return { ok: false, error: 'Prezzo non valido: scrivilo come 450 oppure 1.234,50' };
+  }
+
+  const hostId = await getCurrentHostId();
+  const { db } = await getDb();
+  const result = await createDirectBooking(db, hostId, {
+    propertyId: p.propertyId,
+    platform: p.platform,
+    guestFullName: p.guestFullName,
+    guestPhone: phone,
+    guestEmail: p.guestEmail || null,
+    guestLanguage: p.guestLanguage || null,
+    numGuests: p.numGuests,
+    checkinAt: isoToUtcMidnight(p.checkinDate),
+    checkoutAt: isoToUtcMidnight(p.checkoutDate),
+    priceTotal: prezzo,
+    hostNotes: p.hostNotes || null,
+  });
+
+  if (!result.ok) {
+    const messaggi = {
+      property_not_found: 'Struttura non trovata',
+      wrong_host: 'Struttura non trovata',
+      invalid_dates: 'La partenza deve essere dopo l’arrivo',
+      stay_too_long: 'Più di un anno non è un soggiorno: controlla le date',
+      duplicate:
+        'Su queste date hai già una prenotazione con un nome. Aprila e modificala, invece di crearne una seconda.',
+    } as const;
+    return { ok: false, error: messaggi[result.reason] };
+  }
+
+  revalidatePath('/dashboard');
+  revalidatePath('/dashboard/upcoming-checkins');
+  revalidatePath('/properties');
+  return {
+    ok: true,
+    absorbed: result.absorbed,
+    premuraActivated: result.premuraActivated,
+    partialOverlapCount: result.partialOverlaps.length,
+  };
 }

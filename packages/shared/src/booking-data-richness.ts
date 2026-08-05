@@ -14,6 +14,12 @@ export const RICH_DATA_SOURCES = [
   'airbnb_email_parsed',
   'booking_manual_filled',
   'booking_via_channel_manager',
+  // Prenotazione inserita dall'host (diretta o da un canale che non
+  // integriamo). E' la fonte piu' ricca che esista: l'host ha nome,
+  // telefono, email, lingua e numero ospiti dal primo minuto.
+  // DEVE stare qui: se non e' RICH, on-new-booking non parte e
+  // l'upsert iCal non la protegge (vedi upsertBookingShell).
+  'direct_manual',
 ] as const;
 
 // Volutamente NON include 'airbnb_ical_only' anche se semanticamente la
@@ -23,6 +29,18 @@ export const RICH_DATA_SOURCES = [
 // quindi non vogliamo che la UI dashboard inviti l'host a compilare a mano
 // righe Airbnb-iCal-only: sarebbero arricchite dall'email entro minuti.
 export const INCOMPLETE_DATA_SOURCES = ['booking_ical_only', 'booking_email_only'] as const;
+
+// Fonti che producono una FASCIA ANONIMA: righe nate da un feed iCal,
+// senza nome vero ne' telefono. Diverso da INCOMPLETE_DATA_SOURCES:
+// 'booking_email_only' e' incompleta ma non nasce da un calendario, e
+// 'airbnb_ical_only' e' anonima ma non e' nella lista INCOMPLETE
+// (l'arricchimento Airbnb arriva da solo via parser email).
+//
+// Vive qui perche' la usano DUE lati: il worker iCal in apps/api
+// (per decidere se sopprimere una shell) e apps/web (per trovare la
+// fascia da assorbire quando l'host inserisce una prenotazione).
+// Duplicarla avrebbe prodotto drift al primo valore nuovo.
+export const ANONYMOUS_ICAL_SOURCES = ['booking_ical_only', 'airbnb_ical_only'] as const;
 
 // Lista chiusa di tutti i valori data_source riconosciuti dall'applicazione.
 // Sorgente di verita' per il tipo TypeScript DataSource: lo schema DB tiene

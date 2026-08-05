@@ -89,6 +89,12 @@ export const bookings = pgTable(
     // URL listing piattaforma origine (utile in dashboard).
     listingUrl: text('listing_url'),
 
+    // Note libere dell'host su questa prenotazione (allergie, orario di
+    // arrivo concordato, accordi presi a voce). Migration 0037.
+    // NON e' il messaggio dell'ospite: quello vive in
+    // guest_message_original ed e' scritto dall'ospite, non dall'host.
+    hostNotes: text('host_notes'),
+
     // Tracking sync email: quale Gmail message ID ha arricchito questa
     // riga, e quando. Usato per idempotenza (skip se già processato).
     rawEmailId: varchar('raw_email_id', { length: 128 }),

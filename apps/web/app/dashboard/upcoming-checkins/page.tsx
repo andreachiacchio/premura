@@ -2,6 +2,8 @@ import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { startTimer, timed } from '@/lib/perf';
 import { listUpcomingCheckins } from '@/lib/repositories/upcoming-checkins';
+import { createDirectBookingAction } from '../actions';
+import { AddBookingButton } from '../_components/AddBookingButton';
 import Link from 'next/link';
 import {
   type UpcomingCheckinCardData,
@@ -25,6 +27,8 @@ export default async function UpcomingCheckinsPage(): Promise<React.JSX.Element>
     listUpcomingCheckins(db, hostId),
   );
   stop();
+
+  const propertyOptions = properties.map((p) => ({ id: p.id, name: p.name }));
 
   const data: UpcomingCheckinCardData[] = rows.map((r) => ({
     id: r.id,
@@ -87,6 +91,17 @@ export default async function UpcomingCheckinsPage(): Promise<React.JSX.Element>
             Nessun soggiorno in corso e nessun check-in nei prossimi 14 giorni. Quando arriveranno
             nuove prenotazioni le vedrai qui.
           </p>
+          {/* 05/08: e' il punto esatto in cui un host con una
+              prenotazione diretta si bloccava — nessun modo di
+              aggiungerla. Qui il bottone e' l'azione principale. */}
+          <div className="mt-6">
+            <AddBookingButton
+              properties={propertyOptions}
+              createAction={createDirectBookingAction}
+              variant="primary"
+              label="Aggiungi una prenotazione"
+            />
+          </div>
         </div>
       ) : (
         <>
@@ -115,6 +130,14 @@ export default async function UpcomingCheckinsPage(): Promise<React.JSX.Element>
                 check-in.
               </p>
             ) : null}
+          </div>
+
+          <div className="mb-6">
+            <AddBookingButton
+              properties={propertyOptions}
+              createAction={createDirectBookingAction}
+              variant="outline"
+            />
           </div>
 
           <UpcomingCheckinsBoard

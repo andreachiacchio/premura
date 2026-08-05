@@ -1,6 +1,8 @@
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { startTimer, timed } from '@/lib/perf';
+import { AddBookingButton } from '../dashboard/_components/AddBookingButton';
+import { createDirectBookingAction } from '../dashboard/actions';
 import { bookings, properties } from '@premura/db';
 import { and, eq, ne, sql } from 'drizzle-orm';
 import { ChevronRight } from 'lucide-react';
@@ -84,6 +86,7 @@ export default async function PropertiesPage() {
     ),
   ]);
   stop();
+  const propertyOptions = (rows ?? []).map((p) => ({ id: p.id, name: p.name }));
   // counts null = conteggi non disponibili: si dice, non si mostra uno
   // 0 finto ("mai due verita'").
   const countsByProperty = counts ? new Map(counts.map((c) => [c.propertyId, c])) : null;
@@ -158,7 +161,18 @@ export default async function PropertiesPage() {
                     ? 'conteggi non disponibili al momento'
                     : `${upcomingBookings} ${upcomingBookings === 1 ? 'soggiorno' : 'soggiorni'} in arrivo · ${totalBookings} totali`}
                 </p>
-                <span className="flex items-center gap-3">
+                <span className="flex flex-wrap items-center gap-3">
+                  {/* 05/08: la pagina della singola struttura non
+                      esiste (sotto [propertyId] ci sono solo le tre
+                      sottopagine), quindi l'innesto per-struttura e'
+                      qui, con la struttura gia' preselezionata. */}
+                  <AddBookingButton
+                    properties={propertyOptions}
+                    defaultPropertyId={p.id}
+                    createAction={createDirectBookingAction}
+                    variant="link"
+                    label="+ Prenotazione"
+                  />
                   <Link
                     href={`/properties/${p.id}/services`}
                     className="inline-flex items-center gap-1 text-body-sm font-medium text-terracotta-2 hover:underline"
