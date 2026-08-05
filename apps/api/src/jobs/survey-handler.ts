@@ -59,7 +59,31 @@ async function processSendLink(
   }
 
   try {
-    await sendText(candidate.guestPhone, prepared.message);
+    const outcome = await sendText(candidate.guestPhone, prepared.message);
+
+    // sendText NON lancia quando il kill switch e' attivo: ritorna un
+    // esito con skippedReason. Marcare il sondaggio come inviato qui
+    // significava bruciarlo per sempre — al giro dopo prepareSurveySend
+    // trova alreadyPrepared e risponde 'already_sent', quindi il
+    // sondaggio non parte piu' nemmeno dopo aver abbassato lo switch.
+    //
+    // Il resto del sistema fa gia' la cosa giusta: in reserveAndSend il
+    // kill switch e' il PRIMO controllo, prima di scrivere qualunque
+    // stato, proprio perche' spegnendo lo switch il trigger possa
+    // ancora partire. Qui allineiamo: nessuno stato scritto, si
+    // riprova al prossimo tick.
+    if (outcome.skippedReason) {
+      await db
+        .update(guestQuizzes)
+        .set({ sentAt: null, token: null })
+        .where(eq(guestQuizzes.id, prepared.quizId));
+      logger.warn(
+        { bookingId, quizId: prepared.quizId, skippedReason: outcome.skippedReason },
+        'survey link NON inviato: stato azzerato, si riprova al prossimo tick',
+      );
+      return { status: 'skipped', reason: outcome.skippedReason };
+    }
+
     await markSurveySent(db, prepared.quizId);
     logger.info(
       {

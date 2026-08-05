@@ -13,7 +13,7 @@ import { bookingsRoutes } from '../src/api/bookings';
 
 const BOOKING_ID = '00000000-0000-4000-8000-000000000001';
 
-type SelectRow = { id: string; dataSource: string };
+type SelectRow = { id: string; dataSource: string; premuraActiveAt?: Date | null };
 
 // Fabbrica del mock db. selectRows determina cosa ritorna la prima query
 // (lookup booking by id): array vuoto -> 404, una riga -> match. Lo spy
@@ -232,6 +232,49 @@ describe('POST /api/bookings/:id/skip-completion', () => {
     expect(res.json()).toMatchObject({ error: 'booking_not_incomplete' });
     expect(updateValuesSpy).not.toHaveBeenCalled();
 
+    await app.close();
+  });
+});
+
+// 05/08 — premura_active_at e' il gate di guest-app-invite-cron e
+// booking-welcome-cron. Questo percorso scriveva il telefono ma non
+// attivava: l'host compilava il form, la riga diventava completa, e
+// l'agente non la raccoglieva mai. Questi test lo inchiodano.
+describe('complete-manual: attivazione Premura', () => {
+  it('attiva Premura quando la riga non era ancora attiva', async () => {
+    const { app, updateValuesSpy } = await buildApp({
+      selectRows: [{ id: BOOKING_ID, dataSource: 'booking_ical_only', premuraActiveAt: null }],
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/bookings/${BOOKING_ID}/complete-manual`,
+      payload: { guestFullName: 'Giulia Rossi', guestPhone: '+393331234567' },
+    });
+    expect(res.statusCode).toBe(200);
+    const values = updateValuesSpy.mock.calls[0]?.[0] ?? {};
+    expect(values).toHaveProperty('premuraActiveAt');
+    expect(values.guestPhoneSource).toBe('manual');
+    await app.close();
+  });
+
+  it('NON riattiva una riga esclusa di proposito', async () => {
+    const { app, updateValuesSpy } = await buildApp({
+      selectRows: [
+        {
+          id: BOOKING_ID,
+          dataSource: 'booking_ical_only',
+          premuraActiveAt: new Date('2026-08-01T10:00:00Z'),
+        },
+      ],
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/bookings/${BOOKING_ID}/complete-manual`,
+      payload: { guestFullName: 'Giulia Rossi', guestPhone: '+393331234567' },
+    });
+    expect(res.statusCode).toBe(200);
+    const values = updateValuesSpy.mock.calls[0]?.[0] ?? {};
+    expect(values).not.toHaveProperty('premuraActiveAt');
     await app.close();
   });
 });

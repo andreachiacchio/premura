@@ -56,7 +56,11 @@ export const bookingsRoutes: FastifyPluginAsync<BookingsRoutesOptions> = async (
     }
 
     const [existing] = await db
-      .select({ id: bookings.id, dataSource: bookings.dataSource })
+      .select({
+        id: bookings.id,
+        dataSource: bookings.dataSource,
+        premuraActiveAt: bookings.premuraActiveAt,
+      })
       .from(bookings)
       .where(eq(bookings.id, params.data.id))
       .limit(1);
@@ -72,6 +76,15 @@ export const bookingsRoutes: FastifyPluginAsync<BookingsRoutesOptions> = async (
       });
     }
 
+    // premura_active_at e' il gate di TUTTE le pipeline a valle
+    // (guest-app-invite-cron, booking-welcome-cron). Finora questo
+    // percorso scriveva il telefono ma non attivava: l'host compilava
+    // il form, la riga diventava completa, e l'agente non la
+    // raccoglieva mai. Attiviamo solo se non era gia' attiva, per non
+    // riaccendere una riga esclusa di proposito (stessa regola di
+    // setBookingGuestPhone).
+    const attivaOra = !existing.premuraActiveAt;
+
     await db
       .update(bookings)
       .set({
@@ -81,6 +94,9 @@ export const bookingsRoutes: FastifyPluginAsync<BookingsRoutesOptions> = async (
         numGuests: body.data.numGuests ?? 1,
         dataSource: 'booking_manual_filled',
         manualCompletionAt: sql`NOW()`,
+        ...(attivaOra
+          ? { premuraActiveAt: sql`NOW()`, guestPhoneSource: 'manual' as const }
+          : {}),
         updatedAt: sql`NOW()`,
       })
       .where(eq(bookings.id, params.data.id));

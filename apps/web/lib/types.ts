@@ -38,4 +38,8 @@ export type BookingForDashboard = {
   numGuests: number;
   checkinAt: Date;
   checkoutAt: Date;
+  /** Codice prenotazione dall'oggetto dell'email Booking. E' l'unico
+   *  dato utile che quell'email porta: permette all'host di ritrovare
+   *  la prenotazione sull'extranet in un clic invece di cercarla. */
+  bookingExternalCode?: string | null;
 };
