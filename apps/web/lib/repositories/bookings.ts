@@ -223,6 +223,7 @@ export async function findByHostId(args: {
       numGuests: bookings.numGuests,
       checkinAt: bookings.checkinAt,
       checkoutAt: bookings.checkoutAt,
+      bookingExternalCode: bookings.bookingExternalCode,
     })
     .from(bookings)
     .innerJoin(properties, eq(properties.id, bookings.propertyId))

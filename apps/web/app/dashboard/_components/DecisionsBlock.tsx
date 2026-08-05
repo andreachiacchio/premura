@@ -188,11 +188,14 @@ export function DecisionsBlock({
                 </span>{' '}
                 — Booking non ci ha dato nome o contatti dell'ospite
               </p>
+              {/* 05/08: porta alla schermata a lista invece che a una
+                  finestra per volta. Con dieci date, dieci modali sono
+                  dieci aperture e nessun senso di quante ne restano. */}
               <a
-                href="#prenotazioni"
+                href="/dashboard/da-completare"
                 className="inline-flex items-center gap-1 text-body-sm font-medium text-terracotta-2 hover:underline"
               >
-                Completa qui sotto
+                {data.incompleteCount === 1 ? 'Completala' : 'Completale tutte'}
                 <ChevronRight aria-hidden className="size-4" />
               </a>
             </Item>
