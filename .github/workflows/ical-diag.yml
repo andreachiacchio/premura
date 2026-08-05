@@ -1,0 +1,45 @@
+# Diagnostica feed iCal + poll on-demand (05/08).
+#
+# Perche' via Fly: ical.booking.com risponde 403 alla CONNECT sia dalla
+# rete di Andrea sia dal proxy dell'agente. Il worker Fly e' l'unico
+# ambiente da cui il feed e' raggiungibile — ed e' quello che fa i poll
+# veri, quindi e' anche la verifica che conta.
+#
+# La property e la modalita' si leggono da .github/ical-diag-request.txt
+# (prima riga non commentata: "<propertyId> [--poll]").
+#
+# Si lancia in due modi (stesso pattern di fly-diag / demo-seed):
+#  - workflow_dispatch (bottone per Andrea)
+#  - push su main che tocca .github/ical-diag-request.txt
+
+name: Diagnostica feed iCal
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/ical-diag-request.txt']
+
+concurrency:
+  group: ical-diag
+  cancel-in-progress: false
+
+jobs:
+  diag:
+    name: fetch feed + poll on-demand
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # UN tentativo, mai retry (lezione fly-ping 30/07): flyctl ssh puo'
+      # uscire con codice != 0 anche a comando riuscito.
+      - name: Esegui diagnostica sul worker
+        run: |
+          ARGS=$(grep -v '^#' .github/ical-diag-request.txt | grep -v '^$' | head -1)
+          echo "argomenti: $ARGS"
+          out=$(flyctl ssh console --app premura-api-staging --process-group worker -C "pnpm exec tsx src/scripts/ical-diag.ts $ARGS" 2>&1) || true
+          echo "$out"
