@@ -231,9 +231,19 @@ export async function reserveAndSend(
   }
 
   try {
+    // allowSkip: QUESTO percorso sa gestire lo skip — marca lo slot
+    // 'skipped' con il motivo, due righe piu' sotto. E' l'unico posto
+    // del progetto che ha il diritto di riceverlo come valore invece
+    // che come errore: ovunque altro un invio bloccato deve fermare il
+    // chiamante, non farlo proseguire come se fosse partito.
     const outcome = input.imageUrl
-      ? await sendImage({ to: phoneE164, imageUrl: input.imageUrl, caption: input.body })
-      : await sendText(phoneE164, input.body);
+      ? await sendImage({
+          to: phoneE164,
+          imageUrl: input.imageUrl,
+          caption: input.body,
+          allowSkip: true,
+        })
+      : await sendText(phoneE164, input.body, { allowSkip: true });
 
     // Caso limite: kill switch acceso DOPO il nostro primo controllo,
     // mentre eravamo tra prenotazione e invio. Il transport non ha

@@ -19,8 +19,15 @@ vi.mock('../src/whatsapp-business', () => ({
   WhatsappSendError: class extends Error {},
 }));
 
-const { isDryRun, isKillSwitchOn, pickJitterMs, resolveTransport, sendImage, sendText } =
-  await import('../src/whatsapp-transport');
+const {
+  WhatsappSendSkipped,
+  isDryRun,
+  isKillSwitchOn,
+  pickJitterMs,
+  resolveTransport,
+  sendImage,
+  sendText,
+} = await import('../src/whatsapp-transport');
 
 /** Invio reale = dry-run disattivato esplicitamente + kill switch spento. */
 function armLiveSending(transport: 'waha' | 'cloud'): void {
@@ -100,24 +107,63 @@ describe('dry-run', () => {
   });
 });
 
+// 05/08 (Andrea) — CONTRATTO INVERTITO.
+//
+// Prima il kill switch ritornava { skippedReason } e cinque chiamanti
+// su otto lo ignoravano: registravano "inviato", facevano avanzare lo
+// stato, e il messaggio non ripartiva piu'. Adesso lancia, e chi
+// tollera lo skip deve dichiararlo con allowSkip.
 describe('kill switch', () => {
-  it('blocca anche con dry-run disattivato', async () => {
+  it('LANCIA invece di ritornare uno skip silenzioso', async () => {
     armLiveSending('waha');
     vi.stubEnv('WHATSAPP_KILL_SWITCH', 'on');
     expect(isKillSwitchOn()).toBe(true);
 
-    const out = await sendText('+393514512070', 'ciao');
+    await expect(sendText('+393514512070', 'ciao')).rejects.toThrow(WhatsappSendSkipped);
+    expect(wahaText).not.toHaveBeenCalled();
+  });
+
+  it('LANCIA anche su sendImage', async () => {
+    armLiveSending('cloud');
+    vi.stubEnv('WHATSAPP_KILL_SWITCH', 'on');
+    await expect(
+      sendImage({ to: '+393514512070', imageUrl: 'https://x/y.jpg' }),
+    ).rejects.toThrow(WhatsappSendSkipped);
+    expect(cloudImage).not.toHaveBeenCalled();
+  });
+
+  it('l errore porta con se il motivo, cosi chi lo cattura puo registrarlo', async () => {
+    armLiveSending('waha');
+    vi.stubEnv('WHATSAPP_KILL_SWITCH', 'on');
+    await expect(sendText('+393514512070', 'ciao')).rejects.toMatchObject({
+      name: 'WhatsappSendSkipped',
+      reason: 'kill_switch',
+    });
+  });
+
+  it('con allowSkip ritorna l esito invece di lanciare (percorso reserveAndSend)', async () => {
+    armLiveSending('waha');
+    vi.stubEnv('WHATSAPP_KILL_SWITCH', 'on');
+
+    const out = await sendText('+393514512070', 'ciao', { allowSkip: true });
     expect(wahaText).not.toHaveBeenCalled();
     expect(out.skippedReason).toBe('kill_switch');
     expect(out.messageId).toBeNull();
+
+    const img = await sendImage({
+      to: '+393514512070',
+      imageUrl: 'https://x/y.jpg',
+      allowSkip: true,
+    });
+    expect(img.skippedReason).toBe('kill_switch');
   });
 
-  it('blocca anche sendImage', async () => {
-    armLiveSending('cloud');
-    vi.stubEnv('WHATSAPP_KILL_SWITCH', 'on');
-    const out = await sendImage({ to: '+393514512070', imageUrl: 'https://x/y.jpg' });
-    expect(cloudImage).not.toHaveBeenCalled();
-    expect(out.skippedReason).toBe('kill_switch');
+  it('il dry-run NON lancia: e una modalita progettata, non un blocco', async () => {
+    vi.stubEnv('WHATSAPP_KILL_SWITCH', 'off');
+    vi.stubEnv('WHATSAPP_DRY_RUN', 'true');
+    const out = await sendText('+393514512070', 'ciao');
+    expect(out.dryRun).toBe(true);
+    expect(out.skippedReason).toBeUndefined();
   });
 });
 

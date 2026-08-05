@@ -42,8 +42,24 @@ export async function submitSurveyAction(
   }
 
   if (!result.alreadySubmitted) {
-    notifyFounderFireAndForget(token).catch(() => {});
-    triggerKitProposalFireAndForget(db, result.bookingId).catch(() => {});
+    // 05/08: erano due .catch(() => {}) muti. Se la proposta del kit
+    // falliva DOPO che l'ospite aveva risposto al sondaggio, non
+    // restava traccia da nessuna parte: l'ospite aveva fatto la sua
+    // parte e il kit — la ragione per cui il prodotto esiste — non
+    // veniva mai proposto. Restano fire-and-forget (la risposta
+    // all'ospite non deve aspettarli) ma adesso il fallimento si vede.
+    notifyFounderFireAndForget(token).catch((err) => {
+      console.error('[survey] notifica founder fallita', {
+        bookingId: result.bookingId,
+        err: err instanceof Error ? `${err.name} — ${err.message}` : String(err),
+      });
+    });
+    triggerKitProposalFireAndForget(db, result.bookingId).catch((err) => {
+      console.error('[survey] proposta kit fallita dopo il sondaggio', {
+        bookingId: result.bookingId,
+        err: err instanceof Error ? `${err.name} — ${err.message}` : String(err),
+      });
+    });
   }
 
   return { ok: true, alreadySubmitted: result.alreadySubmitted };
@@ -53,14 +69,20 @@ async function triggerKitProposalFireAndForget(
   db: Awaited<ReturnType<typeof getDb>>['db'],
   bookingId: string,
 ): Promise<void> {
-  // Slice C: kit proposal generato post-survey. Best-effort, niente throw.
-  // Costo Sonnet ~€0.05-0.08, ~10-20s. Fire-and-forget cosi' la response
-  // della survey non aspetta.
-  try {
-    await triggerKitProposal(db, bookingId);
-  } catch (_e) {
-    // Errore loggato lato agent (Anthropic SDK), niente cascade
-  }
+  // Slice C: kit proposal generato post-survey. Costo Sonnet
+  // ~€0.05-0.08, ~10-20s. Fire-and-forget cosi' la response della
+  // survey non aspetta.
+  //
+  // 05/08: qui c'era un `catch (_e) {}` con il commento "Errore loggato
+  // lato agent (Anthropic SDK)". Era un'assunzione, non un fatto:
+  // l'SDK Anthropic LANCIA, non scrive nel nostro logger. Il commento
+  // dichiarava una copertura che non esisteva, ed e' il modo piu'
+  // efficace per non accorgersi mai di un fallimento.
+  //
+  // Adesso rilancia: il .catch del chiamante lo registra con il
+  // bookingId. Resta best-effort — l'ospite ha gia' avuto la sua
+  // risposta — ma smette di essere invisibile.
+  await triggerKitProposal(db, bookingId);
 }
 
 async function notifyFounderFireAndForget(token: string): Promise<void> {
