@@ -210,7 +210,19 @@ export default async function DashboardPage() {
 
   // "Prenotazione con nome" ha una definizione precisa: i segnaposto
   // dei feed ("Booking Guest", "Reserved", "ospite") non contano.
-  const hasAnyNamedBooking = bookings.some((b) => hasRealGuestName(b.guestFullName));
+  //
+  // Il pannello sotto NON puo' basarsi solo su `bookings`: quella lista
+  // parte da (oggi - 2 giorni), mentre "Chi e' in casa" non ha cutoff.
+  // Un ospite entrato quattro giorni fa e inserito a mano comparirebbe
+  // nella card in cima e, nella stessa colonna, sotto si leggerebbe
+  // "non ho ancora nessun ospite con un nome": due verita' opposte a
+  // dieci pixel di distanza. Il pannello si mostra solo quando la
+  // colonna e' DAVVERO vuota — che e' quello che il commento accanto
+  // ha sempre affermato.
+  const hasAnyNamedBooking =
+    bookings.some((b) => hasRealGuestName(b.guestFullName)) ||
+    guestsInHouseRows.length > 0 ||
+    guestsArrivingRows.length > 0;
   const propertyOptions = hostProperties.map((p) => ({ id: p.id, name: p.name }));
 
   const agentStatus = buildAgentStatus({
