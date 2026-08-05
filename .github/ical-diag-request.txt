@@ -1,0 +1,4 @@
+# Diagnostica feed iCal: prima riga non commentata = "<propertyId> [--poll]".
+# Bump di questo file su main = esegui la diagnostica.
+# run: 1 — Villa Cristina (Praiano), fetch + poll reale
+1f804ff0-2b2f-494a-8171-253730f90019 --poll
