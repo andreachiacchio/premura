@@ -1,6 +1,7 @@
 'use server';
 
-import { getCurrentHostId } from '@/lib/auth';
+import { triggerIcalPollNow } from '@/lib/api';
+import { getCurrentAccessToken, getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { type IcalProbeResult, probeIcalUrl } from '@/lib/ical-probe';
 import {
@@ -21,6 +22,7 @@ import { upsertPropertyKnowledge } from '@/lib/repositories/property-knowledge';
 import { properties } from '@premura/db';
 import { eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
+import { after } from 'next/server';
 import { z } from 'zod';
 
 // Slice 9 + Slice H — server actions per il flusso onboarding.
@@ -76,33 +78,68 @@ export async function testIcalUrlAction(rawUrl: string): Promise<IcalTestResult>
   return probeIcalUrl(rawUrl);
 }
 
+const optionalUrl = z
+  .string()
+  .trim()
+  .refine((v) => v === '' || z.string().url().safeParse(v).success, {
+    message: 'URL non valido',
+  })
+  .optional();
+
 const calendarPayloadSchema = z.object({
-  icalBookingUrl: z
-    .string()
-    .trim()
-    .refine((v) => v === '' || z.string().url().safeParse(v).success, {
-      message: 'URL non valido',
-    })
-    .optional(),
+  icalAirbnbUrl: optionalUrl,
+  icalBookingUrl: optionalUrl,
 });
 
 export async function submitCalendarAction(formData: FormData): Promise<void> {
   const payload = calendarPayloadSchema.parse({
+    icalAirbnbUrl: formData.get('icalAirbnbUrl') ?? undefined,
     icalBookingUrl: formData.get('icalBookingUrl') ?? undefined,
   });
   const hostId = await getCurrentHostId();
   const { db } = await getDb();
 
-  if (payload.icalBookingUrl && payload.icalBookingUrl.length > 0) {
+  // 05/08: due feed, non uno. Airbnb porta il nome dell'ospite,
+  // Booking solo le date — la schermata lo dice, qui li salviamo
+  // entrambi col source giusto (prima si hardcodava 'booking').
+  // Merge, non sovrascrittura: se l'host torna indietro e aggiunge il
+  // secondo feed, il primo resta.
+  const nuovi: Array<{ source: 'airbnb' | 'booking'; url: string }> = [];
+  if (payload.icalAirbnbUrl) nuovi.push({ source: 'airbnb', url: payload.icalAirbnbUrl });
+  if (payload.icalBookingUrl) nuovi.push({ source: 'booking', url: payload.icalBookingUrl });
+
+  if (nuovi.length > 0) {
     const props = await findPropertiesByHostId({ db, hostId });
     const first = props[0];
     if (first) {
+      const [row] = await db
+        .select({ icalSources: properties.icalSources })
+        .from(properties)
+        .where(eq(properties.id, first.id))
+        .limit(1);
+      const esistenti = row?.icalSources ?? [];
+      const merged = [...esistenti];
+      for (const feed of nuovi) {
+        if (!merged.some((f) => f.url === feed.url)) merged.push(feed);
+      }
       await db
         .update(properties)
-        .set({
-          icalSources: [{ source: 'booking', url: payload.icalBookingUrl }],
-        })
+        .set({ icalSources: merged })
         .where(eq(properties.id, first.id));
+
+      // Il calendario si legge SUBITO (ordine Andrea 05/08): il cron
+      // dei 15 minuti fa atterrare l'host su una dashboard vuota, che
+      // e' il momento in cui conclude che il prodotto non fa niente.
+      // Best-effort e non bloccante: se l'enqueue fallisce, il cron
+      // recupera comunque.
+      after(async () => {
+        try {
+          const token = await getCurrentAccessToken();
+          await triggerIcalPollNow(first.id, token);
+        } catch (err) {
+          console.error('[onboarding] poll iCal immediato fallito (restera al cron)', err);
+        }
+      });
     }
   }
 
