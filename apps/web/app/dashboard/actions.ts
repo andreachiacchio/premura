@@ -9,6 +9,7 @@ import {
 } from '@/lib/repositories/possible-cancellations';
 import { getOrCreateDeflectionDraft, markDeflectionSent } from '@/lib/deflection-draft';
 import { composeGuestInvite } from '@/lib/guest-invite';
+import { normalizeEuroAmount } from '@/lib/euro-amount';
 import { normalizePhone } from '@/lib/phone-normalize';
 import { findOwnership } from '@/lib/repositories/bookings';
 import { createDirectBooking } from '@/lib/repositories/direct-bookings';
@@ -336,11 +337,18 @@ export async function dismissCancellationAction(
 const directBookingSchema = z.object({
   propertyId: z.string().uuid('Scegli la struttura'),
   platform: z.enum(['direct', 'booking', 'airbnb', 'altro']),
-  guestFullName: z.string().trim().min(2, 'Il nome deve avere almeno 2 caratteri'),
-  guestPhone: z.string().trim().optional(),
+  // I max riflettono le colonne: varchar(255) su nome ed email,
+  // varchar(32) sul telefono. Senza, l'errore arrivava da Postgres.
+  guestFullName: z
+    .string()
+    .trim()
+    .min(2, 'Il nome deve avere almeno 2 caratteri')
+    .max(255, 'Nome troppo lungo'),
+  guestPhone: z.string().trim().max(32, 'Numero troppo lungo').optional(),
   guestEmail: z
     .string()
     .trim()
+    .max(255, 'Email troppo lunga')
     .optional()
     .refine((v) => !v || z.string().email().safeParse(v).success, {
       message: 'Email non valida',
@@ -401,9 +409,13 @@ export async function createDirectBookingAction(
     phone = norm.e164;
   }
 
-  const prezzo = p.priceTotal ? p.priceTotal.replace(',', '.') : null;
-  if (prezzo !== null && Number.isNaN(Number(prezzo))) {
-    return { ok: false, error: 'Prezzo non valido' };
+  // "1.234,50" e' come un host italiano scrive milleduecentotrentaquattro
+  // e cinquanta. Un replace(',', '.') secco lo avrebbe salvato come
+  // 1,234 euro: il prezzo pilota il budget del kit, quindi sbagliarlo
+  // di mille volte non e' un dettaglio.
+  const prezzo = p.priceTotal ? normalizeEuroAmount(p.priceTotal) : null;
+  if (p.priceTotal && prezzo === null) {
+    return { ok: false, error: 'Prezzo non valido: scrivilo come 450 oppure 1.234,50' };
   }
 
   const hostId = await getCurrentHostId();
@@ -427,6 +439,9 @@ export async function createDirectBookingAction(
       property_not_found: 'Struttura non trovata',
       wrong_host: 'Struttura non trovata',
       invalid_dates: 'La partenza deve essere dopo l’arrivo',
+      stay_too_long: 'Più di un anno non è un soggiorno: controlla le date',
+      duplicate:
+        'Su queste date hai già una prenotazione con un nome. Aprila e modificala, invece di crearne una seconda.',
     } as const;
     return { ok: false, error: messaggi[result.reason] };
   }

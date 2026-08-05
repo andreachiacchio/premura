@@ -104,6 +104,16 @@ export function AddBookingDialog({
 }): React.JSX.Element {
   const [submitting, setSubmitting] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [esito, setEsito] = React.useState<
+    (CreateDirectBookingResultView & { ok: true }) | null
+  >(null);
+
+  function chiudi(): void {
+    setEsito(null);
+    setSubmitError(null);
+    form.reset();
+    onOpenChange(false);
+  }
 
   const form = useForm<AddBookingFormValues>({
     resolver: zodResolver(addBookingFormSchema),
@@ -136,6 +146,13 @@ export function AddBookingDialog({
         setSubmitError(res.error);
         return;
       }
+      // L'esito NON si butta via: se abbiamo preso il posto di una
+      // fascia occupata, o se ne restano altre che si sovrappongono,
+      // l'host deve saperlo adesso — non trovarselo domani.
+      if (res.absorbed || res.partialOverlapCount > 0 || !res.premuraActivated) {
+        setEsito(res);
+        return;
+      }
       form.reset();
       onOpenChange(false);
     } catch {
@@ -146,6 +163,46 @@ export function AddBookingDialog({
   }
 
   const telefono = form.watch('guestPhone');
+
+  if (esito) {
+    return (
+      <Dialog open={open} onOpenChange={(v) => (v ? onOpenChange(true) : chiudi())}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Prenotazione salvata</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 text-body-sm text-ink">
+            {esito.absorbed && (
+              <p>
+                Ha preso il posto di una fascia occupata che avevo già sul calendario: adesso è
+                una prenotazione con un nome, non più una data anonima.
+              </p>
+            )}
+            {!esito.premuraActivated && (
+              <p className="rounded-card border border-gold-soft bg-gold-soft/30 p-3">
+                Senza numero WhatsApp non posso occuparmene: l’ho salvata, ma resta ferma finché
+                non aggiungi il contatto.
+              </p>
+            )}
+            {esito.partialOverlapCount > 0 && (
+              <p className="rounded-card border border-line bg-paper p-3 text-ink-soft">
+                Su queste date restano{' '}
+                {esito.partialOverlapCount === 1
+                  ? 'un’altra fascia occupata che non coincide'
+                  : `altre ${esito.partialOverlapCount} fasce occupate che non coincidono`}
+                . Non le ho toccate: le trovi in «Date occupate».
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ink" onClick={chiudi}>
+              Ho capito
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -359,7 +416,10 @@ export function AddBookingDialog({
                   <FormControl>
                     <Input placeholder="Arriva tardi, allergica alle noci…" {...field} />
                   </FormControl>
-                  <FormDescription>Le vedi solo tu.</FormDescription>
+                  {/* Onesto: oggi le note restano sulla prenotazione ma
+                      non sono ancora mostrate in nessuna vista. Non
+                      promettiamo di fargliele rivedere. */}
+                  <FormDescription>Restano sulla prenotazione. L’ospite non le vede.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

@@ -1,6 +1,6 @@
 import { type Database, bookings, properties } from '@premura/db';
 import { ANONYMOUS_ICAL_SOURCES } from '@premura/shared';
-import { and, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, notInArray, sql } from 'drizzle-orm';
 
 // Prenotazione inserita dall'host (Andrea 05/08).
 //
@@ -72,7 +72,16 @@ export type CreateDirectBookingResult =
       /** true = Premura e' stata attivata (c'era un numero). */
       premuraActivated: boolean;
     }
-  | { ok: false; reason: 'property_not_found' | 'wrong_host' | 'invalid_dates' };
+  | {
+      ok: false;
+      reason: 'property_not_found' | 'wrong_host' | 'invalid_dates' | 'stay_too_long' | 'duplicate';
+    };
+
+/** Oltre questo, non e' un soggiorno: e' un blocco calendario messo
+ *  nel posto sbagliato. Il tetto conta perche' una riga con nome vero
+ *  lunga mesi verrebbe usata da findCoveringNamedBookings per
+ *  sopprimere fasce anonime legittime dentro tutto l'intervallo. */
+export const MAX_NIGHTS = 365;
 
 /** Notti fra due mezzanotti UTC. */
 export function nightsBetween(checkinAt: Date, checkoutAt: Date): number {
@@ -133,6 +142,7 @@ export async function createDirectBooking(
 ): Promise<CreateDirectBookingResult> {
   const nights = nightsBetween(input.checkinAt, input.checkoutAt);
   if (nights < 1) return { ok: false, reason: 'invalid_dates' };
+  if (nights > MAX_NIGHTS) return { ok: false, reason: 'stay_too_long' };
 
   const [property] = await db
     .select({ id: properties.id, hostId: properties.hostId })
@@ -148,6 +158,27 @@ export async function createDirectBooking(
   // setBookingPremuraActive).
   const premuraActiveAt = input.guestPhone ? now : null;
 
+  // Guardia anti-doppione verso righe GIA' CON NOME (stessa idea di
+  // findSameStayOnProperty nel worker iCal): se sulle stesse date
+  // esiste gia' una prenotazione vera, crearne un'altra significa due
+  // righe per lo stesso soggiorno e — con due numeri — due messaggi
+  // allo stesso ospite. Meglio fermarsi e dirlo.
+  const [gemella] = await db
+    .select({ id: bookings.id })
+    .from(bookings)
+    .where(
+      and(
+        eq(bookings.propertyId, input.propertyId),
+        notInArray(bookings.dataSource, ANON),
+        ne(bookings.status, 'cancelled'),
+        eq(bookings.isCalendarBlock, false),
+        sql`${bookings.checkinAt}::date = ${input.checkinAt.toISOString()}::timestamptz::date`,
+        sql`${bookings.checkoutAt}::date = ${input.checkoutAt.toISOString()}::timestamptz::date`,
+      ),
+    )
+    .limit(1);
+  if (gemella) return { ok: false, reason: 'duplicate' };
+
   const touching = await findAnonymousRangesTouching(
     db,
     input.propertyId,
@@ -155,8 +186,12 @@ export async function createDirectBooking(
     input.checkoutAt,
   );
   const daAssorbire = touching.find((r) => r.sameDates);
+  // Tutto cio' che NON viene assorbito va segnalato all'host: sia le
+  // sovrapposizioni parziali, sia le eventuali altre fasce con le
+  // stesse identiche date (ne assorbiamo una sola, le altre restano
+  // e l'host deve saperlo invece di trovarsele domani).
   const partialOverlaps = touching
-    .filter((r) => !r.sameDates)
+    .filter((r) => r.id !== daAssorbire?.id)
     .map(({ id, checkinAt, checkoutAt }) => ({ id, checkinAt, checkoutAt }));
 
   // platform_booking_ref nuovo in ENTRAMBI i rami: l'unique index e'
@@ -185,6 +220,12 @@ export async function createDirectBooking(
     guestPhoneAddedByHostId: input.guestPhone ? hostId : null,
     manualCompletionAt: now,
     hostSkippedCompletion: false,
+    // La fascia assorbita puo' portarsi dietro i contatori della
+    // riconciliazione feed: senza azzerarli, una prenotazione appena
+    // creata dall'host nascerebbe gia' segnalata come "possibile
+    // cancellazione". Sono dati del feed, non del soggiorno.
+    feedMissingCount: 0,
+    possibleCancellationAt: null,
     updatedAt: now,
   };
 

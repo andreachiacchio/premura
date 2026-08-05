@@ -1,6 +1,7 @@
 import { ANONYMOUS_ICAL_SOURCES, isRichDataSource } from '@premura/shared';
 import { describe, expect, it } from 'vitest';
-import { nightsBetween } from '../lib/repositories/direct-bookings';
+import { normalizeEuroAmount } from '../lib/euro-amount';
+import { MAX_NIGHTS, nightsBetween } from '../lib/repositories/direct-bookings';
 
 // Prenotazione diretta (Andrea 05/08): "va trattata come il caso
 // migliore, non come fallback".
@@ -65,5 +66,53 @@ describe('invarianti dell assorbimento', () => {
     for (const s of ANONYMOUS_ICAL_SOURCES) {
       expect(isRichDataSource(s)).toBe(false);
     }
+  });
+});
+
+// Prezzo: il separatore delle migliaia italiano. Un replace(',', '.')
+// secco salvava "1.234,50" come 1,234 euro — e il prezzo pilota il
+// budget del kit, quindi sbagliarlo di mille volte non e' un dettaglio.
+describe('normalizeEuroAmount', () => {
+  it('intero semplice', () => {
+    expect(normalizeEuroAmount('450')).toBe('450');
+  });
+
+  it('virgola decimale italiana', () => {
+    expect(normalizeEuroAmount('12,5')).toBe('12.5');
+  });
+
+  it('migliaia col punto + decimali con la virgola', () => {
+    expect(normalizeEuroAmount('1.234,50')).toBe('1234.50');
+  });
+
+  it('migliaia col punto senza decimali NON diventa 1,234', () => {
+    expect(normalizeEuroAmount('1.234')).toBe('1234');
+  });
+
+  it('punto decimale allanglosassone resta valido', () => {
+    expect(normalizeEuroAmount('99.90')).toBe('99.90');
+  });
+
+  it('tollera spazi e simbolo euro', () => {
+    expect(normalizeEuroAmount(' 1.500,00 €')).toBe('1500.00');
+  });
+
+  it('testo non numerico -> null, mai un NaN a database', () => {
+    expect(normalizeEuroAmount('abc')).toBeNull();
+    expect(normalizeEuroAmount('12abc')).toBeNull();
+    expect(normalizeEuroAmount('')).toBeNull();
+  });
+
+  it('negativo rifiutato', () => {
+    expect(normalizeEuroAmount('-50')).toBeNull();
+  });
+});
+
+describe('tetto sulla durata', () => {
+  it('un anno e un giorno non e un soggiorno', () => {
+    expect(MAX_NIGHTS).toBe(365);
+    expect(
+      nightsBetween(new Date(Date.UTC(2026, 0, 1)), new Date(Date.UTC(2027, 0, 3))),
+    ).toBeGreaterThan(MAX_NIGHTS);
   });
 });
