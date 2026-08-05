@@ -38,6 +38,45 @@ export type WhatsappTransport = 'waha' | 'cloud';
 /** Errore unificato: il chiamante non deve sapere quale trasporto ha fallito. */
 export type WhatsappTransportError = WhatsappSendError | WahaSendError;
 
+/**
+ * Invio BLOCCATO dal kill switch: nessuna chiamata di rete, nessun
+ * messaggio partito.
+ *
+ * PERCHE' E' UN ERRORE E NON UN VALORE DI RITORNO (Andrea, 05/08).
+ *
+ * Fino a oggi sendText/sendImage ritornavano `{ skippedReason }` e
+ * cinque chiamanti su otto lo ignoravano: registravano "inviato",
+ * facevano avanzare lo stato, e il messaggio non ripartiva piu'.
+ * Il benvenuto all'ospite, il brief al cleaner, il magic link, il
+ * sondaggio: tutti bruciati in silenzio.
+ *
+ * Un contratto che si sbaglia per omissione e' sbagliato. Adesso il
+ * default lancia: chi non fa nulla si ferma, invece di mentire.
+ *
+ * Chi PUO' tollerare lo skip lo dichiara con `allowSkip: true`, e in
+ * quel ramo deve registrare il motivo — e' il caso di reserveAndSend,
+ * che marca lo slot 'skipped' nell'audit trail.
+ *
+ * NOTA sul dry-run: NON lancia. E' una modalita' progettata, con il suo
+ * audit trail (outbound_sends.dryRun, "simulato" in dashboard): serve a
+ * esercitare la pipeline, non e' un blocco. Chi fa avanzare stato
+ * irreversibile deve comunque guardare `outcome.dryRun`.
+ */
+export class WhatsappSendSkipped extends Error {
+  readonly reason: 'kill_switch';
+  readonly transport: WhatsappTransport;
+
+  constructor(reason: 'kill_switch', transport: WhatsappTransport) {
+    super(
+      `Invio WhatsApp bloccato da ${reason}: nessun messaggio partito. ` +
+        'Se questo percorso puo tollerarlo, passa allowSkip: true e registra il motivo.',
+    );
+    this.name = 'WhatsappSendSkipped';
+    this.reason = reason;
+    this.transport = transport;
+  }
+}
+
 export function resolveTransport(): WhatsappTransport {
   // Stringa vuota trattata come assente: un secret Fly dichiarato ma non
   // valorizzato, o una riga `WHATSAPP_TRANSPORT=` in .env, arrivano come
@@ -131,11 +170,12 @@ async function applyJitter(immediate: boolean): Promise<number> {
 export async function sendText(
   to: string,
   body: string,
-  opts: { immediate?: boolean } = {},
+  opts: { immediate?: boolean; allowSkip?: boolean } = {},
 ): Promise<SendOutcome> {
   const transport = resolveTransport();
 
   if (isKillSwitchOn()) {
+    if (!opts.allowSkip) throw new WhatsappSendSkipped('kill_switch', transport);
     return {
       messageId: null,
       transport,
@@ -164,10 +204,12 @@ export async function sendImage(params: {
   imageUrl: string;
   caption?: string;
   immediate?: boolean;
+  allowSkip?: boolean;
 }): Promise<SendOutcome> {
   const transport = resolveTransport();
 
   if (isKillSwitchOn()) {
+    if (!params.allowSkip) throw new WhatsappSendSkipped('kill_switch', transport);
     return {
       messageId: null,
       transport,

@@ -151,11 +151,27 @@ export async function processWelcomeJob(
   const msg = await generateWelcomeMessage({ ...candidate, voiceProfile });
 
   try {
+    // Nessun allowSkip: se il kill switch e' attivo questa chiamata
+    // LANCIA, il catch qui sotto lo registra, e NIENTE avanza — la
+    // riga in messages non viene scritta e markWelcomeMessageSent non
+    // viene chiamata. E' cio' che serve perche' il benvenuto riparta
+    // quando lo switch si abbassa.
     const res = await sendImage({
       to: row.guestPhone,
       imageUrl: row.cleanerPhotoUrl,
       caption: msg.text,
     });
+
+    // Il dry-run non lancia (e' una simulazione, non un blocco) ma non
+    // ha mandato niente all'ospite: marcare "inviato" sarebbe la stessa
+    // bugia. Lo stato resta indietro e il messaggio riparte.
+    if (res.dryRun) {
+      logger.warn(
+        { kitId, transport: res.transport },
+        'welcome message SIMULATO (dry-run): stato non avanzato, ripartira',
+      );
+      return { status: 'skipped_dry_run' };
+    }
 
     const now = new Date();
     await db.insert(messages).values({
