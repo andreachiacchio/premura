@@ -1,5 +1,6 @@
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import { startTimer, timed } from '@/lib/perf';
 import { countKitsByStatusForHost, listKitsForHost } from '@/lib/repositories/kits';
 import Link from 'next/link';
 import { KitsList } from './_components/KitsList';
@@ -47,15 +48,17 @@ type SearchParams = { tab?: string };
 export default async function KitsPage({
   searchParams,
 }: { searchParams: Promise<SearchParams> }): Promise<React.JSX.Element> {
-  const hostId = await getCurrentHostId();
+  const stop = startTimer('PAGINA /dashboard/kits dati');
+  const hostId = await timed('getCurrentHostId', () => getCurrentHostId());
   const { db } = await getDb();
   const params = await searchParams;
   const activeTab = STATUS_TABS.find((t) => t.key === params.tab) ?? STATUS_TABS[0];
 
   const [rows, statusCounts] = await Promise.all([
-    listKitsForHost(db, hostId, [...activeTab.statuses]),
-    countKitsByStatusForHost(db, hostId),
+    timed('q listKitsForHost', () => listKitsForHost(db, hostId, [...activeTab.statuses])),
+    timed('q countKitsByStatusForHost', () => countKitsByStatusForHost(db, hostId)),
   ]);
+  stop();
 
   const tabCounts: Record<string, number> = {};
   for (const tab of STATUS_TABS) {

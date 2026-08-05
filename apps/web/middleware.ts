@@ -1,3 +1,4 @@
+import { timed } from '@/lib/perf';
 import { createSupabaseMiddlewareClient } from '@/lib/supabase-middleware';
 import { type NextRequest, NextResponse } from 'next/server';
 
@@ -11,11 +12,11 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // propagati al browser e la sessione scade silenziosamente. Pattern
   // Supabase ssr ufficiale: getUser() prima di qualsiasi altra logica
   // del middleware.
+  const { pathname, search } = request.nextUrl;
+
   const {
     data: { user },
-  } = await supabase.auth.getUser();
-
-  const { pathname, search } = request.nextUrl;
+  } = await timed(`middleware.getUser ${pathname}`, () => supabase.auth.getUser());
   // Rotte protette: dashboard host + flusso connect-gmail + onboarding
   // (slice 9 prep). /api/* resta fuori, i route handler fanno auth
   // interna e ritornano 401.

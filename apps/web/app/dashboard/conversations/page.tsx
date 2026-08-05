@@ -1,5 +1,6 @@
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import { startTimer, timed } from '@/lib/perf';
 import { propertyColorOrFallback } from '@/lib/property-color';
 import {
   type ConversationListItem,
@@ -38,9 +39,13 @@ function conversationTitle(c: ConversationListItem): string {
 }
 
 export default async function ConversationsPage(): Promise<React.JSX.Element> {
-  const hostId = await getCurrentHostId();
+  const stop = startTimer('PAGINA /dashboard/conversations dati');
+  const hostId = await timed('getCurrentHostId', () => getCurrentHostId());
   const { db } = await getDb();
-  const conversations = await listConversationsForHost(db, hostId);
+  const conversations = await timed('q listConversationsForHost', () =>
+    listConversationsForHost(db, hostId),
+  );
+  stop();
   const now = new Date();
 
   const pendingTotal = conversations.reduce((acc, c) => acc + c.pendingDraftCount, 0);

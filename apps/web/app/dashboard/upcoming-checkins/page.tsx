@@ -1,5 +1,6 @@
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import { startTimer, timed } from '@/lib/perf';
 import { listUpcomingCheckins } from '@/lib/repositories/upcoming-checkins';
 import Link from 'next/link';
 import {
@@ -17,9 +18,13 @@ import {
 export const dynamic = 'force-dynamic';
 
 export default async function UpcomingCheckinsPage(): Promise<React.JSX.Element> {
-  const hostId = await getCurrentHostId();
+  const stop = startTimer('PAGINA /dashboard/upcoming-checkins dati');
+  const hostId = await timed('getCurrentHostId', () => getCurrentHostId());
   const { db } = await getDb();
-  const { rows, properties, welcomeTimeSlot } = await listUpcomingCheckins(db, hostId);
+  const { rows, properties, welcomeTimeSlot } = await timed('q listUpcomingCheckins', () =>
+    listUpcomingCheckins(db, hostId),
+  );
+  stop();
 
   const data: UpcomingCheckinCardData[] = rows.map((r) => ({
     id: r.id,
