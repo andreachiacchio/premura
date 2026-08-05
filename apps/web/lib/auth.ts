@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { type Database, hosts } from '@premura/db';
 import type { User } from '@supabase/supabase-js';
 import { eq, sql } from 'drizzle-orm';
+import { cache } from 'react';
 
 // Helper auth: risolve l'host dell'utente Supabase corrente.
 //
@@ -144,12 +145,28 @@ export async function ensureHostForAuthUser(
   return created[0];
 }
 
-/** Host corrente (riga garantita: la crea al primo accesso). */
-export async function getCurrentHost(): Promise<CurrentHost> {
+/** Host corrente (riga garantita: la crea al primo accesso).
+ *
+ *  Memoizzata per RICHIESTA con cache() di React (05/08): due
+ *  componenti server o una action che la chiamano due volte pagano un
+ *  solo auth.getUser + un solo lookup hosts.
+ *
+ *  Perche' e' sicura, verificato punto per punto:
+ *   - onboardingStep/onboardingCompleted usciti da qui non li legge
+ *     nessuno: chi guarda lo stato onboarding usa getOnboardingState(),
+ *     che fa una SELECT fresca;
+ *   - hosts.id non cambia mai dentro una richiesta, e
+ *     ensureHostForAuthUser e' idempotente;
+ *   - le server action girano PRIMA che esista lo scope di cache React,
+ *     quindi il render dopo un redirect parte comunque a cache vuota.
+ *
+ *  NON memoizzare ensureHostForAuthUser: /auth/callback la chiama
+ *  direttamente con un db esplicito, e i test la usano cosi'. */
+export const getCurrentHost = cache(async (): Promise<CurrentHost> => {
   const user = await requireAuthUser();
   const { db } = await getDb();
   return ensureHostForAuthUser(db, user);
-}
+});
 
 /** Compat: tutto il codice esistente consuma l'hostId da qui. Ora e'
  *  hosts.id (chiave propria), NON piu' l'id Supabase. */
