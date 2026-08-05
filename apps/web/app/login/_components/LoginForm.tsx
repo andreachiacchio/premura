@@ -44,6 +44,8 @@ type FormState =
 const ERROR_MESSAGES: Record<string, string> = {
   missing_code: "Link non valido, riprova",
   exchange_failed: "Sessione scaduta, riprova",
+  oauth_unavailable:
+    "Accesso con Google non disponibile in questo momento: entra con l'email qui sotto",
 };
 
 function callbackErrorMessage(code: string | null): string | null {

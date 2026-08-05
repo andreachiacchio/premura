@@ -6,11 +6,10 @@ import Link from 'next/link';
 
 // Riscrittura 04/08 v2 (brief "missione"): hero = missione in una riga,
 // meta' destra occupata dalla conversazione statica (ospite di notte ->
-// risposta pronta -> host approva). CTA primario "Continua con Google":
-// il flusso di registrazione non esiste ancora (punto 2), quindi il
-// bottone porta al form beta (#beta-access) — NON cambiarlo in un link
-// OAuth finche' la registrazione non e' chiusa, altrimenti il secondo
-// host che si registra finisce contro un muro.
+// risposta pronta -> host approva).
+// A6 (05/08): "Continua con Google" e' collegato al flusso OAuth reale
+// (/auth/google -> consent -> /auth/callback -> host creato) ora che la
+// registrazione e' mergiata e testata.
 // Niente numeri di posti: nessuna scarsita' artificiale.
 
 function ConversationDemo() {
@@ -98,7 +97,7 @@ export function Hero() {
             </p>
 
             <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <GoogleCtaButton href="#beta-access" />
+              <GoogleCtaButton href="/auth/google" />
               <Link
                 href="/login"
                 className="text-body-sm text-ink-soft underline decoration-line underline-offset-4 transition-colors hover:text-ink hover:decoration-ink"

@@ -6,8 +6,8 @@ import { GoogleCtaButton } from '@/components/landing/GoogleCtaButton';
 // Correzioni post-review 04/08 (punto 1): la pagina promette UNA cosa —
 // entri da solo. Niente "beta privata in corso", niente "accesso su
 // richiesta", niente limiti di strutture. Il CTA principale e' lo
-// stesso "Continua con Google" dell'hero (che finche' la registrazione
-// non esiste porta qui); il modulo resta ma declassato a secondario.
+// stesso "Continua con Google" dell'hero — A6 (05/08): collegato al
+// flusso OAuth reale; il modulo resta ma declassato a secondario.
 
 export function BetaAccessCTA() {
   return (
@@ -28,7 +28,7 @@ export function BetaAccessCTA() {
         </p>
 
         <div className="mt-8">
-          <GoogleCtaButton href="#beta-form" />
+          <GoogleCtaButton href="/auth/google" />
         </div>
 
         <div id="beta-form" className="mt-14 border-t border-line-soft pt-10 scroll-mt-16">
