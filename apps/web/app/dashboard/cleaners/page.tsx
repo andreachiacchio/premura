@@ -1,5 +1,6 @@
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import { startTimer, timed } from '@/lib/perf';
 import { listCleanersForHost } from '@/lib/repositories/cleaners';
 import Link from 'next/link';
 import { CleanersList } from './_components/CleanersList';
@@ -9,9 +10,11 @@ import { CleanersList } from './_components/CleanersList';
 export const dynamic = 'force-dynamic';
 
 export default async function CleanersPage(): Promise<React.JSX.Element> {
-  const hostId = await getCurrentHostId();
+  const stop = startTimer('PAGINA /dashboard/cleaners dati');
+  const hostId = await timed('getCurrentHostId', () => getCurrentHostId());
   const { db } = await getDb();
-  const cleaners = await listCleanersForHost(db, hostId);
+  const cleaners = await timed('q listCleanersForHost', () => listCleanersForHost(db, hostId));
+  stop();
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8 lg:max-w-5xl xl:max-w-[1400px]">

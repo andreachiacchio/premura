@@ -1,5 +1,6 @@
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import { startTimer, timed } from '@/lib/perf';
 import { bookings, properties } from '@premura/db';
 import { and, eq, ne, sql } from 'drizzle-orm';
 import { ChevronRight } from 'lucide-react';
@@ -27,7 +28,7 @@ const SOURCE_LABELS: Record<string, string> = {
 // schema drift — degrada la SUA sezione, non butta giu' la pagina.
 async function safeQuery<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
   try {
-    return await fn();
+    return await timed(`q ${label}`, fn);
   } catch (err) {
     console.error(`[properties] ${label} failed`, err);
     return fallback;
@@ -35,7 +36,8 @@ async function safeQuery<T>(label: string, fn: () => Promise<T>, fallback: T): P
 }
 
 export default async function PropertiesPage() {
-  const hostId = await getCurrentHostId();
+  const stop = startTimer('PAGINA /properties dati');
+  const hostId = await timed('getCurrentHostId', () => getCurrentHostId());
   const { db } = await getDb();
 
   // Conteggi in query aggregata separata, come fa la home (bug produzione
@@ -81,6 +83,7 @@ export default async function PropertiesPage() {
       null,
     ),
   ]);
+  stop();
   // counts null = conteggi non disponibili: si dice, non si mostra uno
   // 0 finto ("mai due verita'").
   const countsByProperty = counts ? new Map(counts.map((c) => [c.propertyId, c])) : null;

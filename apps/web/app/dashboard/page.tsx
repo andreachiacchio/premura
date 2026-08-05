@@ -1,6 +1,7 @@
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getOnboardingState, urlForStep } from '@/lib/onboarding';
+import { startTimer, timed } from '@/lib/perf';
 import {
   buildAgentStatus,
   findNextActiveArrival,
@@ -49,7 +50,7 @@ export const dynamic = 'force-dynamic';
 
 async function safeQuery<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
   try {
-    return await fn();
+    return await timed(`q ${label}`, fn);
   } catch (err) {
     console.error(`[dashboard] ${label} failed`, err);
     return fallback;
@@ -57,7 +58,8 @@ async function safeQuery<T>(label: string, fn: () => Promise<T>, fallback: T): P
 }
 
 export default async function DashboardPage() {
-  const hostId = await getCurrentHostId();
+  const stopTotale = startTimer('PAGINA /dashboard dati');
+  const hostId = await timed('getCurrentHostId', () => getCurrentHostId());
   const { db } = await getDb();
 
   // Slice 9 prep: redirect al flusso onboarding stepper se l'host non
@@ -80,6 +82,7 @@ export default async function DashboardPage() {
     [],
   );
   if (hostProperties.length === 0) {
+    stopTotale();
     return (
       <main className="mx-auto min-h-screen w-full max-w-md bg-ivory">
         <DashboardHeader hostFirstName="Andrea" />
@@ -162,6 +165,7 @@ export default async function DashboardPage() {
         feedsInErrore: 0,
       }),
     ]);
+  stopTotale();
 
   const incompleteToCompleteCount = bookings.filter(
     (b) => isIncompleteDataSource(b.dataSource) && !b.hostSkippedCompletion,

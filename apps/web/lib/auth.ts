@@ -1,4 +1,5 @@
 import { getDb } from '@/lib/db';
+import { timed } from '@/lib/perf';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { type Database, hosts } from '@premura/db';
 import type { User } from '@supabase/supabase-js';
@@ -34,7 +35,7 @@ async function requireAuthUser(): Promise<User> {
   const {
     data: { user },
     error,
-  } = await supabase.auth.getUser();
+  } = await timed('auth.getUser (pagina)', () => supabase.auth.getUser());
   if (error) {
     throw new Error(`[auth] supabase.auth.getUser failed: ${error.message}`);
   }
@@ -59,15 +60,17 @@ export async function ensureHostForAuthUser(
   db: Database,
   user: Pick<User, 'id' | 'email' | 'user_metadata'>,
 ): Promise<CurrentHost> {
-  const byAuthId = await db
-    .select({
-      id: hosts.id,
-      onboardingCompleted: hosts.onboardingCompleted,
-      onboardingStep: hosts.onboardingStep,
-    })
-    .from(hosts)
-    .where(eq(hosts.authUserId, user.id))
-    .limit(1);
+  const byAuthId = await timed('hosts lookup (auth_user_id)', () =>
+    db
+      .select({
+        id: hosts.id,
+        onboardingCompleted: hosts.onboardingCompleted,
+        onboardingStep: hosts.onboardingStep,
+      })
+      .from(hosts)
+      .where(eq(hosts.authUserId, user.id))
+      .limit(1),
+  );
   if (byAuthId[0]) return byAuthId[0];
 
   const email = user.email?.trim().toLowerCase();
