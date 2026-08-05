@@ -1,9 +1,8 @@
 import { Button } from '@/components/Button';
 
-// CTA unico della pagina (correzioni post-review 04/08): la landing
-// promette UNA cosa — entri da solo. Finche' la registrazione Google
-// non esiste (punto 2), il bottone porta al modulo: NON collegarlo a
-// OAuth prima che il flusso sia chiuso.
+// CTA unico della pagina: la landing promette UNA cosa — entri da solo.
+// A6 (05/08): collegato al flusso reale, href = /auth/google (route
+// handler che avvia OAuth PKCE e rimanda a /auth/callback).
 
 const GoogleG = (
   <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
