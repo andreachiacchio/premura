@@ -110,10 +110,30 @@ app.get('/health', () => {
     outboundQueue: outboundQueueCron.nextRun()?.toISOString() ?? null,
   };
   const allScheduled = Object.values(crons).every((next) => next !== null);
+
+  // In che modalita' di invio si trova il worker ADESSO.
+  //
+  // La riga di avvio non basta: `flyctl logs` tiene una finestra di
+  // una ventina di minuti, e un worker riavviato mezz'ora prima ha gia'
+  // perso il suo log — e' successo il 06/08, due volte. Qui la domanda
+  // si puo' fare quando serve, e la risposta non scade.
+  //
+  // Le funzioni sono quelle che i mittenti chiamano prima di ogni
+  // invio, e leggono l'ambiente a ogni chiamata: quindi questo e' lo
+  // stato corrente, non quello del boot. Nessun valore di secret esce:
+  // solo la conclusione.
+  const killSwitch = isKillSwitchOn();
+  const dryRun = isDryRun();
+
   return {
     status: allScheduled ? 'ok' : 'degraded',
     process: 'worker',
     crons,
+    invii: {
+      killSwitch,
+      dryRun,
+      modo: killSwitch ? 'BLOCCATI' : dryRun ? 'simulati' : 'REALI',
+    },
     timestamp: new Date().toISOString(),
   };
 });
