@@ -15,3 +15,9 @@ dichiarata su Fly). Verificare secret, health worker, log cron.
 # i log dell'app, quindi il verdetto ora la ripesca e la porta in coda.
 # Questo bump serve a leggerla: e' la risposta sul valore vero del
 # dry-run, quella che manca da due giorni.
+
+# run 06/08 quater: la riga di avvio non c'era, e il motivo non era il
+# restart. Il log stava solo in index.ts, cioe' nel process group `app`
+# — una macchina che Fly tiene ferma e che non manda niente a nessuno.
+# I cron e la coda outbound vivono nel worker, che quel file non lo
+# esegue mai. Ora la riga sta anche in worker.ts: questo bump la legge.
