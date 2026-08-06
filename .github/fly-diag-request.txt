@@ -33,3 +33,8 @@ dichiarata su Fly). Verificare secret, health worker, log cron.
 # alle 13:56. Invece di rincorrere la finestra, /health del worker ora
 # dichiara la modalita' corrente: la domanda si fa quando serve e la
 # risposta non scade. Questo bump la legge.
+
+# run 06/08 septies: deploy 29 (73235c2) verde alle 14:29, worker
+# riavviato con /health che dichiara la modalita' di invio. Questo bump
+# tocca solo il file di richiesta, quindi la diagnostica gira da sola e
+# chiede al worker invece di cercare una riga di log scaduta.
