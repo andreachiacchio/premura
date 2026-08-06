@@ -2,12 +2,16 @@ import { dayPhrase } from '@/lib/format-date';
 import { displayGuestName, hasRealGuestName } from '@/lib/guest-name';
 import { propertyColorOrFallback } from '@/lib/property-color';
 import type { HomeGuestRow } from '@/lib/repositories/home-guests';
+import { ChevronRight } from 'lucide-react';
+import Link from 'next/link';
+import { EmptyState } from './EmptyState';
 
-// "Chi e' in casa" + "In arrivo" — home desktop (Andrea, 30/07 punto 1):
-// card compatte con iniziale, nome, struttura, frase di stato, pallino
-// verde per chi e' in casa, badge Attivo / Manca numero per chi arriva.
-// Solo da md in su: su mobile gli ospiti restano compressi nei
-// contatori dell'agent card, come nel prototipo.
+/** Oltre tre, la lista smette di essere una risposta e diventa un elenco. */
+const MAX_ARRIVING = 3;
+
+// "Chi e' in casa" + "Chi arriva" — card compatte con iniziale, nome,
+// struttura, frase di stato, pallino verde per chi e' in casa, badge
+// Attivo / Manca numero per chi arriva.
 //
 // Il colore della struttura (properties.color) e' il bordo sinistro
 // della card e l'avatar: riconoscere la struttura senza leggere.
@@ -85,10 +89,14 @@ function GuestCard({
             </span>
           ) : null}
         </div>
+        {/* La struttura e' un'etichetta: puo' restare piccola e colorata.
+            La frase sotto invece e' l'informazione operativa — "arriva
+            domani", "in casa da due notti" — e va letta, quindi 15px e
+            un grigio leggibile. Il grigio chiaro resta ai metadati. */}
         <p className="truncate text-[12px]" style={{ color }}>
           {row.propertyName}
         </p>
-        <p className="text-[12px] text-ink-mute">
+        <p className="text-body text-ink-soft">
           {inHouse ? stayPhrase(row, now) : arrivalPhrase(row, now)}
         </p>
       </div>
@@ -100,38 +108,74 @@ export function HomeGuests({
   inHouse,
   arriving,
   now,
+  calendarRead = false,
+  maxArriving = MAX_ARRIVING,
 }: {
   inHouse: HomeGuestRow[];
   arriving: HomeGuestRow[];
   now: Date;
-}): React.JSX.Element | null {
-  if (inHouse.length === 0 && arriving.length === 0) return null;
+  /**
+   * Almeno un calendario e' stato letto davvero. Serve allo stato
+   * vuoto: "nessun arrivo" e "nessun arrivo, e il calendario e'
+   * aggiornato" sono due affermazioni diverse, e la seconda si puo'
+   * fare solo dopo aver guardato.
+   */
+  calendarRead?: boolean;
+  maxArriving?: number;
+}): React.JSX.Element {
+  // 06/08: prima era `hidden md:flex` — su mobile "chi e' in casa" non
+  // si vedeva affatto, ed era la sezione che risponde alla domanda
+  // della dashboard. Con una colonna sola vale a ogni larghezza.
+  const shown = arriving.slice(0, maxArriving);
+  const hiddenCount = arriving.length - shown.length;
+
   return (
-    <div className="hidden flex-col gap-6 md:flex">
-      {inHouse.length > 0 ? (
-        <section aria-label="Chi è in casa">
-          <h2 className="mb-2 text-eyebrow uppercase tracking-wider text-ok">
-            Chi è in casa · {inHouse.length}
-          </h2>
+    <div className="flex flex-col gap-6">
+      <section aria-label="Chi è in casa">
+        <h2 className="mb-2 text-eyebrow uppercase tracking-wider text-ok">
+          Chi è in casa{inHouse.length > 0 ? ` · ${inHouse.length}` : ''}
+        </h2>
+        {inHouse.length > 0 ? (
           <ul className="flex flex-col gap-2">
             {inHouse.map((r) => (
               <GuestCard key={r.id} row={r} now={now} inHouse={true} />
             ))}
           </ul>
-        </section>
-      ) : null}
-      {arriving.length > 0 ? (
-        <section aria-label="In arrivo">
-          <h2 className="mb-2 text-eyebrow uppercase tracking-wider text-ink-mute">
-            In arrivo · prossimi 7 giorni · {arriving.length}
-          </h2>
-          <ul className="flex flex-col gap-2">
-            {arriving.map((r) => (
-              <GuestCard key={r.id} row={r} now={now} inHouse={false} />
-            ))}
-          </ul>
-        </section>
-      ) : null}
+        ) : (
+          <EmptyState>Nessuno in casa stanotte.</EmptyState>
+        )}
+      </section>
+
+      <section aria-label="Chi arriva">
+        <h2 className="mb-2 text-eyebrow uppercase tracking-wider text-ink-mute">
+          Chi arriva · prossimi 7 giorni{arriving.length > 0 ? ` · ${arriving.length}` : ''}
+        </h2>
+        {arriving.length > 0 ? (
+          <>
+            <ul className="flex flex-col gap-2">
+              {shown.map((r) => (
+                <GuestCard key={r.id} row={r} now={now} inHouse={false} />
+              ))}
+            </ul>
+            {hiddenCount > 0 ? (
+              <Link
+                href="/dashboard/upcoming-checkins"
+                className="mt-2 inline-flex min-h-[44px] items-center gap-1 text-body font-medium text-terracotta-2 hover:underline"
+              >
+                Vedi tutti ({arriving.length})
+                <ChevronRight aria-hidden className="size-4" />
+              </Link>
+            ) : null}
+          </>
+        ) : (
+          // "Il calendario e' aggiornato" si puo' dire solo dopo averlo
+          // letto: senza questa condizione sarebbe la stessa calma finta
+          // che abbiamo tolto dalla agent card.
+          <EmptyState>
+            Nessun arrivo in programma.{calendarRead ? ' Il calendario è aggiornato.' : ''}
+          </EmptyState>
+        )}
+      </section>
     </div>
   );
 }

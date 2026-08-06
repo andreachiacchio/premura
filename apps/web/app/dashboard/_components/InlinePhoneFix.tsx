@@ -1,8 +1,10 @@
 'use client';
 
 import { Check, Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { setBookingGuestPhoneAction } from '../upcoming-checkins/actions';
+import { useResolveDecision } from './DecisionCard';
 
 // Input inline per risolvere "ospite senza numero" DENTRO il blocco
 // decisioni della home. Principio di prodotto: ogni problema porta con
@@ -17,6 +19,8 @@ export function InlinePhoneFix({
   bookingId: string;
   guestName: string;
 }): React.JSX.Element {
+  const router = useRouter();
+  const resolve = useResolveDecision();
   const [pending, startTransition] = useTransition();
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -33,9 +37,11 @@ export function InlinePhoneFix({
           setError(result.reason === 'invalid_phone' ? 'Numero non valido' : 'Salvataggio fallito');
           return;
         }
-        // La revalidate fara' sparire la voce dal blocco; il check da'
-        // riscontro immediato nel frattempo.
         setSaved(true);
+        // L'attesa serve: il refresh rimonta l'albero e senza di essa la
+        // card sparirebbe di colpo, senza dire che il numero e' salvo.
+        await resolve(`Numero di ${guestName} salvato — me ne occupo io`);
+        router.refresh();
       } catch {
         setError('Errore di rete');
       }
@@ -44,7 +50,7 @@ export function InlinePhoneFix({
 
   if (saved) {
     return (
-      <span className="inline-flex items-center gap-1 text-body-sm font-medium text-ok">
+      <span className="inline-flex min-h-[44px] items-center gap-1 text-body font-medium text-ok">
         <Check aria-hidden className="size-4" />
         Fatto
       </span>
@@ -52,7 +58,7 @@ export function InlinePhoneFix({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
       <input
         type="tel"
         inputMode="tel"
@@ -61,7 +67,7 @@ export function InlinePhoneFix({
         disabled={pending}
         aria-label={`Numero WhatsApp di ${guestName}`}
         aria-invalid={error ? true : undefined}
-        className={`h-9 w-44 rounded-card-sm border bg-paper px-2.5 text-body text-ink focus:outline-none focus:ring-2 focus:ring-terracotta-soft/40 ${error ? 'border-alert' : 'border-line'}`}
+        className={`min-h-[44px] w-full rounded-card-sm border bg-paper px-3 text-body text-ink focus:outline-none focus:ring-2 focus:ring-terracotta-soft/40 sm:w-52 ${error ? 'border-alert' : 'border-line'}`}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
@@ -72,7 +78,7 @@ export function InlinePhoneFix({
         onBlur={save}
       />
       {pending ? <Loader2 aria-hidden className="size-4 animate-spin text-ink-mute" /> : null}
-      {error ? <span className="text-body-sm text-alert">{error}</span> : null}
+      {error ? <span className="text-body text-alert">{error}</span> : null}
     </div>
   );
 }

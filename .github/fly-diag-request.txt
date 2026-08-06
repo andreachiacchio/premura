@@ -21,3 +21,8 @@ dichiarata su Fly). Verificare secret, health worker, log cron.
 # — una macchina che Fly tiene ferma e che non manda niente a nessuno.
 # I cron e la coda outbound vivono nel worker, che quel file non lo
 # esegue mai. Ora la riga sta anche in worker.ts: questo bump la legge.
+
+# run 06/08 quinquies: deploy 28 (45ee6ca) verde alle 13:26, worker
+# riavviato con il log in worker.ts. Questo bump tocca SOLO questo file:
+# non rientra nei path di deploy-api, quindi la diagnostica gira da sola
+# e stavolta legge i log DOPO il riavvio, non insieme al build.

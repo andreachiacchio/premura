@@ -1,33 +1,36 @@
 import { dayPhrase, formatDayMonth } from '@/lib/format-date';
 import type { GuestMissingPhoneSoon } from '@/lib/repositories/home-summary';
 import type { PossibleCancellation } from '@/lib/repositories/possible-cancellations';
+import { countOpenDecisions } from '@/lib/repositories/open-decisions';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import { DecisionCard } from './DecisionCard';
 import { InlinePhoneFix } from './InlinePhoneFix';
 import { PossibleCancellationActions } from './PossibleCancellationActions';
 
-// Blocco 2 della home — "Serve una tua decisione".
+// "Serve una tua decisione" — la risposta alla domanda della dashboard.
 //
 // SOLO cio' che e' fermo in attesa dell'host, ogni voce con l'azione che
-// la risolve. Vuoto = il blocco non si renderizza affatto (il silenzio
-// e' l'informazione: non c'e' niente che aspetta te).
+// la risolve. Vuoto = il blocco non si renderizza affatto. Il silenzio
+// e' l'informazione: non c'e' niente che aspetta te, e non serve una
+// riga che lo dica — una riga che dice "tutto ok" e' esattamente la
+// bugia che abbiamo tolto dalla agent card.
 //
-// Le vecchie card "check-in da configurare" e "prenotazioni da
-// completare" confluiscono qui: erano decisioni in attesa travestite da
-// categorie.
+// Ogni voce e' una DecisionCard: titolo su una riga, corpo su due, il
+// resto dietro "Dettagli".
 
 const ARRIVO_FMT = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric' });
 
 /**
- * Bozza in attesa, resa come voce del blocco. La card (ReplyDraftCard,
- * client component con anteprima + approva/modifica/scarta inline) arriva
- * come ReactNode gia' costruito dalla pagina: questo componente resta
- * server-side e non importa niente di client.
+ * Bozza in attesa. La card (ReplyDraftCard, client component con
+ * anteprima e azioni inline) arriva come ReactNode gia' costruito dalla
+ * pagina: questo componente resta server-side.
  */
 export type DecisionDraftItem = {
   key: string;
   /** "in attesa da 12 min" — calcolato server-side al render. */
   waitingLabel: string;
+  guestLabel: string;
   card: React.ReactNode;
 };
 
@@ -40,7 +43,7 @@ export type DecisionsData = {
   draftItems: DecisionDraftItem[];
   /** Ospiti senza numero con arrivo entro 3 giorni — fix inline. */
   missingPhoneSoon: GuestMissingPhoneSoon[];
-  /** Prenotazioni con dati incompleti (form nella lista sotto). */
+  /** Prenotazioni con dati incompleti (schermata a lista dedicata). */
   incompleteCount: number;
   /** Kit proposti in attesa di approvazione. */
   pendingKitsCount: number;
@@ -48,14 +51,15 @@ export type DecisionsData = {
   possibleCancellations: PossibleCancellation[];
 };
 
+/** Stessa definizione del badge in navigazione: mai due conteggi. */
 export function decisionsCount(d: DecisionsData): number {
-  return (
-    d.draftItems.length +
-    d.missingPhoneSoon.length +
-    (d.incompleteCount > 0 ? 1 : 0) +
-    (d.pendingKitsCount > 0 ? 1 : 0) +
-    d.possibleCancellations.length
-  );
+  return countOpenDecisions({
+    replyDrafts: d.draftItems,
+    missingPhoneSoon: d.missingPhoneSoon,
+    possibleCancellations: d.possibleCancellations,
+    incompleteCount: d.incompleteCount,
+    pendingKitsCount: d.pendingKitsCount,
+  });
 }
 
 function arrivalPhrase(checkinAt: Date, now: Date): string {
@@ -69,25 +73,8 @@ function arrivalPhrase(checkinAt: Date, now: Date): string {
   return `arriva ${ARRIVO_FMT.format(checkinAt)}`;
 }
 
-function groupMissingPhoneByProperty(
-  guests: GuestMissingPhoneSoon[],
-): Array<[string, GuestMissingPhoneSoon[]]> {
-  const groups = new Map<string, GuestMissingPhoneSoon[]>();
-  for (const g of guests) {
-    const list = groups.get(g.propertyName) ?? [];
-    list.push(g);
-    groups.set(g.propertyName, list);
-  }
-  return [...groups.entries()];
-}
-
-function Item({ children }: { children: React.ReactNode }): React.JSX.Element {
-  return (
-    <li className="flex flex-col gap-2 border-t border-line-soft px-4 py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between">
-      {children}
-    </li>
-  );
-}
+const linkClass =
+  'inline-flex min-h-[44px] w-full items-center justify-center gap-1 rounded-full border border-terracotta-soft px-4 text-body font-medium text-terracotta-2 hover:bg-peach sm:w-auto';
 
 export function DecisionsBlock({
   data,
@@ -96,111 +83,95 @@ export function DecisionsBlock({
   data: DecisionsData;
   now?: Date;
 }): React.JSX.Element | null {
-  const total = decisionsCount(data);
-  if (total === 0) return null;
+  if (decisionsCount(data) === 0) return null;
 
   return (
-    <section aria-label="Serve una tua decisione" className="mx-5 mt-5 md:mx-0">
-      <div className="overflow-hidden rounded-card border border-terracotta-soft bg-paper shadow-sm">
-        <header className="bg-gradient-to-br from-peach to-peach-deep px-4 py-4">
-          <h2 className="font-serif text-[24px] font-medium leading-tight text-terracotta-2">
-            Serve una tua decisione
-          </h2>
-        </header>
-        <ul>
-          {data.draftItems.map((d) => (
-            <li key={d.key} className="border-t border-line-soft px-4 py-3 first:border-t-0">
-              <p className="mb-2 text-body-sm font-medium text-terracotta-2">
-                Risposta pronta · {d.waitingLabel}
-              </p>
-              {d.card}
-            </li>
-          ))}
+    <section aria-label="Serve una tua decisione">
+      <h2 className="mb-3 font-serif text-h4 leading-tight text-ink">Serve una tua decisione</h2>
+      <div className="flex flex-col gap-3">
+        {data.draftItems.map((d) => (
+          <DecisionCard
+            key={d.key}
+            kind="draft"
+            title={`Risposta per ${d.guestLabel}`}
+            body={d.waitingLabel}
+            details={d.card}
+          />
+        ))}
 
-          {/* Possibili cancellazioni PRIMA di tutto il resto tranne le
-              bozze: rischio concreto di preparare kit e pulizie per
-              ospiti che hanno disdetto (30/07). */}
-          {data.possibleCancellations.map((c) => (
-            <Item key={c.bookingId}>
-              <p className="text-body text-ink">
-                <span className="font-medium text-alert">Possibile cancellazione:</span>{' '}
-                <span className="font-medium">{c.guestFirstName ?? c.guestFullName}</span> ·{' '}
-                {c.propertyName} · {formatDayMonth(c.checkinAt)} – {formatDayMonth(c.checkoutAt)} —
-                il calendario {c.platform === 'booking' ? 'Booking' : 'Airbnb'} non la mostra più
-                da 2 controlli (arrivo {dayPhrase(c.checkinAt, now)}). Verifica sull'extranet.
+        {/* Possibili cancellazioni subito dopo le bozze: rischio
+            concreto di preparare kit e pulizie per ospiti che hanno
+            disdetto (30/07). */}
+        {data.possibleCancellations.map((c) => (
+          <DecisionCard
+            key={c.bookingId}
+            kind="cancellation"
+            title={`${c.guestFirstName ?? c.guestFullName} · ${c.propertyName}`}
+            body={`Il calendario ${c.platform === 'booking' ? 'Booking' : 'Airbnb'} non la mostra più da 2 controlli.`}
+            details={
+              <p>
+                {formatDayMonth(c.checkinAt)} – {formatDayMonth(c.checkoutAt)}, arrivo{' '}
+                {dayPhrase(c.checkinAt, now)}. Verifica sull'extranet prima di confermare: se la
+                confermi cancellata, Premura smette di seguirla.
               </p>
+            }
+            actions={
               <PossibleCancellationActions
                 bookingId={c.bookingId}
                 guestLabel={c.guestFirstName ?? c.guestFullName}
               />
-            </Item>
-          ))}
+            }
+          />
+        ))}
 
-          {groupMissingPhoneByProperty(data.missingPhoneSoon).map(([propertyName, guests]) => (
-            <li key={propertyName}>
-              {/* Raggruppamento per struttura (30/07): intestazione sticky
-                  mentre si scorre, le righe sotto parlano dei suoi ospiti. */}
-              <p className="sticky top-0 z-10 border-t border-line-soft bg-paper/95 px-4 py-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-ink-mute backdrop-blur-sm">
-                {propertyName}
+        {data.missingPhoneSoon.map((g) => (
+          <DecisionCard
+            key={g.bookingId}
+            kind="phone"
+            title={`${g.guestFirstName ?? g.guestFullName} · ${g.propertyName}`}
+            body={`${arrivalPhrase(g.checkinAt, now)} e non ha un numero WhatsApp.`}
+            details={
+              <p>
+                Senza numero non posso mandare il benvenuto né rispondere se scrive. Puoi
+                inserirlo qui: da quel momento me ne occupo io.
               </p>
-              <ul>
-                {guests.map((g) => (
-                  <Item key={g.bookingId}>
-                    <p className="text-body text-ink">
-                      <span className="font-medium">{g.guestFirstName ?? g.guestFullName}</span>{' '}
-                      {arrivalPhrase(g.checkinAt, now)} e non ha un numero WhatsApp
-                    </p>
-                    <InlinePhoneFix
-                      bookingId={g.bookingId}
-                      guestName={g.guestFirstName ?? g.guestFullName}
-                    />
-                  </Item>
-                ))}
-              </ul>
-            </li>
-          ))}
+            }
+            actions={
+              <InlinePhoneFix
+                bookingId={g.bookingId}
+                guestName={g.guestFirstName ?? g.guestFullName}
+              />
+            }
+          />
+        ))}
 
-          {data.pendingKitsCount > 0 ? (
-            <Item>
-              <p className="text-body text-ink">
-                <span className="font-medium">
-                  {data.pendingKitsCount} kit{' '}
-                  {data.pendingKitsCount === 1 ? 'proposto' : 'proposti'}
-                </span>{' '}
-                — da approvare prima dell'ordine
-              </p>
-              <Link
-                href="/dashboard/kits"
-                className="inline-flex items-center gap-1 text-body-sm font-medium text-terracotta-2 hover:underline"
-              >
+        {data.pendingKitsCount > 0 ? (
+          <DecisionCard
+            kind="kit"
+            title={`${data.pendingKitsCount} kit ${data.pendingKitsCount === 1 ? 'proposto' : 'proposti'}`}
+            body="Da approvare prima che parta l'ordine."
+            actions={
+              <Link href="/dashboard/kits" className={linkClass}>
                 Guarda le proposte
                 <ChevronRight aria-hidden className="size-4" />
               </Link>
-            </Item>
-          ) : null}
+            }
+          />
+        ) : null}
 
-          {data.incompleteCount > 0 ? (
-            <Item>
-              <p className="text-body text-ink">
-                <span className="font-medium">
-                  {data.incompleteCount}{' '}
-                  {data.incompleteCount === 1 ? 'prenotazione' : 'prenotazioni'} da completare
-                </span>{' '}
-                — Booking non ci ha dato nome o contatti dell'ospite
-              </p>
-              {/* 05/08: porta alla schermata a lista invece che a una
-                  finestra per volta. Con dieci date, dieci modali sono
-                  dieci aperture e nessun senso di quante ne restano. */}
-              <a
-                href="/dashboard/da-completare"
-                className="inline-flex items-center gap-1 text-body-sm font-medium text-terracotta-2 hover:underline"
-              >
+        {data.incompleteCount > 0 ? (
+          <DecisionCard
+            kind="incomplete"
+            title={`${data.incompleteCount} ${data.incompleteCount === 1 ? 'prenotazione' : 'prenotazioni'} da completare`}
+            body="Booking non ci ha dato nome o contatti dell'ospite."
+            actions={
+              <Link href="/dashboard/da-completare" className={linkClass}>
                 {data.incompleteCount === 1 ? 'Completala' : 'Completale tutte'}
                 <ChevronRight aria-hidden className="size-4" />
-              </a>
-            </Item>
-          ) : null}
-        </ul>
+              </Link>
+            }
+          />
+        ) : null}
       </div>
     </section>
   );

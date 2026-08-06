@@ -2,14 +2,15 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import {
-  confirmCancellationAction,
-  dismissCancellationAction,
-} from '../actions';
+import { confirmCancellationAction, dismissCancellationAction } from '../actions';
+import { decisionActionClass, useResolveDecision } from './DecisionCard';
 
-// Azioni della voce "possibile cancellazione" in Serve una tua
-// decisione: l'host conferma (cancellata davvero) o smentisce (ancora
-// attiva). La conferma chiede conferma: cancella una prenotazione.
+// Azioni della voce "possibile cancellazione": l'host conferma
+// (cancellata davvero) o smentisce (ancora attiva). La conferma chiede
+// conferma — cancella una prenotazione, e non si torna indietro da soli.
+//
+// Niente swipe: e' un'azione che riguarda un ospite, e uno swipe
+// involontario non deve poter cancellare un soggiorno.
 
 export function PossibleCancellationActions({
   bookingId,
@@ -19,45 +20,55 @@ export function PossibleCancellationActions({
   guestLabel: string;
 }): React.JSX.Element {
   const router = useRouter();
+  const resolve = useResolveDecision();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const run = (action: (id: string) => Promise<{ ok: boolean }>, confirmText?: string): void => {
+  const run = (
+    action: (id: string) => Promise<{ ok: boolean }>,
+    doneMessage: string,
+    confirmText?: string,
+  ): void => {
     if (confirmText && !window.confirm(confirmText)) return;
     setError(null);
     startTransition(async () => {
       const result = await action(bookingId);
-      if (!result.ok) setError('Operazione fallita, riprova');
-      else router.refresh();
+      if (!result.ok) {
+        setError('Operazione fallita, riprova');
+        return;
+      }
+      // L'attesa serve: il refresh rimonta l'albero e senza di essa la
+      // card sparirebbe di colpo, senza conferma di cosa e' successo.
+      await resolve(doneMessage);
+      router.refresh();
     });
   };
 
-  const handleConfirm = (): void =>
-    run(
-      confirmCancellationAction,
-      `Confermi che la prenotazione di ${guestLabel} è cancellata? Premura smetterà di seguirla.`,
-    );
-  const handleDismiss = (): void => run(dismissCancellationAction);
-
   return (
-    <div className="flex shrink-0 items-center gap-2">
+    <>
       <button
         type="button"
-        onClick={handleConfirm}
+        onClick={() =>
+          run(
+            confirmCancellationAction,
+            `Prenotazione di ${guestLabel} archiviata`,
+            `Confermi che la prenotazione di ${guestLabel} è cancellata? Premura smetterà di seguirla.`,
+          )
+        }
         disabled={pending}
-        className="rounded-full border border-alert/40 px-3 py-1.5 text-[12px] font-medium text-alert hover:bg-alert/5 disabled:opacity-60"
+        className={`${decisionActionClass} border border-alert/40 text-alert hover:bg-alert/5`}
       >
         Confermo: cancellata
       </button>
       <button
         type="button"
-        onClick={handleDismiss}
+        onClick={() => run(dismissCancellationAction, `${guestLabel} resta in programma`)}
         disabled={pending}
-        className="rounded-full border border-line px-3 py-1.5 text-[12px] font-medium text-ink-soft hover:bg-line-soft disabled:opacity-60"
+        className={`${decisionActionClass} border border-line text-ink-soft hover:bg-line-soft`}
       >
         È ancora attiva
       </button>
-      {error ? <p className="text-body-sm text-alert">{error}</p> : null}
-    </div>
+      {error ? <p className="text-body text-alert">{error}</p> : null}
+    </>
   );
 }

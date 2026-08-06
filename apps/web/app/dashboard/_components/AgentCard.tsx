@@ -19,12 +19,19 @@ export function AgentCard({
   stats,
 }: {
   status: AgentStatus;
-  stats: { activeGuests: number; actionsToday: number; needsYou: number };
+  /**
+   * 06/08: "Azioni oggi" e' stato RIMOSSO. Contava le righe del feed,
+   * dry-run comprese: con il dry-run attivo mostrava un numero mentre
+   * all'ospite non era arrivato niente. Un contatore che puo' salire
+   * senza che l'azione sia avvenuta e' esattamente il tipo di numero
+   * che non si mostra. Torna quando conta invii con una prova.
+   */
+  stats: { activeGuests: number; needsYou: number };
 }) {
   return (
     <section
       aria-label="Premura sta lavorando"
-      className="relative mx-5 mt-1 overflow-hidden rounded-[24px] bg-gradient-to-br from-ink to-[#2A4A60] p-6 pb-5 text-paper shadow-lg md:mx-0 md:flex md:items-center md:gap-6 md:rounded-card md:px-5 md:py-4"
+      className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-ink to-[#2A4A60] p-6 pb-5 text-paper shadow-lg md:flex md:items-center md:gap-6 md:rounded-card md:px-5 md:py-4"
     >
       {/* Archi decorativi come nel prototipo */}
       <div
@@ -52,7 +59,6 @@ export function AgentCard({
         {/* "In casa": stessa semantica e stesso numero della metrica
             accanto — mai due verita' (bug 30/07: "9 attivi" vs "20"). */}
         <Stat num={stats.activeGuests} label="In casa" />
-        <Stat num={stats.actionsToday} label="Azioni oggi" />
         <Stat num={stats.needsYou} label="Serve te" />
       </div>
     </section>
