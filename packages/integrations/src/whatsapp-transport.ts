@@ -96,12 +96,22 @@ export function resolveTransport(): WhatsappTransport {
 // vivono solo i tre che dipendono da configurazione e non da stato.
 
 /**
- * Interruttore generale. Con WHATSAPP_KILL_SWITCH=on nessun messaggio
- * parte, nemmeno in dry-run disattivato. E' l'ultima riga di difesa e
- * si legge a ogni invio, non al boot: si spegne senza redeploy.
+ * Interruttore generale. Nessun messaggio parte, nemmeno con il dry-run
+ * disattivato. E' l'ultima riga di difesa e si legge a ogni invio, non
+ * al boot: si sblocca senza redeploy.
+ *
+ * ATTIVO A MENO CHE il valore non sia esattamente 'off' (06/08, Andrea).
+ * Prima era il contrario — attivo solo con 'on' — e voleva dire che un
+ * refuso, una maiuscola, uno spazio o una variabile cancellata per
+ * sbaglio staccavano il freno *in silenzio*. Il modo di fallire era
+ * "manda", ed era il verso sbagliato: Premura scrive su WhatsApp da un
+ * numero che, se bannato, non si appella. Ora un ambiente che perde la
+ * variabile smette di inviare invece di iniziare, e per mandare davvero
+ * bisogna dichiararlo. Lo stato effettivo viene stampato all'avvio
+ * dell'API chiamando questa stessa funzione, quindi il guasto si vede.
  */
 export function isKillSwitchOn(): boolean {
-  return (process.env.WHATSAPP_KILL_SWITCH ?? '').trim().toLowerCase() === 'on';
+  return (process.env.WHATSAPP_KILL_SWITCH ?? '').trim().toLowerCase() !== 'off';
 }
 
 /**

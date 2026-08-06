@@ -93,6 +93,10 @@ describe('dry-run', () => {
 
   it('non chiama nessun trasporto e non applica jitter', async () => {
     vi.stubEnv('WHATSAPP_TRANSPORT', 'waha');
+    // Freno staccato ESPLICITAMENTE: dal 06/08 il kill switch e' attivo
+    // finche' non si dichiara 'off', quindi senza questa riga il test
+    // non arriverebbe mai al ramo dry-run — verrebbe fermato prima.
+    vi.stubEnv('WHATSAPP_KILL_SWITCH', 'off');
     vi.stubEnv('WHATSAPP_DRY_RUN', 'true');
     const out = await sendText('+393514512070', 'ciao');
 

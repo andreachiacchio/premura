@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { createServerClient } from '@premura/db';
+import { isDryRun, isKillSwitchOn } from '@premura/integrations';
 import { sql } from 'drizzle-orm';
 import Fastify from 'fastify';
 import { bookingsRoutes } from './api/bookings';
@@ -138,6 +139,26 @@ try {
   await apiClient.close().catch(() => {});
   process.exit(1);
 }
+
+// In che modalita' di invio siamo partiti davvero.
+//
+// Le due funzioni chiamate qui sono LE STESSE che chiamano i mittenti
+// prima di ogni sendText/sendImage: quello che si legge nei log e'
+// l'esito su cui il codice agisce, non una rilettura per conto proprio
+// delle variabili d'ambiente. Rileggerle qui vorrebbe dire avere due
+// interpretazioni della stessa configurazione, e prima o poi diverse.
+//
+// Serve perche' i secret di Fly sono write-only: `secrets list` mostra
+// nomi e digest, mai valori, quindi da fuori si sa che una variabile
+// esiste ma non a cosa e' impostata. Questa riga e' l'unico modo di
+// sapere se il freno e' tirato senza esporre niente: stampa la
+// conclusione, non il valore.
+const killSwitch = isKillSwitchOn();
+const dryRun = isDryRun();
+app.log.info(
+  { killSwitch, dryRun, invii: killSwitch ? 'BLOCCATI' : dryRun ? 'simulati' : 'REALI' },
+  'modalita invio WhatsApp',
+);
 
 const port = Number(process.env.PORT ?? 3000);
 await app.listen({ port, host: '0.0.0.0' });
