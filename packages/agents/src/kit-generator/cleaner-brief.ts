@@ -201,6 +201,9 @@ export async function sendCleanerBrief(
     // immediate: il brief va a Karen, non a un ospite. Il jitter
     // 30-60s serve a non sembrare un bot verso WhatsApp sui numeri
     // degli ospiti; verso il nostro operatore e' solo ritardo.
+    //
+    // Nessun allowSkip: col kill switch attivo questa chiamata LANCIA
+    // e si esce da 'send_error' senza far avanzare il kit.
     const res = await sendText(cleanerRow.whatsappNumber, brief, { immediate: true });
     messageId = res.messageId;
   } catch (err) {
@@ -210,13 +213,51 @@ export async function sendCleanerBrief(
     };
   }
 
+  // Il dry-run non lancia, ma il brief non e' arrivato a nessuno:
+  // "simulato" non e' "inviato", quindi il kit non avanza.
+  if (!messageId) {
+    return {
+      status: 'send_error',
+      error: 'nessun providerMessageId: invio simulato o non confermato, kit non avanzato',
+    };
+  }
+
+  await markCleanerBriefed(db, kitId, messageId);
+
+  return { status: 'sent', messageId };
+}
+
+/**
+ * Marca il kit come briefato al cleaner e lo porta in 'ordering'.
+ *
+ * providerMessageId e' OBBLIGATORIO e non nullo: e' la prova che il
+ * brief e' partito davvero (Andrea, 05/08).
+ *
+ * PERCHE' ESISTE. Prima queste due righe erano scritte in linea subito
+ * dopo il sendText, senza guardarne l'esito: col kill switch attivo il
+ * cleaner non riceveva niente e il kit passava comunque a 'ordering'.
+ * Una scrittura in linea non puo' essere protetta da un parametro
+ * obbligatorio — per questo e' stata estratta in una funzione.
+ *
+ * Stesso modello di setKitSetupComplete, che senza photoUrl non si
+ * puo' chiamare.
+ */
+export async function markCleanerBriefed(
+  db: Database,
+  kitId: string,
+  providerMessageId: string,
+): Promise<void> {
+  if (!providerMessageId) {
+    throw new Error(
+      '[markCleanerBriefed] providerMessageId vuoto: non e una prova di invio. ' +
+        'Se il brief non e partito, il kit non deve avanzare a ordering.',
+    );
+  }
   const now = new Date();
   await db
     .update(kits)
     .set({ cleanerBriefedAt: now, status: 'ordering', updatedAt: now })
     .where(eq(kits.id, kitId));
-
-  return { status: 'sent', messageId };
 }
 
 // ─────────────────────────────────────────────────────────────

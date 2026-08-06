@@ -1,7 +1,9 @@
 import 'dotenv/config';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
 import { createServerClient } from '@premura/db';
+import { sql } from 'drizzle-orm';
 import Fastify from 'fastify';
 import { bookingsRoutes } from './api/bookings';
 import { propertiesRoutes } from './api/properties';
@@ -27,7 +29,44 @@ const app = Fastify({
 });
 
 await app.register(helmet);
-await app.register(cors, { origin: true });
+
+// CORS: lista esplicita da CORS_ORIGIN, separata da virgole.
+// `origin: true` accettava QUALUNQUE origine, quindi qualsiasi sito
+// poteva chiamare l'API dal browser di un host loggato. Il default
+// senza la variabile e' `false` — nessuna origine cross-site — perche'
+// una configurazione dimenticata deve chiudere, non aprire.
+const corsOrigins = (process.env.CORS_ORIGIN ?? '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter((o) => o.length > 0);
+if (corsOrigins.length === 0) {
+  app.log.warn(
+    'CORS_ORIGIN non impostata: nessuna origine cross-site ammessa. ' +
+      'Se la dashboard chiama questa API dal browser, impostala.',
+  );
+}
+await app.register(cors, {
+  origin: corsOrigins.length > 0 ? corsOrigins : false,
+  credentials: true,
+});
+
+// Rate limit globale. Era in dependencies ma non registrato: l'API
+// stava senza alcun tetto.
+//
+// I /webhooks/ NON sono esclusi: sono gli endpoint piu' esposti, e
+// lasciarli senza limite sarebbe il contrario della protezione. Hanno
+// un tetto piu' alto perche' una raffica legittima di eventi Meta o
+// WAHA e' normale, mentre un host non fa 120 richieste al minuto.
+const RATE_LIMIT_DEFAULT = 120;
+const RATE_LIMIT_WEBHOOK = 600;
+
+await app.register(rateLimit, {
+  timeWindow: '1 minute',
+  keyGenerator: (req) => req.ip,
+  // Tetto differenziato in un punto solo: i webhook restano protetti,
+  // ma con la soglia giusta per il loro traffico.
+  max: (req) => (req.url.startsWith('/webhooks/') ? RATE_LIMIT_WEBHOOK : RATE_LIMIT_DEFAULT),
+});
 
 app.get('/health', () => ({
   status: 'ok',
@@ -88,15 +127,41 @@ await app.register(wahaWebhookRoutes, { db: apiClient.db });
 
 // TODO: register dashboard API, cleaner endpoints
 
+// Il database risponde? Meglio non partire affatto che partire e
+// fallire su ogni richiesta: un processo sano che restituisce 500 a
+// tutti e' piu' difficile da diagnosticare di uno che non si alza.
+try {
+  await apiClient.db.execute(sql`SELECT 1`);
+  app.log.info('database raggiungibile');
+} catch (err) {
+  app.log.fatal({ err }, 'database NON raggiungibile: non avvio il server');
+  await apiClient.close().catch(() => {});
+  process.exit(1);
+}
+
 const port = Number(process.env.PORT ?? 3000);
 await app.listen({ port, host: '0.0.0.0' });
 app.log.info(`Premura listening on :${port}`);
 
+// Chiusura: se qualcosa fallisce si esce con 1, non con 0. Uscire
+// sempre a 0 diceva a Fly che la chiusura era pulita anche quando una
+// connessione restava appesa.
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, 'shutdown requested');
-  await app.close();
-  await apiClient.close();
-  process.exit(0);
+  let uscita = 0;
+  try {
+    await app.close();
+  } catch (err) {
+    app.log.error({ err }, 'chiusura del server fallita');
+    uscita = 1;
+  }
+  try {
+    await apiClient.close();
+  } catch (err) {
+    app.log.error({ err }, 'chiusura della connessione al database fallita');
+    uscita = 1;
+  }
+  process.exit(uscita);
 };
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));

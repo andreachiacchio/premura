@@ -170,6 +170,15 @@ export async function countOpenKitsForCleaner(db: Database, cleanerId: string): 
   return rows.length;
 }
 
+// SENZA PROVA D'INVIO, DI PROPOSITO (Andrea, 05/08).
+// Registra che la cleaner ha aperto il magic link ed e' entrata
+// nell'app: e' un'azione sua, non un invio di Premura, quindi non
+// esiste un providerMessageId da pretendere.
+//
+// L'invio del link e' un'altra cosa e vive altrove
+// (cleaner-magic-link.ts). Il modello con la prova obbligatoria e'
+// setKitSetupComplete qui sotto, che senza photoUrl non si puo'
+// chiamare.
 export async function markCleanerAccepted(
   db: Database,
   cleanerId: string,

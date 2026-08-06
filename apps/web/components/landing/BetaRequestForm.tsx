@@ -118,6 +118,8 @@ export function BetaRequestForm() {
         </label>
         <input
           id="beta-email"
+          aria-invalid={errored}
+          aria-describedby={errored ? 'beta-form-error' : undefined}
           type="email"
           inputMode="email"
           autoComplete="email"
@@ -136,6 +138,8 @@ export function BetaRequestForm() {
         </label>
         <input
           id="beta-name"
+          aria-invalid={errored}
+          aria-describedby={errored ? 'beta-form-error' : undefined}
           type="text"
           autoComplete="name"
           required
@@ -154,6 +158,8 @@ export function BetaRequestForm() {
         </label>
         <input
           id="beta-count"
+          aria-invalid={errored}
+          aria-describedby={errored ? 'beta-form-error' : undefined}
           type="number"
           inputMode="numeric"
           required
@@ -178,6 +184,8 @@ export function BetaRequestForm() {
         </label>
         <textarea
           id="beta-city-type"
+          aria-invalid={errored}
+          aria-describedby={errored ? 'beta-form-error' : undefined}
           rows={2}
           maxLength={240}
           value={cityAndType}
@@ -225,8 +233,11 @@ export function BetaRequestForm() {
         {submitting ? 'Un secondo…' : 'Invia richiesta'}
       </Button>
 
+      {/* id stabile: i campi lo referenziano via aria-describedby, cosi'
+          uno screen reader legge il messaggio d'errore insieme al campo
+          invece di lasciarlo scollegato in fondo al form. */}
       {errored ? (
-        <p role="alert" className="text-body-sm text-terracotta-2">
+        <p id="beta-form-error" role="alert" className="text-body-sm text-terracotta-2">
           {status.message}
         </p>
       ) : null}

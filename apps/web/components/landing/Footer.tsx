@@ -23,7 +23,9 @@ export function Footer() {
               Privacy
             </Link>
             <span aria-hidden="true">·</span>
-            <span>© 2026 Premura</span>
+            {/* Anno dinamico: un 2026 fisso diventa una data sbagliata
+                il primo gennaio, sulla pagina che deve sembrare curata. */}
+            <span>© {new Date().getFullYear()} Premura</span>
           </div>
         </div>
       </Container>

@@ -208,6 +208,17 @@ export async function getOrCreateDeflectionDraft(
 // fromEntity=host, metadata.deflection_attempt=true.
 //
 // Idempotente: clic multipli non duplicano.
+//
+// SENZA PROVA D'INVIO, DI PROPOSITO (Andrea, 05/08).
+// Registra che l'host ha copiato il messaggio e aperto l'inbox di
+// Booking: non e' un invio di Premura, non esiste un
+// providerMessageId. Il messaggio lo manda l'host, dalla piattaforma,
+// con le sue mani — noi possiamo solo annotare che ha preso l'azione.
+//
+// Per questo NON prende un providerMessageId obbligatorio come
+// markWelcomeMessageSent, markSurveySent e markCleanerBriefed: quelle
+// marcano invii nostri e la prova esiste. Qui pretenderla
+// significherebbe inventarla.
 export async function markDeflectionSent(
   db: Database,
   draftId: string,

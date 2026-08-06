@@ -14,14 +14,13 @@
 
 import { resolve } from 'node:path';
 import { config as loadEnv } from 'dotenv';
-import { eq, inArray } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { bookings } from '../schema';
 
 loadEnv({ path: resolve('.env.local') });
 
-const HOST_ID = '2ad367f1-3433-4b42-b143-5ece3cd8bb5b';
 const PROPERTY_ID = '404f35b3-2796-44a3-bffc-90c5eba36447';
 
 // UUID deterministici (v5-style ma hardcoded) per idempotenza.
