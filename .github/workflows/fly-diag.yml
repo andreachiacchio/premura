@@ -67,7 +67,29 @@ jobs:
             fi
           done
           echo
-          echo "=== MODALITA INVIO DICHIARATA ALL'AVVIO (ultima riga) ==="
+          echo "=== MODALITA INVIO, CHIESTA ADESSO AL WORKER ==="
+          # Fonte primaria: /health del worker risponde con lo stato
+          # corrente, chiamando le stesse funzioni dei mittenti. Non
+          # dipende da nessuna finestra di log — la domanda si fa quando
+          # serve. Solo la conclusione, mai i valori delle secret.
+          health=$(flyctl ssh console --app premura-api-staging --process-group worker \
+            -C "wget -qO- http://localhost:8080/health" 2>/dev/null) || true
+          modo=$(printf '%s' "$health" | tr ',' '\n' | grep -E '"(killSwitch|dryRun|modo)"' || true)
+          if [ -n "$modo" ]; then
+            printf '%s\n' "$modo"
+          else
+            echo "worker non raggiungibile, oppure /health non espone ancora 'invii'"
+          fi
+
+          echo
+          echo "=== QUANDO E' RIPARTITO IL WORKER (LAST UPDATED) ==="
+          # Serve a distinguere "non e' ripartito" da "e' ripartito ma
+          # il log e' scaduto": senza, le due cose si confondono.
+          flyctl machine list --app premura-api-staging 2>/dev/null \
+            | awk '/worker/ {print "worker aggiornato: " $(NF-3)}' || true
+
+          echo
+          echo "=== RIGA DI AVVIO, SE ANCORA NELLA FINESTRA DI LOG ==="
           # L'API stampa killSwitch/dryRun/invii al boot chiamando le
           # stesse funzioni dei mittenti. La riga esce fra i log
           # dell'app, sepolta sotto centinaia di health check: qui la si

@@ -26,3 +26,10 @@ dichiarata su Fly). Verificare secret, health worker, log cron.
 # riavviato con il log in worker.ts. Questo bump tocca SOLO questo file:
 # non rientra nei path di deploy-api, quindi la diagnostica gira da sola
 # e stavolta legge i log DOPO il riavvio, non insieme al build.
+
+# run 06/08 sexies: due volte la riga di avvio non c'era, e la seconda
+# volta il worker era ripartito davvero (deploy 28, 13:26) — `flyctl
+# logs` tiene una finestra di ~20 minuti e la diagnostica ha guardato
+# alle 13:56. Invece di rincorrere la finestra, /health del worker ora
+# dichiara la modalita' corrente: la domanda si fa quando serve e la
+# risposta non scade. Questo bump la legge.
