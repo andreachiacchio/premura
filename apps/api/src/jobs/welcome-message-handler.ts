@@ -164,13 +164,14 @@ export async function processWelcomeJob(
 
     // Il dry-run non lancia (e' una simulazione, non un blocco) ma non
     // ha mandato niente all'ospite: marcare "inviato" sarebbe la stessa
-    // bugia. Lo stato resta indietro e il messaggio riparte.
-    if (res.dryRun) {
+    // bugia. Senza providerMessageId non c'e' prova d'invio, quindi lo
+    // stato resta indietro e il messaggio riparte.
+    if (!res.messageId) {
       logger.warn(
-        { kitId, transport: res.transport },
-        'welcome message SIMULATO (dry-run): stato non avanzato, ripartira',
+        { kitId, transport: res.transport, dryRun: res.dryRun },
+        'welcome message NON inviato (nessun providerMessageId): stato non avanzato, ripartira',
       );
-      return { status: 'skipped_dry_run' };
+      return { status: res.dryRun ? 'skipped_dry_run' : 'skipped_no_message_id' };
     }
 
     const now = new Date();
@@ -197,7 +198,7 @@ export async function processWelcomeJob(
       },
     });
 
-    await markWelcomeMessageSent(db, kitId);
+    await markWelcomeMessageSent(db, kitId, res.messageId);
 
     logger.info(
       {

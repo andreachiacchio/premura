@@ -235,10 +235,39 @@ export async function findStaleSetups(
     }));
 }
 
+/**
+ * Marca il kit come consegnato all'ospite.
+ *
+ * providerMessageId e' OBBLIGATORIO e non nullo: e' la prova che il
+ * messaggio e' partito davvero (Andrea, 05/08).
+ *
+ * PERCHE'. Prima la firma era (db, kitId) e bastava chiamarla per
+ * dichiarare "consegnato". Col kill switch attivo il transport non
+ * inviava nulla, il chiamante non se ne accorgeva, e questa funzione
+ * scriveva welcome_message_sent_at + status 'delivered_to_guest':
+ * il benvenuto risultava consegnato e non ripartiva piu'.
+ *
+ * Il contratto invertito di sendText/sendImage ferma il chiamante di
+ * oggi, ma non chi scrivera' il prossimo fra sei mesi. Pretendere la
+ * prova come parametro sposta il controllo dal comportamento al tipo:
+ * marcare "consegnato" senza un id reale diventa un errore di
+ * compilazione. In dry-run l'id e' null, quindi non si compila — ed e'
+ * corretto, perche' "simulato" non e' "inviato".
+ *
+ * Stesso modello di setKitSetupComplete, che senza photoUrl non si
+ * puo' chiamare.
+ */
 export async function markWelcomeMessageSent(
   db: Database,
   kitId: string,
+  providerMessageId: string,
 ): Promise<{ ok: true } | { ok: false; reason: 'not_found' }> {
+  if (!providerMessageId) {
+    throw new Error(
+      '[markWelcomeMessageSent] providerMessageId vuoto: non e una prova di invio. ' +
+        'Se il messaggio non e partito, non marcare il kit come consegnato.',
+    );
+  }
   const now = new Date();
   const [row] = await db
     .update(kits)

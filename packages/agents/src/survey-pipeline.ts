@@ -215,7 +215,32 @@ export async function prepareSurveySend(
   };
 }
 
-export async function markSurveySent(db: Database, quizId: string): Promise<void> {
+/**
+ * Marca il sondaggio come inviato all'ospite.
+ *
+ * providerMessageId e' OBBLIGATORIO e non nullo: e' la prova che il
+ * link e' partito davvero (Andrea, 05/08).
+ *
+ * PERCHE'. Prima bastava (db, quizId). Col kill switch attivo sendText
+ * non inviava, il chiamante non guardava l'esito, e questa funzione
+ * scriveva sent_at: al giro successivo prepareSurveySend trovava
+ * alreadyPrepared e rispondeva 'already_sent'. Il sondaggio spariva
+ * per sempre, anche dopo aver abbassato lo switch.
+ *
+ * Stesso modello di setKitSetupComplete, che senza photoUrl non si
+ * puo' chiamare: la prova entra nel tipo, non resta un'assunzione.
+ */
+export async function markSurveySent(
+  db: Database,
+  quizId: string,
+  providerMessageId: string,
+): Promise<void> {
+  if (!providerMessageId) {
+    throw new Error(
+      '[markSurveySent] providerMessageId vuoto: non e una prova di invio. ' +
+        'Se il link non e partito, non marcare il sondaggio come inviato.',
+    );
+  }
   await db.update(guestQuizzes).set({ sentAt: new Date() }).where(eq(guestQuizzes.id, quizId));
 }
 

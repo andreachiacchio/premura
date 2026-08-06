@@ -61,30 +61,24 @@ async function processSendLink(
   try {
     const outcome = await sendText(candidate.guestPhone, prepared.message);
 
-    // sendText NON lancia quando il kill switch e' attivo: ritorna un
-    // esito con skippedReason. Marcare il sondaggio come inviato qui
-    // significava bruciarlo per sempre — al giro dopo prepareSurveySend
-    // trova alreadyPrepared e risponde 'already_sent', quindi il
-    // sondaggio non parte piu' nemmeno dopo aver abbassato lo switch.
-    //
-    // Il resto del sistema fa gia' la cosa giusta: in reserveAndSend il
-    // kill switch e' il PRIMO controllo, prima di scrivere qualunque
-    // stato, proprio perche' spegnendo lo switch il trigger possa
-    // ancora partire. Qui allineiamo: nessuno stato scritto, si
-    // riprova al prossimo tick.
-    if (outcome.skippedReason) {
+    // Col kill switch attivo sendText LANCIA (contratto invertito
+    // 05/08) e si finisce nel catch, che azzera lo stato. Qui resta da
+    // coprire il dry-run, che non lancia ma non ha mandato niente:
+    // senza providerMessageId non c'e' prova d'invio, quindi il
+    // sondaggio non si marca e si riprova al prossimo tick.
+    if (!outcome.messageId) {
       await db
         .update(guestQuizzes)
         .set({ sentAt: null, token: null })
         .where(eq(guestQuizzes.id, prepared.quizId));
       logger.warn(
-        { bookingId, quizId: prepared.quizId, skippedReason: outcome.skippedReason },
-        'survey link NON inviato: stato azzerato, si riprova al prossimo tick',
+        { bookingId, quizId: prepared.quizId, dryRun: outcome.dryRun },
+        'survey link NON inviato (nessun providerMessageId): stato azzerato, si riprova',
       );
-      return { status: 'skipped', reason: outcome.skippedReason };
+      return { status: 'skipped', reason: outcome.dryRun ? 'dry_run' : 'no_message_id' };
     }
 
-    await markSurveySent(db, prepared.quizId);
+    await markSurveySent(db, prepared.quizId, outcome.messageId);
     logger.info(
       {
         bookingId,
