@@ -8,25 +8,20 @@ import {
   findNextActiveArrival,
   getCalendarStateForHost,
 } from '@/lib/repositories/agent-status';
-import { findByHostId } from '@/lib/repositories/bookings';
 import { listGuestsArrivingSoon, listGuestsInHouse } from '@/lib/repositories/home-guests';
-import { getHomeSummary, listGuestsMissingPhoneSoon } from '@/lib/repositories/home-summary';
-import { countKitsByStatusForHost } from '@/lib/repositories/kits';
+import { getHomeSummary } from '@/lib/repositories/home-summary';
 import { findByHostId as findPropertiesByHostId } from '@/lib/repositories/properties';
-import { listPossibleCancellations } from '@/lib/repositories/possible-cancellations';
-import { listPendingReplyDraftsForHost } from '@/lib/repositories/reply-drafts';
-import { isIncompleteDataSource } from '@/lib/types';
 import { hosts } from '@premura/db';
 import { eq } from 'drizzle-orm';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { loadOpenDecisions } from '@/lib/repositories/open-decisions';
 import { AddBookingButton } from './_components/AddBookingButton';
 import { AgentCard } from './_components/AgentCard';
-import { AgentFeed } from './_components/AgentFeed';
 import { BookingsList } from './_components/BookingsList';
 import { DashboardHeader } from './_components/DashboardHeader';
-import { DecisionsBlock, decisionsCount } from './_components/DecisionsBlock';
+import { DecisionsBlock } from './_components/DecisionsBlock';
 import { EmptyOnboardingState } from './_components/EmptyOnboardingState';
+import { EmptyState } from './_components/EmptyState';
 import { HomeGuests } from './_components/HomeGuests';
 import { ReplyDraftCard } from './_components/ReplyDraftCard';
 import {
@@ -99,25 +94,16 @@ export default async function DashboardPage() {
     );
   }
 
+  // Tutto cio' che aspetta l'host viene da UNA fonte, memoizzata per
+  // richiesta: la stessa che alimenta il badge in navigazione. Due
+  // conteggi scritti separatamente divergono, prima o poi.
+  const decisions = await timed('loadOpenDecisions', () => loadOpenDecisions());
+  const { replyDrafts, missingPhoneSoon, possibleCancellations, bookings } = decisions;
+
   // HOTFIX: ogni query e' isolata. Una fail non rompe le altre.
   // Defaults garantiscono empty-state UI graziosa.
-  const [bookings, replyDrafts, kitStatusCounts, summary, missingPhoneSoon, hostRow, nextArrival] =
+  const [summary, hostRow, nextArrival] =
     await Promise.all([
-      safeQuery<Awaited<ReturnType<typeof findByHostId>>>(
-        'findByHostId',
-        () => findByHostId({ db, hostId }),
-        [],
-      ),
-      safeQuery<Awaited<ReturnType<typeof listPendingReplyDraftsForHost>>>(
-        'listPendingReplyDraftsForHost',
-        () => listPendingReplyDraftsForHost(db, hostId),
-        [],
-      ),
-      safeQuery<Record<string, number>>(
-        'countKitsByStatusForHost',
-        () => countKitsByStatusForHost(db, hostId),
-        {},
-      ),
       safeQuery<Awaited<ReturnType<typeof getHomeSummary>>>(
         'getHomeSummary',
         () => getHomeSummary(db, hostId),
@@ -133,11 +119,6 @@ export default async function DashboardPage() {
           },
           feed: [],
         },
-      ),
-      safeQuery<Awaited<ReturnType<typeof listGuestsMissingPhoneSoon>>>(
-        'listGuestsMissingPhoneSoon',
-        () => listGuestsMissingPhoneSoon(db, hostId),
-        [],
       ),
       safeQuery<{ fullName: string | null } | null>(
         'hostFullName',
@@ -161,52 +142,37 @@ export default async function DashboardPage() {
   // Home desktop (30/07): ospiti in casa e in arrivo, stessi predicati
   // della metrica dell'agent card ("mai due verita'").
   const now = new Date();
-  const [guestsInHouseRows, guestsArrivingRows, possibleCancellations, calendars] =
-    await Promise.all([
-      safeQuery('listGuestsInHouse', () => listGuestsInHouse(db, hostId, now), []),
-      safeQuery('listGuestsArrivingSoon', () => listGuestsArrivingSoon(db, hostId, now), []),
-      safeQuery('listPossibleCancellations', () => listPossibleCancellations(db, hostId), []),
-      safeQuery('getCalendarStateForHost', () => getCalendarStateForHost(db, hostId), {
-        feedsTotali: 0,
-        feedsLetti: 0,
-        feedsInErrore: 0,
-      }),
-    ]);
+  const [guestsInHouseRows, guestsArrivingRows, calendars] = await Promise.all([
+    safeQuery('listGuestsInHouse', () => listGuestsInHouse(db, hostId, now), []),
+    safeQuery('listGuestsArrivingSoon', () => listGuestsArrivingSoon(db, hostId, now), []),
+    safeQuery('getCalendarStateForHost', () => getCalendarStateForHost(db, hostId), {
+      feedsTotali: 0,
+      feedsLetti: 0,
+      feedsInErrore: 0,
+    }),
+  ]);
   stopTotale();
-
-  const incompleteToCompleteCount = bookings.filter(
-    (b) => isIncompleteDataSource(b.dataSource) && !b.hostSkippedCompletion,
-  ).length;
-
-  // Slice C: counter kit in attesa di approvazione founder.
-  const pendingKitsCount = (kitStatusCounts.proposed ?? 0) + (kitStatusCounts.modified ?? 0);
 
   // Capitalizzato: nel profilo puo' essere minuscolo ("andrea").
   const rawFirstName = hostRow?.fullName?.trim().split(/\s+/)[0] || 'ospite';
   const hostFirstName = rawFirstName.charAt(0).toUpperCase() + rawFirstName.slice(1);
 
-  // Blocco decisioni costruito PRIMA del render: il contatore "serve te"
-  // dell'agent card e' lo stesso numero, mai due verita' diverse.
   const decisionsData = {
     draftItems: replyDrafts.map((d) => ({
       key: d.id,
       waitingLabel: waitingSince(d.createdAt),
+      guestLabel: d.guestFullName,
       card: <ReplyDraftCard draft={d} />,
     })),
     missingPhoneSoon,
-    incompleteCount: incompleteToCompleteCount,
-    pendingKitsCount,
+    incompleteCount: decisions.incompleteCount,
+    pendingKitsCount: decisions.pendingKitsCount,
     possibleCancellations,
   };
 
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const actionsToday = summary.feed.filter((f) => f.at >= startOfToday).length;
-
-  // 05/08: la card e il contatore "Serve te" leggono lo STESSO numero,
-  // e lo stato dei calendari entra nella frase: mai "tutto tranquillo"
-  // quando c'e' qualcosa in sospeso o il calendario non e' stato letto.
-  const needsYouCount = decisionsCount(decisionsData);
+  // "Serve te" sulla card, badge in navigazione e voci del blocco: un
+  // numero solo, da loadOpenDecisions(). Mai due verita'.
+  const needsYouCount = decisions.count;
 
   // "Prenotazione con nome" ha una definizione precisa: i segnaposto
   // dei feed ("Booking Guest", "Reserved", "ospite") non contano.
@@ -234,137 +200,70 @@ export default async function DashboardPage() {
   });
 
   return (
-    // HOME = RIEPILOGO, tre blocchi (Andrea, 29/07):
-    //   1. metriche — striscia compatta: e' cio' che va bene, non ruba
-    //      spazio a cio' che e' fermo (principio "10 secondi")
-    //   2. "Serve una tua decisione" — solo cio' che aspetta l'host,
-    //      con l'azione inline; vuoto = nascosto
-    //   3. "Fatto dall'agente — oggi" — feed, ieri dietro un click
-    // Sotto i blocchi restano le sezioni operative (risposte da
-    // approvare, prenotazioni) a cui le voci del blocco 2 si ancorano.
-    // Colonna 480px SEMPRE (mobile-first come il prototipo); su desktop
-    // diventa una carta centrata con ombra invece di allargarsi.
-    // DUE LAYOUT, non uno responsive (30/07): sotto md la colonna 480px
-    // del prototipo, esattamente com'e'; da md in su un layout suo che
-    // usa la larghezza (fino a ~1200px): agent card + metriche sulla
-    // stessa riga, decisioni a sinistra e feed a destra, liste a griglia.
-    <main className="mx-auto min-h-screen w-full max-w-[480px] bg-ivory md:max-w-[1200px] md:px-6">
-      <DashboardHeader hostFirstName={hostFirstName} />
+    // UNA COLONNA (Andrea 06/08). Prima erano due, e la principale
+    // ospitava "Date occupate" mentre "Serve una tua decisione" stava di
+    // lato, piu' stretta: l'esatto contrario dell'ordine di importanza.
+    // Con una colonna sola non c'e' da scegliere dove guardare, e
+    // l'ordine verticale E' la priorita'.
+    //
+    // Ordine: stato -> decisioni -> chi e' in casa -> chi arriva ->
+    // date occupate (contesto, in fondo).
+    //
+    // La spaziatura fra sezioni cresce SOLO da md in su. Su mobile piu'
+    // aria significa piu' scroll per arrivare alla stessa cosa, e
+    // trenta secondi non ne hanno.
+    <main className="mx-auto w-full max-w-[720px] px-5 py-6 md:px-8">
+      <div className="flex flex-col gap-6 md:gap-8">
+        <DashboardHeader hostFirstName={hostFirstName} />
 
-      {/* Barra di navigazione vera, sotto il saluto (bug 30/07: i link
-          incastrati sotto le metriche si sovrapponevano). */}
-      <nav
-        aria-label="Sezioni"
-        className="mx-5 mb-5 flex gap-x-5 overflow-x-auto whitespace-nowrap border-y border-line-soft py-2.5 md:mx-0"
-      >
-        {/* Voce corrente evidenziata (punto 5, 30/07). */}
-        <span
-          aria-current="page"
-          className="border-b-2 border-terracotta pb-0.5 text-body-sm font-semibold text-ink"
-        >
-          Oggi
-        </span>
-        <Link
-          href="/dashboard/conversations"
-          className="text-body-sm font-medium text-ink-soft hover:text-ink"
-        >
-          Conversazioni
-        </Link>
-        <Link
-          href="/dashboard/upcoming-checkins"
-          className="text-body-sm font-medium text-ink-soft hover:text-ink"
-        >
-          Chi arriva
-        </Link>
-        <Link
-          href="/dashboard/kits"
-          className="text-body-sm font-medium text-ink-soft hover:text-ink"
-        >
-          Kit
-        </Link>
-        <Link
-          href="/dashboard/cleaners"
-          className="text-body-sm font-medium text-ink-soft hover:text-ink"
-        >
-          Squadra
-        </Link>
-        <Link href="/properties" className="text-body-sm font-medium text-ink-soft hover:text-ink">
-          Strutture
-        </Link>
-      </nav>
+        <AgentCard
+          status={agentStatus}
+          stats={{
+            activeGuests: summary.metrics.guestsInHouse,
+            needsYou: needsYouCount,
+          }}
+        />
 
-      {/* Agent card: barra a tutta larghezza su desktop (punto 2).
-          I riquadri metriche sono stati eliminati: il dato vive SOLO
-          qui (punto 3 — "9 in casa" non deve comparire due volte). */}
-      <AgentCard
-        status={agentStatus}
-        stats={{
-          activeGuests: summary.metrics.guestsInHouse,
-          actionsToday,
-          needsYou: needsYouCount,
-        }}
-      />
+        {/* Vuoto = non si renderizza. Il silenzio e' l'informazione. */}
+        <DecisionsBlock data={decisionsData} />
 
-      {/* Da md: decisioni a sinistra, feed a destra; le liste sotto a
-          tutta larghezza. Su mobile l'ordine DOM resta quello del
-          prototipo: decisioni -> liste -> feed. */}
-      {/* Due colonne piene su desktop (punto 4): sinistra ospiti in
-          casa + in arrivo + liste, destra decisioni + feed. Ordine DOM
-          mobile invariato: decisioni -> liste -> feed. */}
-      <div className="md:mt-4 md:grid md:grid-cols-[3fr_2fr] md:items-start md:gap-4">
-        <div className="md:col-start-2 md:row-start-1">
-          <DecisionsBlock data={decisionsData} />
-        </div>
+        <HomeGuests
+          inHouse={guestsInHouseRows}
+          arriving={guestsArrivingRows}
+          now={now}
+          calendarRead={calendars.feedsLetti > 0}
+        />
 
-        <div className="md:col-start-1 md:row-span-2 md:row-start-1">
-          <HomeGuests inHouse={guestsInHouseRows} arriving={guestsArrivingRows} now={now} />
-          <div id="prenotazioni" className="scroll-mt-6">
-            <BookingsList
-              bookings={bookings}
-              properties={hostProperties}
-              completeAction={completeBookingAction}
-              skipAction={skipBookingAction}
-            />
-          </div>
-          {/* 05/08: quando non c'e' NESSUNA prenotazione con un nome
-              vero, questa colonna resta vuota — HomeGuests ritorna
-              null e BookingsList non ha sezioni. E' il momento in cui
-              un host che lavora in diretto non ha nulla da fare, e
-              l'unica azione sensata e' inserire la prima. */}
-          {!hasAnyNamedBooking && (
-            <div className="rounded-card border border-line-soft bg-paper px-5 py-6 text-center shadow-sm">
-              <p className="font-serif text-h4 leading-tight text-ink">
-                Non ho ancora nessun ospite con un nome.
-              </p>
-              <p className="mt-2 text-body-sm text-ink-soft">
-                Se hai preso una prenotazione al telefono o via email, aggiungila: con il numero
-                me ne occupo io.
-              </p>
-              <div className="mt-5 flex justify-center">
-                <AddBookingButton
-                  properties={propertyOptions}
-                  createAction={createDirectBookingAction}
-                  variant="primary"
-                  label="Aggiungi una prenotazione"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="md:col-start-2 md:row-start-2">
-          <AgentFeed
-            items={summary.feed.map((f) => ({
-              at: f.at.toISOString(),
-              line: f.line,
-              kind: f.kind,
-              simulated: f.simulated,
-            }))}
+        <div id="prenotazioni" className="scroll-mt-6">
+          <BookingsList
+            bookings={bookings}
+            properties={hostProperties}
+            completeAction={completeBookingAction}
+            skipAction={skipBookingAction}
           />
         </div>
-      </div>
 
-      <div className="h-12" aria-hidden />
+        {/* 05/08: quando non c'e' NESSUNA prenotazione con un nome vero
+            la colonna resta vuota — HomeGuests ritorna null e
+            BookingsList non ha sezioni. E' il momento in cui un host che
+            lavora in diretto non ha nulla da fare, e l'unica azione
+            sensata e' inserire la prima. */}
+        {!hasAnyNamedBooking && (
+          <EmptyState
+            hint="Se hai preso una prenotazione al telefono o via email, aggiungila: con il numero me ne occupo io."
+            action={
+              <AddBookingButton
+                properties={propertyOptions}
+                createAction={createDirectBookingAction}
+                variant="primary"
+                label="Aggiungi una prenotazione"
+              />
+            }
+          >
+            Non ho ancora nessun ospite con un nome.
+          </EmptyState>
+        )}
+      </div>
     </main>
   );
 }

@@ -2,6 +2,7 @@ import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { startTimer, timed } from '@/lib/perf';
 import { propertyColorOrFallback } from '@/lib/property-color';
+import { EmptyState } from '../_components/EmptyState';
 import {
   type ConversationListItem,
   listConversationsForHost,
@@ -71,13 +72,9 @@ export default async function ConversationsPage(): Promise<React.JSX.Element> {
       </header>
 
       {conversations.length === 0 ? (
-        <div className="rounded-card border border-line-soft bg-paper px-6 py-10 text-center shadow-sm">
-          <p className="font-serif text-h3 leading-tight text-ink">Ancora nessuna conversazione.</p>
-          <p className="mt-2 text-body text-ink-soft">
-            Quando un ospite scrive su WhatsApp la vedi qui, con la risposta proposta da
-            approvare. Non serve fare nulla adesso.
-          </p>
-        </div>
+        <EmptyState hint="Quando un ospite scrive su WhatsApp la conversazione compare qui, con la risposta pronta da approvare.">
+          Nessun messaggio aperto. Ti scrivo solo se serve.
+        </EmptyState>
       ) : (
         <ul className="flex flex-col gap-3">
           {conversations.map((c) => {
