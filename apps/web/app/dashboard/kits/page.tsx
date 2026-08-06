@@ -78,7 +78,7 @@ export default async function KitsPage({
           href="/dashboard"
           className="text-sm text-ink-mute underline-offset-2 hover:underline"
         >
-          ← Dashboard
+          ← Oggi
         </Link>
       </header>
 

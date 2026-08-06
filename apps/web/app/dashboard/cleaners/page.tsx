@@ -58,7 +58,7 @@ export default async function CleanersPage(): Promise<React.JSX.Element> {
 
       <p className="mt-8 text-xs text-ink-mute">
         <Link href="/dashboard" className="underline-offset-2 hover:underline">
-          ← Dashboard
+          ← Oggi
         </Link>
       </p>
     </div>

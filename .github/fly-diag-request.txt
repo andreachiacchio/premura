@@ -4,3 +4,8 @@ dichiarata su Fly). Verificare secret, health worker, log cron.
 
 # run 06/08: serve sapere se WHATSAPP_DRY_RUN e impostato su Fly
 # (secrets list stampa nomi e digest, mai valori).
+
+# run 06/08 bis: il run precedente ha risposto, ma la risposta stava al
+# primo step e da fuori si legge solo la coda del log. Aggiunto uno step
+# finale che stampa il verdetto in fondo. Questo bump serve a rilanciare
+# la diagnostica con quello step.

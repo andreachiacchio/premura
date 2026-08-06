@@ -262,7 +262,7 @@ export default async function DashboardPage() {
           aria-current="page"
           className="border-b-2 border-terracotta pb-0.5 text-body-sm font-semibold text-ink"
         >
-          Home
+          Oggi
         </span>
         <Link
           href="/dashboard/conversations"
@@ -274,7 +274,7 @@ export default async function DashboardPage() {
           href="/dashboard/upcoming-checkins"
           className="text-body-sm font-medium text-ink-soft hover:text-ink"
         >
-          Prossimi check-in
+          Chi arriva
         </Link>
         <Link
           href="/dashboard/kits"

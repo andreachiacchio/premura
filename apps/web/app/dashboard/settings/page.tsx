@@ -28,7 +28,7 @@ export default async function SettingsPage() {
         href="/dashboard"
         className="mb-3 inline-block text-body-sm text-ink-mute underline-offset-2 hover:underline"
       >
-        ← Dashboard
+        ← Oggi
       </Link>
       <header className="mb-8">
         <p className="text-eyebrow uppercase text-ink-mute">Impostazioni</p>

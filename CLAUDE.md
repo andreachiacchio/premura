@@ -59,6 +59,35 @@ Riferimento completo in `CONTEXT.md` §4. In sintesi:
 5. **Observabilità totale**: ogni decisione dell'agente viene loggata con
    ragionamento. Niente black box.
 
+## R2 — leggere l'esito, non assumerlo
+
+> Questa è la regola che ha generato i tre bug del 5 agosto. Sta qui
+> perché vale ovunque, non solo nel prompt in cui è nata.
+
+**Un valore mostrato o registrato deve derivare dal dato che pretende di
+descrivere.** Mai da un'assunzione ottimistica presa a parte.
+
+Le due forme in cui si presenta:
+
+1. **Sui fatti** — chi chiama una funzione che può fallire deve *leggere*
+   cosa ha restituito prima di avanzare lo stato. Un invio "partito" si
+   scrive solo con la prova dell'invio in mano (vedi il parametro
+   `providerMessageId` obbligatorio su `markWelcomeMessageSent`,
+   `markSurveySent`, `markCleanerBriefed`). Se una funzione registra
+   un'azione *umana* e non un invio di Premura, il commento deve dire
+   **cosa registra**, non solo perché non ha una prova.
+2. **Sul testo** — la frase che l'host legge deve derivare dallo stesso
+   conteggio che gli mostri accanto. "Tutto tranquillo" accanto a
+   "SERVE TE: 1" sono due verità opposte a dieci centimetri. E non si
+   dice mai "tranquillo" quando semplicemente non si è ancora guardato:
+   calendario non letto è uno stato suo, con la sua azione.
+
+Come si rende vera, non solo scritta: **il dato che serve alla verità è
+un parametro obbligatorio**. Se si può omettere, prima o poi qualcuno lo
+omette e il default mente in silenzio. Ometterlo deve essere un errore di
+compilazione (vedi `buildAgentStatus`, dove `needsYouCount` e `calendars`
+sono obbligatori e la stringa di calma incondizionata è stata eliminata).
+
 ## Stack e convenzioni
 
 - **Linguaggio**: TypeScript strict mode

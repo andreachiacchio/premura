@@ -104,7 +104,7 @@ export default async function PropertiesPage() {
           href="/dashboard"
           className="text-body-sm text-ink-mute underline-offset-2 hover:underline"
         >
-          ← Dashboard
+          ← Oggi
         </Link>
       </header>
 

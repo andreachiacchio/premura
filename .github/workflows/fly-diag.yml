@@ -48,3 +48,22 @@ jobs:
 
       - name: Log recenti (cercare gmail-sync-cron)
         run: flyctl logs --app premura-api-staging --no-tail || true
+
+      # VERDETTO IN CODA, non in cima. `flyctl logs` sputa centinaia di
+      # righe di health check, e le API che rileggono questo log danno
+      # solo la coda: una risposta stampata al primo step diventa
+      # illeggibile da fuori. Quello che serve sapere sta in fondo.
+      # Solo NOMI, mai valori: `secrets list` non li espone e qui si
+      # guarda esclusivamente la prima colonna.
+      - name: Verdetto — secrets che governano gli invii (solo nomi)
+        run: |
+          names=$(flyctl secrets list --app premura-api-staging 2>/dev/null | awk 'NR>1 {print $1}')
+          echo "=== SECRETS INVII (nome, mai valore) ==="
+          for k in WHATSAPP_KILL_SWITCH WHATSAPP_DRY_RUN WAHA_BASE_URL WAHA_SESSION WAHA_API_KEY; do
+            if printf '%s\n' "$names" | grep -qx -- "$k"; then
+              echo "$k: IMPOSTATA"
+            else
+              echo "$k: NON impostata (vale il default del codice)"
+            fi
+          done
+          echo "=== FINE VERDETTO ==="
