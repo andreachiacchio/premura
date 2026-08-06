@@ -9,3 +9,9 @@ dichiarata su Fly). Verificare secret, health worker, log cron.
 # primo step e da fuori si legge solo la coda del log. Aggiunto uno step
 # finale che stampa il verdetto in fondo. Questo bump serve a rilanciare
 # la diagnostica con quello step.
+
+# run 06/08 ter: dopo #110 l'API stampa all'avvio killSwitch/dryRun/
+# invii chiamando le funzioni dei mittenti. La riga finisce sepolta fra
+# i log dell'app, quindi il verdetto ora la ripesca e la porta in coda.
+# Questo bump serve a leggerla: e' la risposta sul valore vero del
+# dry-run, quella che manca da due giorni.

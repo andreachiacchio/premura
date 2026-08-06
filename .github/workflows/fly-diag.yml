@@ -66,4 +66,18 @@ jobs:
               echo "$k: NON impostata (vale il default del codice)"
             fi
           done
+          echo
+          echo "=== MODALITA INVIO DICHIARATA ALL'AVVIO (ultima riga) ==="
+          # L'API stampa killSwitch/dryRun/invii al boot chiamando le
+          # stesse funzioni dei mittenti. La riga esce fra i log
+          # dell'app, sepolta sotto centinaia di health check: qui la si
+          # ripesca e la si porta in coda, dove e' leggibile da fuori.
+          boot=$(flyctl logs --app premura-api-staging --no-tail 2>/dev/null \
+            | grep 'modalita invio WhatsApp' | tail -1)
+          if [ -n "$boot" ]; then
+            echo "$boot"
+          else
+            echo "nessuna riga di avvio nella finestra di log disponibile"
+            echo "(l'API non si e' riavviata di recente, oppure il deploy e' anteriore al log)"
+          fi
           echo "=== FINE VERDETTO ==="

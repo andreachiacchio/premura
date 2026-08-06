@@ -159,6 +159,27 @@ export function buildTimeline(
     );
   }
 
+  // Guida della casa (guest_app_invite): parte appena compare il numero.
+  // 06/08: prima non c'era NESSUNA riga per questo trigger — l'invito
+  // partiva e la pagina non lo diceva. Una cosa fatta e non mostrata e'
+  // uno stato che l'host non puo' verificare, e in prova sarebbe
+  // sembrato "non ancora partito" mentre era gia' uscito.
+  const invite = bySendTrigger.get('guest_app_invite');
+  if (invite) {
+    items.push({
+      label: 'Guida della casa',
+      detail:
+        invite.status === 'sent'
+          ? `inviata${invite.sentAt ? ` ${formatDayMonth(new Date(invite.sentAt))}` : ''}${invite.dryRun ? ' (simulato)' : ''}`
+          : invite.status === 'skipped'
+            ? 'saltata'
+            : invite.status === 'failed'
+              ? 'invio fallito — da sbloccare'
+              : 'in coda',
+      done: invite.status === 'sent',
+    });
+  }
+
   // Survey pre-arrivo: parte a T-7 giorni (±1) al giro delle 09:00.
   if (row.surveyStatus === 'completed') {
     const at = row.surveyCompletedAt;

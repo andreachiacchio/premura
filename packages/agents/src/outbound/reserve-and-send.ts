@@ -7,7 +7,13 @@ import {
   properties,
   providers,
 } from '@premura/db';
-import { checkNumberOnWhatsapp, isKillSwitchOn, sendImage, sendText } from '@premura/integrations';
+import {
+  checkNumberOnWhatsapp,
+  isDryRun,
+  isKillSwitchOn,
+  sendImage,
+  sendText,
+} from '@premura/integrations';
 import { findForbiddenPhone } from '@premura/shared';
 import { and, desc, eq, gte, sql } from 'drizzle-orm';
 
@@ -187,7 +193,15 @@ export async function reserveAndSend(
   // la variabile mentre l'invio e' in volo, l'audit deve dire cosa e'
   // successo davvero, non cosa dice l'ambiente adesso. La UI (feed home,
   // timeline check-in) etichetta "simulato" leggendo QUESTA colonna.
-  const dryRun = (process.env.WHATSAPP_DRY_RUN ?? 'true').trim().toLowerCase() !== 'false';
+  //
+  // 06/08: prima qui c'era una COPIA dell'espressione di isDryRun().
+  // Identica, per ora — ed e' il "per ora" il problema: la colonna su cui
+  // l'host legge "simulato" derivava da una seconda interpretazione della
+  // stessa variabile, libera di divergere da quella che i mittenti usano
+  // per decidere se inviare davvero. Due letture della stessa
+  // configurazione sono due verita' in attesa di separarsi. Adesso la
+  // funzione e' una sola, la stessa che chiama il transport.
+  const dryRun = isDryRun();
 
   if (!dryRun && (await realSendsToday(db, now)) >= maxSendsPerDay()) {
     return { status: 'skipped', reason: 'daily_cap_reached', outboundSendId: null };
