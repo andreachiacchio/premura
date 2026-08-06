@@ -6,10 +6,14 @@ import { buildAgentStatus } from '../lib/repositories/agent-status';
 // letto il calendario e' peggio — e' il momento in cui l'host conclude
 // che il prodotto non fa niente. Questi test inchiodano i tre stati.
 
+// 06/08: needsYouCount e calendars sono obbligatori. Ometterli non
+// compila piu', quindi il caso "la frase non sa quanto sta mostrando
+// la card" non e' testabile a runtime — e' proprio il punto.
 const BASE = {
   pendingDraftsCount: 0,
   oldestDraftGuestName: null,
   nextArrival: null,
+  needsYouCount: 0,
 };
 
 describe('buildAgentStatus — la card dice la verita', () => {
@@ -59,13 +63,14 @@ describe('buildAgentStatus — la card dice la verita', () => {
     expect(got.action).toContain('3 cose che aspettano te');
   });
 
-  it('calendario letto e niente da fare -> lo dice esplicitamente', () => {
+  it('calendario letto e niente da decidere -> lo dice, senza fingere calma', () => {
     const got = buildAgentStatus({
       ...BASE,
       needsYouCount: 0,
       calendars: { feedsTotali: 1, feedsLetti: 1, feedsInErrore: 0 },
     });
-    expect(got.action).toBe('Calendario letto, nessun arrivo in programma.');
+    expect(got.action).toBe('Niente da decidere adesso.');
+    expect(got.sub).toContain('Calendario letto');
   });
 
   it('le bozze restano la priorita assoluta, anche col calendario da leggere', () => {
@@ -80,8 +85,40 @@ describe('buildAgentStatus — la card dice la verita', () => {
     expect(got.action).toContain('serve il tuo via');
   });
 
-  it('senza informazioni sui calendari il comportamento storico non cambia', () => {
-    const got = buildAgentStatus(BASE);
-    expect(got.action).toBe('Tutto tranquillo, nessuna azione in sospeso.');
+  // La frase di calma non deve poter uscire da nessuna combinazione di
+  // input: e' la stringa che ieri stava accanto a "SERVE TE: 1".
+  it('nessuno stato produce "tutto tranquillo"', () => {
+    for (const feedsTotali of [0, 1, 2]) {
+      for (const feedsLetti of [0, 1]) {
+        for (const feedsInErrore of [0, 1]) {
+          for (const needsYouCount of [0, 1, 3]) {
+            for (const pendingDraftsCount of [0, 1]) {
+              const got = buildAgentStatus({
+                ...BASE,
+                pendingDraftsCount,
+                oldestDraftGuestName: 'Sofia',
+                needsYouCount,
+                calendars: { feedsTotali, feedsLetti, feedsInErrore },
+              });
+              expect(got.action.toLowerCase()).not.toContain('tranquillo');
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // R2: la frase non e' una stringa scelta a parte, deriva dallo stesso
+  // numero che la card mostra. Se "Serve te" e' > 0, la frase lo dice.
+  it('se il contatore mostra qualcosa, la frase lo nomina', () => {
+    for (const needsYouCount of [1, 2, 7]) {
+      const got = buildAgentStatus({
+        ...BASE,
+        needsYouCount,
+        calendars: { feedsTotali: 1, feedsLetti: 1, feedsInErrore: 0 },
+      });
+      expect(got.action).toContain(needsYouCount === 1 ? 'una cosa' : String(needsYouCount));
+      expect(got.action).toContain('aspetta');
+    }
   });
 });

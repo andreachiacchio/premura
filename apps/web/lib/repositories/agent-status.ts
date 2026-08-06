@@ -97,21 +97,30 @@ export async function getCalendarStateForHost(
  *  2. calendario rotto -> l'host deve ricollegarlo, o non arriva nulla
  *  3. nessun calendario / mai letto -> lo stato vero della lettura
  *  4. prossimo arrivo attivo -> il benvenuto e' in preparazione
- *  5. altre cose che aspettano l'host -> MAI "tutto tranquillo"
- *  6. letto e niente in programma -> la verita', senza inventare
+ *  5. altre cose che aspettano l'host -> col numero, mai una calma finta
+ *  6. letto e niente da decidere -> la verita', senza inventare
  *
  * 05/08 (Andrea): "Tutto tranquillo" accanto a "SERVE TE: 1" e' una
  * contraddizione, e "tranquillo" quando il calendario non e' ancora
  * stato letto e' peggio: e' il momento in cui l'host conclude che il
  * prodotto non fa niente. Un solo punto di verita'.
+ *
+ * 06/08 (Andrea): la regola c'era ma aveva una scappatoia. needsYouCount
+ * e calendars erano opzionali, e chi li ometteva ricadeva su una frase
+ * di calma scelta a parte. Ora sono OBBLIGATORI: la frase non puo' che
+ * derivare dagli stessi numeri che la card mostra, e chiamare questa
+ * funzione senza quei numeri e' un errore di compilazione — non una
+ * riga di calma silenziosamente sbagliata. La stringa "Tutto tranquillo"
+ * non esiste piu': non c'e' nessuno stato in cui sia la risposta giusta.
  */
 export function buildAgentStatus(input: {
   pendingDraftsCount: number;
   oldestDraftGuestName: string | null;
   nextArrival: NextArrival | null;
   /** Contatore "Serve te" della card: stessa fonte, mai due verita'. */
-  needsYouCount?: number;
-  calendars?: CalendarState;
+  needsYouCount: number;
+  /** Stato reale della lettura: senza, non si puo' dire nulla sulla calma. */
+  calendars: CalendarState;
   now?: Date;
 }): AgentStatus {
   const now = input.now ?? new Date();
@@ -128,28 +137,26 @@ export function buildAgentStatus(input: {
   }
 
   const cal = input.calendars;
-  if (cal) {
-    if (cal.feedsInErrore > 0) {
-      return {
-        action:
-          cal.feedsInErrore === 1
-            ? 'Un calendario non risponde più.'
-            : `${cal.feedsInErrore} calendari non rispondono più.`,
-        sub: 'Vanno ricollegati: finché sono fermi, le nuove date non arrivano.',
-      };
-    }
-    if (cal.feedsTotali === 0) {
-      return {
-        action: 'Non ho ancora un calendario da leggere.',
-        sub: 'Collega Airbnb o Booking: da lì arrivano gli ospiti.',
-      };
-    }
-    if (cal.feedsLetti === 0) {
-      return {
-        action: 'Sto leggendo il tuo calendario…',
-        sub: 'Ci vuole meno di un minuto: ricarica tra poco.',
-      };
-    }
+  if (cal.feedsInErrore > 0) {
+    return {
+      action:
+        cal.feedsInErrore === 1
+          ? 'Un calendario non risponde più.'
+          : `${cal.feedsInErrore} calendari non rispondono più.`,
+      sub: 'Vanno ricollegati: finché sono fermi, le nuove date non arrivano.',
+    };
+  }
+  if (cal.feedsTotali === 0) {
+    return {
+      action: 'Non ho ancora un calendario da leggere.',
+      sub: 'Collega Airbnb o Booking: da lì arrivano gli ospiti.',
+    };
+  }
+  if (cal.feedsLetti === 0) {
+    return {
+      action: 'Sto leggendo il tuo calendario…',
+      sub: 'Ci vuole meno di un minuto: ricarica tra poco.',
+    };
   }
 
   if (input.nextArrival) {
@@ -170,7 +177,7 @@ export function buildAgentStatus(input: {
     };
   }
 
-  const needsYou = input.needsYouCount ?? 0;
+  const needsYou = input.needsYouCount;
   if (needsYou > 0) {
     return {
       action:
@@ -181,15 +188,11 @@ export function buildAgentStatus(input: {
     };
   }
 
-  if (cal && cal.feedsLetti > 0) {
-    return {
-      action: 'Calendario letto, nessun arrivo in programma.',
-      sub: 'Appena entra una prenotazione me ne occupo io.',
-    };
-  }
-
+  // Unico stato di calma possibile, e ci si arriva solo dopo aver
+  // escluso tutto il resto: niente da decidere E almeno un calendario
+  // letto davvero. "Adesso" perche' e' una fotografia, non una promessa.
   return {
-    action: 'Tutto tranquillo, nessuna azione in sospeso.',
-    sub: null,
+    action: 'Niente da decidere adesso.',
+    sub: 'Calendario letto, nessun arrivo in programma: appena entra una prenotazione me ne occupo io.',
   };
 }

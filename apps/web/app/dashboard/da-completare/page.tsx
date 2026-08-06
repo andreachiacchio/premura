@@ -56,7 +56,7 @@ export default async function DaCompletarePage(): Promise<React.JSX.Element> {
     <main className="mx-auto min-h-screen w-full max-w-3xl bg-ivory px-5 pt-12 pb-16">
       <header className="mb-8">
         <Link href="/dashboard" className="text-eyebrow uppercase text-ink-mute hover:text-ink-soft">
-          ← Dashboard
+          ← Oggi
         </Link>
         <h1 className="mt-2 font-serif text-h1 leading-[1.05] tracking-tight text-ink">
           Date da completare

@@ -73,10 +73,10 @@ export default async function UpcomingCheckinsPage(): Promise<React.JSX.Element>
           href="/dashboard"
           className="text-eyebrow uppercase text-ink-mute hover:text-ink-soft"
         >
-          ← Dashboard
+          ← Oggi
         </Link>
         <h1 className="mt-2 font-serif text-h1 leading-[1.05] tracking-tight text-ink">
-          Prossimi check-in
+          Chi arriva
         </h1>
         <p className="mt-3 text-body-lg text-ink-soft">
           Soggiorni in corso e arrivi dei prossimi 14 giorni. Il numero WhatsApp attiva l'agente;
