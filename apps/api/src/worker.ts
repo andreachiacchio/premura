@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { createServerClient } from '@premura/db';
+import { isDryRun, isKillSwitchOn } from '@premura/integrations';
 import Fastify from 'fastify';
 import { wahaWebhookRoutes } from './api/webhooks/waha';
 import { startBookingWelcomeCron } from './jobs/booking-welcome-cron';
@@ -64,6 +65,25 @@ const apiClient = createServerClient();
 // process group app. La stessa route resta registrata anche su app come
 // URL di riserva.
 await app.register(wahaWebhookRoutes, { db: apiClient.db });
+
+// In che modalita' di invio parte IL PROCESSO CHE INVIA.
+//
+// La stessa riga esiste in index.ts, ma index.ts e' il process group
+// `app`: una macchina che Fly ferma quando nessuno chiama l'HTTP, e che
+// non manda messaggi a nessuno. I cron e la coda outbound vivono QUI, e
+// qui la riga serve — cercarla nei log e non trovarla e' esattamente
+// quello che e' successo il 06/08.
+//
+// Le due funzioni sono quelle che i mittenti chiamano prima di ogni
+// invio: si stampa l'esito su cui il codice agisce, non una rilettura
+// per conto proprio delle variabili. E' l'unico modo di sapere da fuori
+// se il freno e' tirato, visto che i secret di Fly sono write-only.
+const killSwitch = isKillSwitchOn();
+const dryRun = isDryRun();
+app.log.info(
+  { killSwitch, dryRun, invii: killSwitch ? 'BLOCCATI' : dryRun ? 'simulati' : 'REALI' },
+  'modalita invio WhatsApp',
+);
 
 const icalCron = startIcalCron();
 const surveyCron = startSurveyCron();
