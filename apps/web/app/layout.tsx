@@ -46,7 +46,20 @@ export default function RootLayout({
 }) {
   return (
     <html lang="it" className={`${inter.variable} ${fraunces.variable}`}>
-      <body>{children}</body>
+      <body>
+        {/* Skip link: primo elemento focalizzabile della pagina.
+            Invisibile finche' non riceve il focus da tastiera, poi
+            compare in alto a sinistra. Serve a chi naviga con Tab o
+            con uno screen reader per saltare la navigazione e
+            arrivare al contenuto. */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-card focus:bg-ink focus:px-4 focus:py-2 focus:text-body-sm focus:text-paper"
+        >
+          Salta al contenuto
+        </a>
+        {children}
+      </body>
     </html>
   );
 }

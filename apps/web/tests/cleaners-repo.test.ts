@@ -8,18 +8,8 @@ import {
 // Slice F — Test repository cleaners (mock DB chain).
 
 describe('countActiveCleanersForHost', () => {
-  function makeDb(count: number): Database {
-    const limit = () =>
-      Promise.resolve(count > 0 ? [{ count }] : [{ count: 0 }]);
-    const where = () => ({ limit });
-    return {
-      select: () => ({
-        from: () => ({
-          where,
-        }),
-      }),
-    } as unknown as Database;
-  }
+  // (rimossa una fabbrica makeDb mai usata: ogni test qui sotto
+  //  costruisce il proprio mock in linea)
 
   it('ritorna count cleaners attive', async () => {
     const dbMock: Database = {

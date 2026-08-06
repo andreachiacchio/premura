@@ -66,7 +66,7 @@ export type MergeVoiceInput = {
 export function mergeVoiceProfile(
   input: MergeVoiceInput,
 ): MergedVoiceProfile | 'duplicate_skipped' {
-  const { current, newAnalysis, newMessagesCount, newMessageIds } = input;
+  const { current, newAnalysis, newMessageIds } = input;
 
   const processedIds = current.processedMessageIds ?? [];
   // Idempotenza: se TUTTI i nuovi messageId sono gia' processati, skip.

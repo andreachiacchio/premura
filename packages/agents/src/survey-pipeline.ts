@@ -26,7 +26,6 @@ import { signSurveyToken, verifySurveyToken } from './survey-token';
 
 const SEND_WINDOW_DAYS_BEFORE_CHECKIN = 7;
 const SEND_WINDOW_TOLERANCE_DAYS = 1; // [now+6, now+8] daily catch.
-const TOKEN_TTL_DAYS = 14; // Token valido fino a 7gg post-checkin.
 const ABANDON_AFTER_HOURS = 96;
 
 export type SurveySendCandidate = {

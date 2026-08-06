@@ -1,5 +1,5 @@
 import type { Database } from '@premura/db';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   ONBOARDING_STEPS,
   type OnboardingStep,
