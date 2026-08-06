@@ -61,13 +61,19 @@ function db(providerRows: Row[]): Database {
 describe('reserveAndSend — guardia contatti fornitori', () => {
   // Stringa vuota, non delete: i parser la trattano come assente
   // (dry-run resta ON di default: nessuna chiamata di rete nei test).
+  //
+  // Il kill switch invece vuole 'off' ESPLICITO: dal 06/08 e' attivo a
+  // meno che non lo si dichiari spento, quindi la stringa vuota lo
+  // lascerebbe acceso e questi test verificherebbero il blocco
+  // sbagliato — troverebbero il freno tirato invece della guardia
+  // contatti. Qui serve il freno staccato per arrivare alla guardia.
   beforeEach(() => {
-    process.env.WHATSAPP_KILL_SWITCH = '';
+    process.env.WHATSAPP_KILL_SWITCH = 'off';
     process.env.WHATSAPP_DRY_RUN = '';
     process.env.WHATSAPP_TRANSPORT = '';
   });
   afterEach(() => {
-    process.env.WHATSAPP_KILL_SWITCH = '';
+    process.env.WHATSAPP_KILL_SWITCH = 'off';
     process.env.WHATSAPP_DRY_RUN = '';
     process.env.WHATSAPP_TRANSPORT = '';
   });
