@@ -1,3 +1,4 @@
+import { BackLink } from '@/components/BackLink';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { findByHostId } from '@/lib/repositories/properties';
@@ -6,13 +7,14 @@ import { notFound } from 'next/navigation';
 import { AiAssistantModal } from './_components/AiAssistantModal';
 import { HousePhotosEditor } from './_components/HousePhotosEditor';
 import { LocalTipsEditor } from './_components/LocalTipsEditor';
+import { SectionForm } from './_components/SectionForm';
 import {
   saveAdditionalInfoAction,
   saveCheckInOutInstructionsAction,
+  saveGuestAppUrlAction,
   saveHouseRulesAction,
   saveKeyboxAction,
   saveKitDefaultPlacementAction,
-  saveGuestAppUrlAction,
   saveLanguageDefaultAction,
   saveParkingAction,
   saveWifiAction,
@@ -23,9 +25,10 @@ export const dynamic = 'force-dynamic';
 // Slice 12 — Pagina property knowledge.
 //
 // Form unico con sezioni collassabili (HTML5 details/summary).
-// Auto-save on submit di sezione (action server-side, no JS lato client
-// nello scaffold base — refinement con onBlur fetch arriva in slice
-// futuro).
+// Ogni sezione salva per conto suo, con un bottone esplicito: niente
+// autosave (07/08 — vedi SectionForm per il perche'). Il bottone e la
+// conferma stanno dentro SectionForm, che li tiene legati allo stesso
+// stato del form.
 //
 // Pre-check ownership: la property deve appartenere all'host
 // corrente. Altrimenti 404.
@@ -58,13 +61,24 @@ export default async function PropertyKnowledgePage(props: {
   return (
     <main className="mx-auto min-h-screen w-full max-w-2xl bg-ivory px-5 pt-12 pb-16">
       <header className="mb-8">
-        <p className="text-eyebrow uppercase text-ink-mute">Manuale digitale</p>
+        <BackLink href="/properties">Strutture</BackLink>
+        <p className="mt-2 text-eyebrow uppercase text-ink-mute">Manuale digitale</p>
         <h1 className="mt-2 font-serif text-h1 leading-[1.05] tracking-tight text-ink">
           {property.name}
         </h1>
+        {/* 07/08: qui c'era «Tutto si salva da solo». Non era vero —
+            nessun autosave e' mai esistito su questa pagina, e un host
+            che compilava tre sezioni fidandosi di quella riga perdeva
+            tutto chiudendo la scheda, in silenzio.
+            Il salvataggio esplicito resta la scelta giusta: qui si
+            scrivono password WiFi e codici keybox, e un salvataggio
+            automatico congelerebbe un valore parziale che l'agente
+            potrebbe usare per rispondere a un ospite. Quindi si dice
+            come funziona davvero. */}
         <p className="mt-3 text-body-lg text-ink-soft">
-          Compila quello che vuoi, quando vuoi. Tutto si salva da solo. Useremo questi dati per
-          rispondere agli ospiti senza svegliarti ogni volta.
+          Compila quello che vuoi, quando vuoi. Ogni sezione ha il suo tasto per salvare — finché
+          non lo premi, non ho scritto niente. Useremo questi dati per rispondere agli ospiti senza
+          svegliarti ogni volta.
         </p>
         <div className="mt-4">
           <AiAssistantModal propertyId={propertyId} />
@@ -73,7 +87,7 @@ export default async function PropertyKnowledgePage(props: {
 
       <div className="flex flex-col gap-3">
         <Section title="Codice keybox e ingresso" defaultOpen>
-          <form action={saveKeybox} className="flex flex-col gap-3">
+          <SectionForm action={saveKeybox}>
             <FieldLabel>
               Codice keybox
               <input
@@ -96,12 +110,11 @@ export default async function PropertyKnowledgePage(props: {
                 className="rounded-card border border-line bg-paper px-3 py-2 text-body text-ink placeholder:text-ink-mute focus:border-terracotta-soft focus:outline-none"
               />
             </FieldLabel>
-            <SaveButton />
-          </form>
+          </SectionForm>
         </Section>
 
         <Section title="WiFi">
-          <form action={saveWifi} className="flex flex-col gap-3">
+          <SectionForm action={saveWifi}>
             <FieldLabel>
               Nome rete (SSID)
               <input
@@ -132,12 +145,11 @@ export default async function PropertyKnowledgePage(props: {
                 className="rounded-card border border-line bg-paper px-3 py-2 text-body text-ink focus:border-terracotta-soft focus:outline-none"
               />
             </FieldLabel>
-            <SaveButton />
-          </form>
+          </SectionForm>
         </Section>
 
         <Section title="Parcheggio">
-          <form action={saveParking} className="flex flex-col gap-3">
+          <SectionForm action={saveParking}>
             <FieldLabel>
               Tipo
               <select
@@ -164,12 +176,11 @@ export default async function PropertyKnowledgePage(props: {
                 className="rounded-card border border-line bg-paper px-3 py-2 text-body text-ink focus:border-terracotta-soft focus:outline-none"
               />
             </FieldLabel>
-            <SaveButton />
-          </form>
+          </SectionForm>
         </Section>
 
         <Section title="Regole della casa">
-          <form action={saveHouseRules} className="flex flex-col gap-3">
+          <SectionForm action={saveHouseRules}>
             <div className="grid grid-cols-2 gap-3">
               <FieldLabel>
                 Silenzio dalle
@@ -218,12 +229,11 @@ export default async function PropertyKnowledgePage(props: {
                 className="rounded-card border border-line bg-paper px-3 py-2 text-body text-ink focus:border-terracotta-soft focus:outline-none"
               />
             </FieldLabel>
-            <SaveButton />
-          </form>
+          </SectionForm>
         </Section>
 
         <Section title="Check-in / Check-out">
-          <form action={saveCheckInOut} className="flex flex-col gap-3">
+          <SectionForm action={saveCheckInOut}>
             <FieldLabel>
               Istruzioni check-in
               <textarea
@@ -246,8 +256,7 @@ export default async function PropertyKnowledgePage(props: {
                 className="rounded-card border border-line bg-paper px-3 py-2 text-body text-ink placeholder:text-ink-mute focus:border-terracotta-soft focus:outline-none"
               />
             </FieldLabel>
-            <SaveButton />
-          </form>
+          </SectionForm>
         </Section>
 
         <Section title="Contatti d'emergenza">
@@ -269,7 +278,7 @@ export default async function PropertyKnowledgePage(props: {
         </Section>
 
         <Section title="Link della guida ospite">
-          <form action={saveGuestAppUrl} className="flex flex-col gap-3">
+          <SectionForm action={saveGuestAppUrl}>
             <FieldLabel>
               Indirizzo della guida di QUESTA casa
               <input
@@ -282,15 +291,14 @@ export default async function PropertyKnowledgePage(props: {
               />
             </FieldLabel>
             <p className="text-body-sm text-ink-soft">
-              È il link che l&apos;ospite riceve con l&apos;invito. Se resta vuoto l&apos;invito
-              non parte: meglio un messaggio che manca di uno che manda alla casa sbagliata.
+              È il link che l&apos;ospite riceve con l&apos;invito. Se resta vuoto l&apos;invito non
+              parte: meglio un messaggio che manca di uno che manda alla casa sbagliata.
             </p>
-            <SaveButton />
-          </form>
+          </SectionForm>
         </Section>
 
         <Section title="Setup omaggio">
-          <form action={savePlacement} className="flex flex-col gap-3">
+          <SectionForm action={savePlacement}>
             <FieldLabel>
               Dove la cleaner deve lasciare il kit
               <input
@@ -305,8 +313,7 @@ export default async function PropertyKnowledgePage(props: {
             <p className="text-body-sm text-ink-mute">
               Se vuoto, il default è &laquo;tavolo cucina&raquo;.
             </p>
-            <SaveButton />
-          </form>
+          </SectionForm>
         </Section>
 
         <Section title="Foto della casa">
@@ -314,7 +321,7 @@ export default async function PropertyKnowledgePage(props: {
         </Section>
 
         <Section title="Lingua default">
-          <form action={saveLanguage} className="flex flex-col gap-3">
+          <SectionForm action={saveLanguage}>
             <FieldLabel>
               Lingua di default per messaggi welcome / storytelling kit
               <select
@@ -326,12 +333,11 @@ export default async function PropertyKnowledgePage(props: {
                 <option value="en">English</option>
               </select>
             </FieldLabel>
-            <SaveButton />
-          </form>
+          </SectionForm>
         </Section>
 
         <Section title="Note libere">
-          <form action={saveAdditionalInfo} className="flex flex-col gap-3">
+          <SectionForm action={saveAdditionalInfo}>
             <textarea
               name="additionalInfo"
               defaultValue={knowledge?.additionalInfo ?? ''}
@@ -340,8 +346,7 @@ export default async function PropertyKnowledgePage(props: {
               placeholder="Tutto quello che non rientra altrove. Caratteristiche speciali, segreti del quartiere, contatti vari."
               className="rounded-card border border-line bg-paper px-3 py-2 text-body text-ink focus:border-terracotta-soft focus:outline-none"
             />
-            <SaveButton />
-          </form>
+          </SectionForm>
         </Section>
       </div>
     </main>
@@ -384,16 +389,5 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
     <label className="flex flex-col gap-1.5 text-body-sm font-medium text-ink-soft">
       {children}
     </label>
-  );
-}
-
-function SaveButton() {
-  return (
-    <button
-      type="submit"
-      className="self-start inline-flex h-10 items-center justify-center rounded-full bg-terracotta px-5 text-body-sm font-medium text-paper shadow-sm transition-colors hover:bg-terracotta-2"
-    >
-      Salva sezione
-    </button>
   );
 }

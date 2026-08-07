@@ -1,6 +1,6 @@
-import { defineConfig } from "vitest/config";
-import react from "@vitejs/plugin-react";
-import path from "node:path";
+import path from 'node:path';
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vitest/config';
 
 // Config Vitest per i test React di apps/web. Environment jsdom +
 // @testing-library/jest-dom matchers via setup file. Isolato dai test
@@ -11,19 +11,20 @@ import path from "node:path";
 export default defineConfig({
   plugins: [react()],
   test: {
-    name: "web",
+    name: 'web',
     globals: false,
-    environment: "jsdom",
-    setupFiles: ["./vitest.setup.ts"],
+    environment: 'jsdom',
+    setupFiles: ['./vitest.setup.ts'],
     include: [
-      "tests/dashboard/**/*.test.{ts,tsx}",
-      "tests/auth/**/*.test.{ts,tsx}",
+      'tests/dashboard/**/*.test.{ts,tsx}',
+      'tests/components/**/*.test.{ts,tsx}',
+      'tests/auth/**/*.test.{ts,tsx}',
     ],
-    exclude: ["**/node_modules/**", "**/dist/**", "**/.next/**"],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**'],
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "."),
+      '@': path.resolve(__dirname, '.'),
     },
   },
 });

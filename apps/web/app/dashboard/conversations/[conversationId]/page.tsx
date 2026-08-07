@@ -1,8 +1,8 @@
+import { BackLink } from '@/components/BackLink';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { propertyColorOrFallback } from '@/lib/property-color';
 import { type ThreadMessage, getConversationThread } from '@/lib/repositories/conversations';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ThreadDraftPanel } from '../_components/ThreadDraftPanel';
 
@@ -65,12 +65,7 @@ export default async function ConversationThreadPage({
   return (
     <main className="mx-auto min-h-screen w-full max-w-3xl bg-ivory px-5 pt-12 pb-16">
       <header className="mb-6">
-        <Link
-          href="/dashboard/conversations"
-          className="text-eyebrow uppercase text-ink-mute hover:text-ink-soft"
-        >
-          ← Conversazioni
-        </Link>
+        <BackLink href="/dashboard/conversations">Conversazioni</BackLink>
         <h1 className="mt-2 font-serif text-h2 leading-[1.05] tracking-tight text-ink">{title}</h1>
         {conversation.attributed && conversation.propertyName ? (
           <p

@@ -290,7 +290,19 @@ export async function saveLanguageDefaultAction(
 ): Promise<void> {
   const id = idSchema.parse(propertyId);
   const hostId = await assertOwnership(id);
-  const value = languageDefaultSchema.parse(formData.get('languageDefault') ?? 'it');
+  // BUG 2 (07/08). Prima era `formData.get('languageDefault') ?? 'it'`:
+  // se il campo non arrivava, il fallback scriveva 'it' e l'azione
+  // riportava successo. Selezionavi English, premevi Salva, e la pagina
+  // ti diceva di sì mentre salvava italiano.
+  //
+  // Un campo che non arriva e' un form rotto, non una preferenza per
+  // l'italiano. Adesso lancia: meglio un errore visibile di un valore
+  // sbagliato scritto in silenzio.
+  const raw = formData.get('languageDefault');
+  if (raw === null) {
+    throw new Error('Campo lingua mancante dal form: nulla e stato salvato');
+  }
+  const value = languageDefaultSchema.parse(raw);
   const { db } = await getDb();
   await upsertPropertyKnowledge(db, id, hostId, { languageDefault: value });
   revalidatePath(`/properties/${id}/knowledge`);

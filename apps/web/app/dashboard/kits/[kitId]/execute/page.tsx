@@ -1,3 +1,4 @@
+import { BackLink } from '@/components/BackLink';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getKitForHost } from '@/lib/repositories/kits';
@@ -6,7 +7,6 @@ import {
   buildGlovoSearchUrl,
   computeAmazonOrderByDate,
 } from '@premura/agents';
-import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { StatusTimeline } from '../../_components/StatusBadge';
 import { ExecuteWorkflow } from './_components/ExecuteWorkflow';
@@ -90,12 +90,7 @@ export default async function KitExecutePage({
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
       <header className="mb-6">
-        <Link
-          href={`/dashboard/kits/${kitId}`}
-          className="mb-3 inline-block text-sm text-ink-mute underline-offset-2 hover:underline"
-        >
-          ← Dettaglio kit
-        </Link>
+        <BackLink href={`/dashboard/kits/${kitId}`}>Dettaglio kit</BackLink>
         <h1 className="text-2xl font-semibold text-ink">Esegui ordini — {kit.guestFullName}</h1>
         <p className="mt-1 text-sm text-ink-mute">
           {kit.propertyName} · check-in {checkinFmt}
