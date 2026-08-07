@@ -86,6 +86,11 @@ export const icalPollWorker = new Worker<IcalPollJobData>(
       // UID visti in QUESTO poll (anche di eventi-blocco che il mapper
       // scarta): servono alla riconciliazione cancellazioni.
       const seenRefs = new Set<string>();
+      // Le DATE viste, non solo gli UID. Booking riemette la stessa
+      // fascia con un UID nuovo ogni notte: senza le date, la riga
+      // vecchia sembra sparita e viene marcata come cancellazione
+      // mentre l'ospite e' ancora in casa (06/08).
+      const seenRanges: Array<{ checkinAt: Date; checkoutAt: Date }> = [];
       let hasVcalendar = false;
 
       for (const component of components) {
@@ -97,6 +102,7 @@ export const icalPollWorker = new Worker<IcalPollJobData>(
         const shell = mapIcalEventToBookingShell(component, propertyId, source);
         if (!shell) continue;
         seenRefs.add(shell.platformBookingRef);
+        seenRanges.push({ checkinAt: shell.checkinAt, checkoutAt: shell.checkoutAt });
         mapped += 1;
 
         try {
@@ -167,7 +173,14 @@ export const icalPollWorker = new Worker<IcalPollJobData>(
       let cancellations: Awaited<ReturnType<typeof reconcileMissingEvents>> | null = null;
       if (parsedOk && (source === 'booking' || source === 'airbnb')) {
         try {
-          cancellations = await reconcileMissingEvents(client.db, propertyId, source, seenRefs);
+          cancellations = await reconcileMissingEvents(
+            client.db,
+            propertyId,
+            source,
+            seenRefs,
+            new Date(),
+            seenRanges,
+          );
           for (const flaggedId of cancellations.flagged) {
             logger.warn(
               { propertyId, source, bookingId: flaggedId },

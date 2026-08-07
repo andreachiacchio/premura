@@ -1,3 +1,4 @@
+import { BackLink } from '@/components/BackLink';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { startTimer, timed } from '@/lib/perf';
@@ -74,12 +75,7 @@ export default async function KitsPage({
             Proposte generate da Premura, da approvare/eseguire/consegnare.
           </p>
         </div>
-        <Link
-          href="/dashboard"
-          className="text-sm text-ink-mute underline-offset-2 hover:underline"
-        >
-          ← Oggi
-        </Link>
+        <BackLink href="/dashboard">Oggi</BackLink>
       </header>
 
       <nav className="mb-6 flex flex-wrap gap-2 border-b border-line">

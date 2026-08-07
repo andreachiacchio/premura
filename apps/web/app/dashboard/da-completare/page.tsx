@@ -1,9 +1,9 @@
+import { BackLink } from '@/components/BackLink';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { startTimer, timed } from '@/lib/perf';
 import { findByHostId } from '@/lib/repositories/bookings';
 import { isIncompleteDataSource } from '@/lib/types';
-import Link from 'next/link';
 import { completeBookingAction, skipBookingAction } from '../actions';
 import { AddBookingButton } from '../_components/AddBookingButton';
 import { createDirectBookingAction } from '../actions';
@@ -55,9 +55,7 @@ export default async function DaCompletarePage(): Promise<React.JSX.Element> {
   return (
     <main className="mx-auto min-h-screen w-full max-w-3xl bg-ivory px-5 pt-12 pb-16">
       <header className="mb-8">
-        <Link href="/dashboard" className="text-eyebrow uppercase text-ink-mute hover:text-ink-soft">
-          ← Oggi
-        </Link>
+        <BackLink href="/dashboard">Oggi</BackLink>
         <h1 className="mt-2 font-serif text-h1 leading-[1.05] tracking-tight text-ink">
           Date da completare
         </h1>

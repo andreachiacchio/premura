@@ -1,3 +1,4 @@
+import { BackLink } from '@/components/BackLink';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { startTimer, timed } from '@/lib/perf';
@@ -93,19 +94,14 @@ export default async function PropertiesPage() {
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-ivory px-5 pt-10 pb-16 lg:max-w-5xl xl:max-w-[1400px]">
-      <header className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="font-serif text-[clamp(28px,5vw,40px)] leading-tight text-ink">
-            Strutture
-          </h1>
-          <p className="mt-1 text-body-sm text-ink-mute">Le tue case e i calendari collegati.</p>
-        </div>
-        <Link
-          href="/dashboard"
-          className="text-body-sm text-ink-mute underline-offset-2 hover:underline"
-        >
-          ← Oggi
-        </Link>
+      {/* Il ritorno SOPRA il titolo, a sinistra: e' dove l'occhio arriva
+          leggendo, ed e' il lato che il pollice raggiunge. */}
+      <header className="mb-6">
+        <BackLink href="/dashboard">Oggi</BackLink>
+        <h1 className="mt-2 font-serif text-[clamp(28px,5vw,40px)] leading-tight text-ink">
+          Strutture
+        </h1>
+        <p className="mt-1 text-body text-ink-soft">Le tue case e i calendari collegati.</p>
       </header>
 
       <Link
@@ -161,7 +157,13 @@ export default async function PropertiesPage() {
                     ? 'conteggi non disponibili al momento'
                     : `${upcomingBookings} ${upcomingBookings === 1 ? 'soggiorno' : 'soggiorni'} in arrivo · ${totalBookings} totali`}
                 </p>
-                <span className="flex flex-wrap items-center gap-3">
+                {/* GERARCHIA (07/08). Erano quattro link identici in
+                    fila: l'azione principale non sembrava tale, e per
+                    trovarla bisognava leggerli tutti e quattro.
+                    "+ Prenotazione" e' l'unica cosa che si FA da qui —
+                    le altre tre portano altrove — quindi e' un bottone,
+                    e le altre restano link, staccate da una riga. */}
+                <div className="mt-3 flex flex-col gap-3">
                   {/* 05/08: la pagina della singola struttura non
                       esiste (sotto [propertyId] ci sono solo le tre
                       sottopagine), quindi l'innesto per-struttura e'
@@ -170,29 +172,26 @@ export default async function PropertiesPage() {
                     properties={propertyOptions}
                     defaultPropertyId={p.id}
                     createAction={createDirectBookingAction}
-                    variant="link"
+                    variant="primary"
                     label="+ Prenotazione"
                   />
-                  <Link
-                    href={`/properties/${p.id}/services`}
-                    className="inline-flex items-center gap-1 text-body-sm font-medium text-terracotta-2 hover:underline"
-                  >
-                    Servizi
-                  </Link>
-                  <Link
-                    href={`/properties/${p.id}/calendars`}
-                    className="inline-flex items-center gap-1 text-body-sm font-medium text-terracotta-2 hover:underline"
-                  >
-                    Calendari
-                  </Link>
-                  <Link
-                    href={`/properties/${p.id}/knowledge`}
-                    className="inline-flex items-center gap-1 text-body-sm font-medium text-terracotta-2 hover:underline"
-                  >
-                    Info casa
-                    <ChevronRight aria-hidden className="size-4" />
-                  </Link>
-                </span>
+                  <span className="flex flex-wrap items-center gap-x-1 gap-y-1 border-t border-line-soft pt-1">
+                    {[
+                      { href: `/properties/${p.id}/services`, label: 'Servizi' },
+                      { href: `/properties/${p.id}/calendars`, label: 'Calendari' },
+                      { href: `/properties/${p.id}/knowledge`, label: 'Info casa' },
+                    ].map((l) => (
+                      <Link
+                        key={l.href}
+                        href={l.href}
+                        className="inline-flex min-h-[44px] items-center gap-1 rounded-card px-3 text-body font-medium text-terracotta-2 transition-colors hover:bg-peach"
+                      >
+                        {l.label}
+                        <ChevronRight aria-hidden className="size-4" />
+                      </Link>
+                    ))}
+                  </span>
+                </div>
               </div>
             </li>
           );

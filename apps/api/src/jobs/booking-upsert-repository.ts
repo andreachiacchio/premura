@@ -196,6 +196,59 @@ async function findSameStayOnProperty(
   return row;
 }
 
+/**
+ * Stessa property, STESSO feed, fascia che si SOVRAPPONE a quella in
+ * arrivo. E' l'identita' vera di un soggiorno iCal.
+ *
+ * 06/08 — la prova. Villa Cristina, una sola prenotazione (Julian Falch
+ * Milde, 1-8 agosto, codice 6382670828), tre righe in tre notti:
+ *   5-8 ago · UID 6b27abfc…
+ *   6-8 ago · UID 8cbf50c9…
+ *   7-8 ago · UID 03dacfe9…
+ * Booking accorcia la fascia al periodo residuo ogni notte e le assegna
+ * un UID NUOVO. Nessuno dei tre contiene il codice prenotazione reale.
+ *
+ * Quindi: l'UID iCal di Booking non identifica il soggiorno, e non lo ha
+ * mai fatto. Il confronto per date ESATTE non bastava — bastava un
+ * giorno di differenza per creare un doppione e marcare il precedente
+ * come possibile cancellazione.
+ *
+ * La sovrapposizione e' l'identita' giusta perche' una struttura non
+ * puo' essere occupata due volte nello stesso momento: due fasce che si
+ * accavallano sulla stessa property sono la stessa fascia, aggiornata.
+ *
+ * Sovrapposizione STRETTA: due soggiorni consecutivi (checkout il 8,
+ * check-in il 8) si toccano ma non si sovrappongono, e restano due.
+ */
+async function findOverlappingSameSourceStay(
+  db: Database,
+  shell: IcalBookingShell,
+): Promise<
+  { id: string; platformBookingRef: string; checkinAt: Date; checkoutAt: Date } | undefined
+> {
+  const [row] = await db
+    .select({
+      id: bookings.id,
+      platformBookingRef: bookings.platformBookingRef,
+      checkinAt: bookings.checkinAt,
+      checkoutAt: bookings.checkoutAt,
+    })
+    .from(bookings)
+    .where(
+      and(
+        eq(bookings.propertyId, shell.propertyId),
+        eq(bookings.dataSource, shell.dataSource),
+        sql`${bookings.status} <> 'cancelled'`,
+        sql`${bookings.checkinAt}::date < ${shell.checkoutAt.toISOString()}::timestamptz::date`,
+        sql`${shell.checkinAt.toISOString()}::timestamptz::date < ${bookings.checkoutAt}::date`,
+      ),
+    )
+    .orderBy(bookings.checkinAt)
+    .limit(1);
+
+  return row;
+}
+
 export async function upsertBookingShell(
   db: Database,
   shell: IcalBookingShell,
@@ -219,6 +272,52 @@ export async function upsertBookingShell(
         },
       };
     }
+  }
+
+  // ACCORCIAMENTO PROGRESSIVO (06/08): Booking riemette la fascia col
+  // periodo residuo e un UID nuovo a ogni notte di un soggiorno in
+  // corso. Non e' un'anomalia da tollerare: e' il suo comportamento
+  // normale, e va gestito qui, per nome.
+  //
+  // Si aggiorna la riga esistente invece di crearne una nuova. Il
+  // ripristino di feedMissingCount e possibleCancellationAt e' parte
+  // della correzione: la riga che stava per essere marcata "possibile
+  // cancellazione" e' proprio quella che il feed ha appena riconfermato
+  // con un altro UID.
+  const shifted = await findOverlappingSameSourceStay(db, shell);
+  if (shifted && shifted.platformBookingRef !== shell.platformBookingRef) {
+    // Si tiene la FINESTRA PIU' AMPIA fra le due, non l'ultima vista.
+    // La fascia dice "qui e' occupato": se il 5 c'era qualcuno, il fatto
+    // che stanotte Booking mostri solo 6-8 non cancella il 5. Prendere
+    // l'ultima data farebbe sparire da "chi e' in casa" un ospite che e'
+    // in casa — e la sua sparizione sarebbe muta.
+    const checkinAt = shifted.checkinAt < shell.checkinAt ? shifted.checkinAt : shell.checkinAt;
+    const checkoutAt =
+      shifted.checkoutAt > shell.checkoutAt ? shifted.checkoutAt : shell.checkoutAt;
+    const nights = Math.max(
+      1,
+      Math.round((checkoutAt.getTime() - checkinAt.getTime()) / 86_400_000),
+    );
+
+    await db
+      .update(bookings)
+      .set({
+        platformBookingRef: shell.platformBookingRef,
+        checkinAt,
+        checkoutAt,
+        nights,
+        feedMissingCount: 0,
+        possibleCancellationAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(bookings.id, shifted.id));
+
+    return {
+      inserted: false,
+      bookingId: shifted.id,
+      skipped: true,
+      reason: 'stessa fascia riemessa dal feed con un UID nuovo: aggiornata, non duplicata',
+    };
   }
 
   // Guardia anti-doppione cross-feed / manuale. Va PRIMA dell'insert:

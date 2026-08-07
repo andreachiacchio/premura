@@ -1,3 +1,4 @@
+import { BackLink } from '@/components/BackLink';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { startTimer, timed } from '@/lib/perf';
@@ -57,9 +58,7 @@ export default async function CleanersPage(): Promise<React.JSX.Element> {
       )}
 
       <p className="mt-8 text-xs text-ink-mute">
-        <Link href="/dashboard" className="underline-offset-2 hover:underline">
-          ← Oggi
-        </Link>
+        <BackLink href="/dashboard">Oggi</BackLink>
       </p>
     </div>
   );

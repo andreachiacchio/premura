@@ -1,10 +1,10 @@
+import { BackLink } from '@/components/BackLink';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { startTimer, timed } from '@/lib/perf';
 import { listUpcomingCheckins } from '@/lib/repositories/upcoming-checkins';
 import { createDirectBookingAction } from '../actions';
 import { AddBookingButton } from '../_components/AddBookingButton';
-import Link from 'next/link';
 import {
   type UpcomingCheckinCardData,
   UpcomingCheckinsBoard,
@@ -69,12 +69,7 @@ export default async function UpcomingCheckinsPage(): Promise<React.JSX.Element>
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl bg-ivory px-5 pt-12 pb-16 xl:max-w-[1400px] xl:px-10">
       <header className="mb-8">
-        <Link
-          href="/dashboard"
-          className="text-eyebrow uppercase text-ink-mute hover:text-ink-soft"
-        >
-          ← Oggi
-        </Link>
+        <BackLink href="/dashboard">Oggi</BackLink>
         <h1 className="mt-2 font-serif text-h1 leading-[1.05] tracking-tight text-ink">
           Chi arriva
         </h1>
