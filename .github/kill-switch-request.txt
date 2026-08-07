@@ -25,5 +25,13 @@
 #           Va rimesso a `on` appena il messaggio e' confermato
 #           arrivato. Sotto non c'e' nessun'altra rete: dry-run e'
 #           spento.
+#   07/08 — RIALZATO. Il cron ha ticchettato alle 12:50:00.106 Rome e ha
+#           provato davvero: slot guest_app_invite riservato, poi
+#           status=failed con last_error "fetch failed" — la chiamata a
+#           WAHA non e' mai arrivata a destinazione. Uno slot failed non
+#           si sblocca da solo e il cron non riprova, quindi non c'e'
+#           piu' niente da aspettare: tenere il freno giu' sarebbe solo
+#           rischio senza esito. Il perche' del "fetch failed" e' un
+#           problema a parte, da chiudere prima di riabbassarlo.
 
-off
+on
