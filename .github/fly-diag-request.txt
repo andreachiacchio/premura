@@ -38,3 +38,10 @@ dichiarata su Fly). Verificare secret, health worker, log cron.
 # riavviato con /health che dichiara la modalita' di invio. Questo bump
 # tocca solo il file di richiesta, quindi la diagnostica gira da sola e
 # chiede al worker invece di cercare una riga di log scaduta.
+
+# run 07/08: prima di abbassare il kill switch per il test serve sapere
+# se HOST_NOTIFY_PHONE e' impostata. hosts.phone e' null nel database,
+# quindi quella secret e' l'unica fonte per la notifica «c'e' una bozza
+# che aspetta il tuo ok»: se non c'e', scrivendo come ospite la notifica
+# viene saltata in silenzio. Aggiunta alla lista del verdetto (solo il
+# nome, mai il valore). Questo bump la legge.

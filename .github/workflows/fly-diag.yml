@@ -59,7 +59,12 @@ jobs:
         run: |
           names=$(flyctl secrets list --app premura-api-staging 2>/dev/null | awk 'NR>1 {print $1}')
           echo "=== SECRETS INVII (nome, mai valore) ==="
-          for k in WHATSAPP_KILL_SWITCH WHATSAPP_DRY_RUN WAHA_BASE_URL WAHA_SESSION WAHA_API_KEY; do
+          # HOST_NOTIFY_PHONE decide una cosa sola ma la decide in
+          # silenzio: hosts.phone e' null, quindi la notifica «c'e' una
+          # bozza da approvare» parte solo se questa secret esiste.
+          # Senza, il codice logga «notifica bozza saltata» e nessuno se
+          # ne accorge. Sapere se c'e' non richiede il valore.
+          for k in WHATSAPP_KILL_SWITCH WHATSAPP_DRY_RUN WAHA_BASE_URL WAHA_SESSION WAHA_API_KEY HOST_NOTIFY_PHONE; do
             if printf '%s\n' "$names" | grep -qx -- "$k"; then
               echo "$k: IMPOSTATA"
             else
