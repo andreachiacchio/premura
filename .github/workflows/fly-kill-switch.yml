@@ -1,0 +1,108 @@
+# Alza e abbassa il kill switch degli invii WhatsApp.
+#
+# PERCHE' ESISTE. `fly-secrets-deploy` rilascia le secret gia' staged ma
+# non ne scrive nessuna, e in sessione non c'e' flyctl: finora il kill
+# switch si poteva solo guardare, non muovere. Con dry-run spento il
+# kill switch e' l'unica barriera fra i cron e i telefoni degli ospiti,
+# e chi lo abbassa deve poterlo rialzare da solo — se per rialzarlo
+# serve una persona alla tastiera, prima o poi resta giu' una notte.
+#
+# COME SI USA. Due strade, stesso esito:
+#  - workflow_dispatch, scegliendo lo stato dal menu (bottone per Andrea)
+#  - push su main che tocca .github/kill-switch-request.txt, il cui
+#    contenuto dichiara lo stato voluto (la via della sessione Claude)
+#
+# FAIL CLOSED, due volte. Nel codice: isKillSwitchOn() considera il
+# freno TIRATO a meno che il valore non sia esattamente 'off', quindi
+# un valore storto blocca gli invii invece di permetterli. Qui: se il
+# file non dichiara esattamente `on` o `off`, il workflow esce in
+# errore SENZA toccare niente. Un file ambiguo non muove il freno.
+#
+# L'ESITO SI LEGGE, NON SI ASSUME (R2). L'ultimo step non stampa quello
+# che abbiamo chiesto: chiede al worker come si e' svegliato e stampa
+# la sua risposta. `flyctl secrets set` riavvia le macchine, quindi la
+# risposta arriva dal processo nuovo, quello che manda davvero.
+
+name: Kill switch invii WhatsApp
+
+on:
+  workflow_dispatch:
+    inputs:
+      stato:
+        description: 'on = invii BLOCCATI · off = invii PERMESSI'
+        required: true
+        type: choice
+        # Virgolette obbligatorie: in YAML `on` e `off` senza virgolette
+        # sono i booleani true/false, e il menu offrirebbe quelli.
+        options: ['on', 'off']
+  push:
+    branches: [main]
+    paths: ['.github/kill-switch-request.txt']
+
+concurrency:
+  group: fly-kill-switch
+  cancel-in-progress: false
+
+jobs:
+  set:
+    name: scrivi WHATSAPP_KILL_SWITCH
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Stato voluto (dal menu o dal file)
+        id: voluto
+        run: |
+          if [ -n "${{ inputs.stato }}" ]; then
+            stato="${{ inputs.stato }}"
+            echo "fonte: menu workflow_dispatch"
+          else
+            # Prima riga che non sia vuota o un commento.
+            stato=$(grep -vE '^\s*(#|$)' .github/kill-switch-request.txt | head -1 | tr -d '[:space:]')
+            echo "fonte: .github/kill-switch-request.txt"
+          fi
+          case "$stato" in
+            on|off) ;;
+            *)
+              echo "::error::stato non riconosciuto: «$stato». Ammessi solo on e off. Niente e' stato toccato."
+              exit 1
+              ;;
+          esac
+          echo "stato=$stato" >> "$GITHUB_OUTPUT"
+          if [ "$stato" = "off" ]; then
+            echo "::warning::kill switch in ABBASSAMENTO: gli invii diventano REALI (dry-run e' spento)."
+          fi
+
+      - name: Scrivi la secret (riavvia le macchine)
+        run: |
+          flyctl secrets set "WHATSAPP_KILL_SWITCH=${{ steps.voluto.outputs.stato }}" \
+            --app premura-api-staging
+
+      # Il verdetto NON ripete quello che abbiamo chiesto: chiede al
+      # worker riavviato come si e' svegliato. Se le due cose non
+      # coincidono, e' questo che vogliamo vedere.
+      - name: Verdetto — come si e' svegliato il worker
+        if: always()
+        run: |
+          echo "chiesto: WHATSAPP_KILL_SWITCH=${{ steps.voluto.outputs.stato }}"
+          echo
+          echo "=== MODALITA DICHIARATA DAL WORKER ==="
+          # Il riavvio impiega qualche decina di secondi: chiedere
+          # subito significa parlare col processo vecchio.
+          sleep 45
+          health=$(flyctl ssh console --app premura-api-staging --process-group worker \
+            -C "wget -qO- http://localhost:8080/health" 2>/dev/null) || true
+          modo=$(printf '%s' "$health" | tr ',' '\n' | grep -E '"(killSwitch|dryRun|modo)"' || true)
+          if [ -n "$modo" ]; then
+            printf '%s\n' "$modo"
+          else
+            echo "worker non raggiungibile via ssh — ripiego sulla riga di avvio nei log"
+            flyctl logs --app premura-api-staging --no-tail 2>/dev/null \
+              | grep 'modalita invio WhatsApp' | tail -1 \
+              || echo "nessuna riga di avvio nella finestra di log"
+          fi
+          echo "=== FINE VERDETTO ==="
