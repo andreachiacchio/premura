@@ -1,7 +1,7 @@
+import { BackLink } from '@/components/BackLink';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getCleanerForHost } from '@/lib/repositories/cleaners';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { CleanerForm } from '../../_components/CleanerForm';
 
@@ -19,12 +19,7 @@ export default async function EditCleanerPage({
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
       <header className="mb-6">
-        <Link
-          href={`/dashboard/cleaners/${cleaner.id}`}
-          className="mb-3 inline-block text-sm text-ink-mute underline-offset-2 hover:underline"
-        >
-          ← Dettaglio cleaner
-        </Link>
+        <BackLink href={`/dashboard/cleaners/${cleaner.id}`}>Dettaglio cleaner</BackLink>
         <h1 className="text-2xl font-semibold text-ink">Modifica {cleaner.fullName}</h1>
       </header>
       <CleanerForm

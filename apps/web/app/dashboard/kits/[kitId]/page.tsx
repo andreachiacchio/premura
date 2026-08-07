@@ -1,3 +1,4 @@
+import { BackLink } from '@/components/BackLink';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getKitForHost } from '@/lib/repositories/kits';
@@ -30,12 +31,7 @@ export default async function KitDetailPage({
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
       <header className="mb-6">
-        <Link
-          href="/dashboard/kits"
-          className="mb-3 inline-block text-sm text-ink-mute underline-offset-2 hover:underline"
-        >
-          ← Tutti i kit
-        </Link>
+        <BackLink href="/dashboard/kits">Tutti i kit</BackLink>
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-ink">Kit per {kit.guestFullName}</h1>

@@ -1,3 +1,4 @@
+import { BackLink } from '@/components/BackLink';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getCleanerForHost, listPropertiesForCleaner } from '@/lib/repositories/cleaners';
@@ -27,12 +28,7 @@ export default async function CleanerDetailPage({
   return (
     <div className="mx-auto max-w-3xl px-6 py-8">
       <header className="mb-6">
-        <Link
-          href="/dashboard/cleaners"
-          className="mb-3 inline-block text-sm text-ink-mute underline-offset-2 hover:underline"
-        >
-          ← Cleaner
-        </Link>
+        <BackLink href="/dashboard/cleaners">Cleaner</BackLink>
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-ink">{cleaner.fullName}</h1>
