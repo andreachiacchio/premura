@@ -1,3 +1,4 @@
+import { BackLink } from '@/components/BackLink';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { startTimer, timed } from '@/lib/perf';
@@ -54,9 +55,7 @@ export default async function ConversationsPage(): Promise<React.JSX.Element> {
   return (
     <main className="mx-auto min-h-screen w-full max-w-3xl bg-ivory px-5 pt-12 pb-16">
       <header className="mb-8">
-        <Link href="/dashboard" className="text-eyebrow uppercase text-ink-mute hover:text-ink-soft">
-          ← Oggi
-        </Link>
+        <BackLink href="/dashboard">Oggi</BackLink>
         <h1 className="mt-2 font-serif text-h1 leading-[1.05] tracking-tight text-ink">
           Conversazioni
         </h1>

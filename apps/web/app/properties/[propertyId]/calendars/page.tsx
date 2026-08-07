@@ -1,8 +1,8 @@
+import { BackLink } from '@/components/BackLink';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { properties } from '@premura/db';
 import { and, eq } from 'drizzle-orm';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { CalendarManager } from './_components/CalendarManager';
 
@@ -37,12 +37,7 @@ export default async function PropertyCalendarsPage(props: {
           </h1>
           <p className="mt-1 text-body-sm text-ink-mute">{property.name}</p>
         </div>
-        <Link
-          href="/properties"
-          className="text-body-sm text-ink-mute underline-offset-2 hover:underline"
-        >
-          ← Strutture
-        </Link>
+        <BackLink href="/properties">Strutture</BackLink>
       </header>
 
       {created ? (

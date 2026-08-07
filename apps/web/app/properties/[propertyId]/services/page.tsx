@@ -1,7 +1,7 @@
+import { BackLink } from '@/components/BackLink';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { listProvidersForHost, listServicesForProperty } from '@/lib/repositories/services';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ServicesManager } from './_components/ServicesManager';
 
@@ -28,12 +28,7 @@ export default async function PropertyServicesPage({
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-ivory px-5 pt-10 pb-16 lg:max-w-3xl">
       <header className="mb-6">
-        <Link
-          href="/properties"
-          className="text-eyebrow uppercase text-ink-mute hover:text-ink-soft"
-        >
-          ← Strutture
-        </Link>
+        <BackLink href="/properties">Strutture</BackLink>
         <h1 className="mt-2 font-serif text-[clamp(28px,5vw,40px)] leading-tight text-ink">
           Servizi · {data.property.name}
         </h1>

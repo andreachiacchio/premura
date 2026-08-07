@@ -1,8 +1,8 @@
+import { BackLink } from '@/components/BackLink';
 import { getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { hosts } from '@premura/db';
 import { eq } from 'drizzle-orm';
-import Link from 'next/link';
 import { saveWelcomeSettingsAction } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -24,12 +24,7 @@ export default async function SettingsPage() {
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-2xl bg-ivory px-5 pt-12 pb-16 lg:max-w-5xl">
-      <Link
-        href="/dashboard"
-        className="mb-3 inline-block text-body-sm text-ink-mute underline-offset-2 hover:underline"
-      >
-        ← Oggi
-      </Link>
+      <BackLink href="/dashboard">Oggi</BackLink>
       <header className="mb-8">
         <p className="text-eyebrow uppercase text-ink-mute">Impostazioni</p>
         <h1 className="mt-2 font-serif text-h1 leading-tight tracking-tight text-ink">

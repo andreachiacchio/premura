@@ -1,5 +1,5 @@
+import { BackLink } from '@/components/BackLink';
 import { getCurrentHostId } from '@/lib/auth';
-import Link from 'next/link';
 import { AddPropertyWizard } from './_components/AddPropertyWizard';
 
 // Wizard "Aggiungi struttura". L'import da annuncio e' il cuore: la
@@ -23,12 +23,7 @@ export default async function NewPropertyPage() {
             Dall'annuncio esistente o da zero: pochi minuti, poi pensa a tutto Premura.
           </p>
         </div>
-        <Link
-          href="/properties"
-          className="text-body-sm text-ink-mute underline-offset-2 hover:underline"
-        >
-          ← Strutture
-        </Link>
+        <BackLink href="/properties">Strutture</BackLink>
       </header>
 
       <AddPropertyWizard />
