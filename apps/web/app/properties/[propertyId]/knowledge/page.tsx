@@ -12,6 +12,7 @@ import {
   saveHouseRulesAction,
   saveKeyboxAction,
   saveKitDefaultPlacementAction,
+  saveGuestAppUrlAction,
   saveLanguageDefaultAction,
   saveParkingAction,
   saveWifiAction,
@@ -52,6 +53,7 @@ export default async function PropertyKnowledgePage(props: {
   const saveCheckInOut = saveCheckInOutInstructionsAction.bind(null, propertyId);
   const savePlacement = saveKitDefaultPlacementAction.bind(null, propertyId);
   const saveLanguage = saveLanguageDefaultAction.bind(null, propertyId);
+  const saveGuestAppUrl = saveGuestAppUrlAction.bind(null, propertyId);
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-2xl bg-ivory px-5 pt-12 pb-16">
@@ -264,6 +266,27 @@ export default async function PropertyKnowledgePage(props: {
             propertyId={propertyId}
             initial={knowledge?.localTipsCuratedHost ?? []}
           />
+        </Section>
+
+        <Section title="Link della guida ospite">
+          <form action={saveGuestAppUrl} className="flex flex-col gap-3">
+            <FieldLabel>
+              Indirizzo della guida di QUESTA casa
+              <input
+                type="url"
+                name="guestAppUrl"
+                defaultValue={property?.guestAppUrl ?? ''}
+                maxLength={500}
+                placeholder="https://..."
+                className="h-11 rounded-card border border-line bg-paper px-3 text-body text-ink placeholder:text-ink-mute focus:border-terracotta-soft focus:outline-none"
+              />
+            </FieldLabel>
+            <p className="text-body-sm text-ink-soft">
+              È il link che l&apos;ospite riceve con l&apos;invito. Se resta vuoto l&apos;invito
+              non parte: meglio un messaggio che manca di uno che manda alla casa sbagliata.
+            </p>
+            <SaveButton />
+          </form>
         </Section>
 
         <Section title="Setup omaggio">
