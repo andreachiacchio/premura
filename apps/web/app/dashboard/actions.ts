@@ -14,6 +14,7 @@ import { normalizePhone } from '@/lib/phone-normalize';
 import { findOwnership } from '@/lib/repositories/bookings';
 import { createDirectBooking } from '@/lib/repositories/direct-bookings';
 import { findHostWaNumber } from '@/lib/repositories/hosts';
+import { geocodeAddress } from '@/lib/geocode';
 import { createProperty } from '@/lib/repositories/properties';
 import { approveAndQueueReplyDraft, rejectReplyDraft } from '@/lib/repositories/reply-drafts';
 import { bookings, properties } from '@premura/db';
@@ -117,6 +118,35 @@ export async function createPropertyAction(formData: FormData): Promise<void> {
         ? payload.icalBookingUrl
         : undefined,
   });
+
+  // GEOCODING AL SALVATAGGIO (07/08, bug 3). Prima partiva solo dal
+  // bottone opzionale del wizard, che si puo' saltare — e saltandolo la
+  // struttura restava senza coordinate benche' la citta' ci fosse.
+  // Senza coordinate non esistono i consigli locali generati dalla
+  // posizione, che e' il pezzo su cui poggia la guest app automatica.
+  //
+  // BEST-EFFORT PER COSTRUZIONE: Nominatim e' un servizio esterno con
+  // rate limit, e la struttura DEVE nascere comunque. Se fallisce, le
+  // coordinate restano nulle e il backfill le riprende — non si perde
+  // la casa per un timeout di terze parti.
+  try {
+    const hit = await geocodeAddress(`${payload.name}, ${payload.city}`);
+    const fallback = hit ?? (await geocodeAddress(payload.city));
+    if (fallback) {
+      await db
+        .update(properties)
+        .set({
+          latitude: String(fallback.latitude),
+          longitude: String(fallback.longitude),
+          updatedAt: new Date(),
+        })
+        .where(eq(properties.id, created.id));
+    } else {
+      console.warn('[createProperty] geocoding senza risultati', { city: payload.city });
+    }
+  } catch (err) {
+    console.error('[createProperty] geocoding fallito, coordinate da recuperare', err);
+  }
 
   // Slice 6.5.3: trigger one-shot iCal poll immediato. Best-effort: se
   // fallisce, il prossimo cron tick (max 15 min) fara' il poll comunque.
