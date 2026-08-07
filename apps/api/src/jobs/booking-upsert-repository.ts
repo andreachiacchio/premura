@@ -239,6 +239,18 @@ async function findOverlappingSameSourceStay(
         eq(bookings.propertyId, shell.propertyId),
         eq(bookings.dataSource, shell.dataSource),
         sql`${bookings.status} <> 'cancelled'`,
+        // I blocchi calendario sono FUORI dall'identita' (07/08).
+        //
+        // is_calendar_block e' il modo con cui una riga viene messa da
+        // parte: l'host lo usa per neutralizzare un doppione senza
+        // perderne la traccia. Se l'aggiornamento potesse ricadere su
+        // una di quelle, la riga tornerebbe viva da sola.
+        //
+        // Il caso concreto: dopo la pulizia di Villa Cristina, f6542e38
+        // (blocco) e 07c1d347 (vera) sono ENTRAMBE 5-8 agosto, stesso
+        // feed. Senza questo filtro il pareggio lo scioglieva Postgres,
+        // e una volta su due avrebbe aggiornato quella sbagliata.
+        eq(bookings.isCalendarBlock, false),
         sql`${bookings.checkinAt}::date < ${shell.checkoutAt.toISOString()}::timestamptz::date`,
         sql`${shell.checkinAt.toISOString()}::timestamptz::date < ${bookings.checkoutAt}::date`,
       ),
