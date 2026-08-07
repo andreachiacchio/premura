@@ -25,7 +25,17 @@ export type ReconcileTarget = {
   platformBookingRef: string;
   feedMissingCount: number;
   possibleCancellationAt: Date | null;
+  checkinAt: Date;
+  checkoutAt: Date;
 };
+
+/** Una fascia vista nel poll: serve a capire se copre ancora una riga. */
+export type SeenRange = { checkinAt: Date; checkoutAt: Date };
+
+/** Sovrapposizione STRETTA: due soggiorni consecutivi si toccano, non si coprono. */
+function overlaps(a: SeenRange, b: SeenRange): boolean {
+  return a.checkinAt < b.checkoutAt && b.checkinAt < a.checkoutAt;
+}
 
 export type MissingUpdatePlan = {
   /** Righe riapparse nel feed: contatore e sospetto si azzerano. */
@@ -39,11 +49,24 @@ export type MissingUpdatePlan = {
 export function planMissingUpdates(
   targets: ReconcileTarget[],
   seenRefs: ReadonlySet<string>,
+  seenRanges: readonly SeenRange[] = [],
 ): MissingUpdatePlan {
   const resetIds: string[] = [];
   const updates: MissingUpdatePlan['updates'] = [];
   for (const t of targets) {
-    if (seenRefs.has(t.platformBookingRef)) {
+    // Un UID sparito NON e' una cancellazione se le sue date sono ancora
+    // coperte da un altro evento dello STESSO feed (06/08).
+    //
+    // Booking riemette la fascia col periodo residuo e un UID nuovo a
+    // ogni notte: il vecchio UID sparisce davvero, ma l'ospite e' ancora
+    // li' — lo dice l'evento che ha preso il suo posto. Guardare solo
+    // gli UID faceva concludere "cancellata" da una prova che non
+    // riguardava la prenotazione, ma il modo in cui il feed la nomina.
+    const stillCovered =
+      seenRefs.has(t.platformBookingRef) ||
+      seenRanges.some((r) => overlaps(r, { checkinAt: t.checkinAt, checkoutAt: t.checkoutAt }));
+
+    if (stillCovered) {
       if (t.feedMissingCount > 0 || t.possibleCancellationAt) resetIds.push(t.id);
     } else {
       const nextCount = t.feedMissingCount + 1;
@@ -70,6 +93,7 @@ export async function reconcileMissingEvents(
   source: 'booking' | 'airbnb',
   seenRefs: ReadonlySet<string>,
   now: Date = new Date(),
+  seenRanges: readonly SeenRange[] = [],
 ): Promise<ReconcileSummary> {
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
@@ -80,6 +104,8 @@ export async function reconcileMissingEvents(
       platformBookingRef: bookings.platformBookingRef,
       feedMissingCount: bookings.feedMissingCount,
       possibleCancellationAt: bookings.possibleCancellationAt,
+      checkinAt: bookings.checkinAt,
+      checkoutAt: bookings.checkoutAt,
     })
     .from(bookings)
     .where(
@@ -92,7 +118,7 @@ export async function reconcileMissingEvents(
       ),
     );
 
-  const plan = planMissingUpdates(targets, seenRefs);
+  const plan = planMissingUpdates(targets, seenRefs, seenRanges);
 
   if (plan.resetIds.length > 0) {
     await db
