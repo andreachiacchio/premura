@@ -14,6 +14,8 @@ import {
   uploadPhotoToBucket,
 } from '@/lib/storage';
 import { getPropertyKnowledge, parseKnowledgeFromText } from '@premura/agents';
+import { properties } from '@premura/db';
+import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
@@ -504,3 +506,41 @@ export async function applyParsedKnowledgeAction(
 }
 
 export type { PropertyKnowledgePatch };
+
+// ─── Link della guida ospite ──────────────────────────────────────
+//
+// 07/08. Prima questo valore NON esisteva come campo: veniva scritto
+// una volta sola alla creazione della struttura, leggendo
+// WELCOME_GUEST_APP_URL — una variabile d'ambiente GLOBALE.
+//
+// Con una casa funzionava per coincidenza. Con due, la seconda
+// ereditava il link della prima, e l'ospite riceveva la guida di
+// un'altra casa: un errore che non compare in nessun log e si scopre
+// da un ospite confuso. Ora e' un campo per struttura, e la variabile
+// d'ambiente non viene piu' letta.
+//
+// Vuoto = nessun link. L'invito guest app non parte affatto invece di
+// partire monco: meglio un messaggio che manca di uno che manda
+// altrove.
+const guestAppUrlSchema = z
+  .string()
+  .trim()
+  .max(500)
+  .refine((v) => v === '' || /^https:\/\/\S+$/.test(v), {
+    message: 'Deve essere un indirizzo https://',
+  });
+
+export async function saveGuestAppUrlAction(
+  propertyId: string,
+  formData: FormData,
+): Promise<void> {
+  const id = idSchema.parse(propertyId);
+  const hostId = await assertOwnership(id);
+  const raw = guestAppUrlSchema.parse(formData.get('guestAppUrl') ?? '');
+  const { db } = await getDb();
+  await db
+    .update(properties)
+    .set({ guestAppUrl: raw === '' ? null : raw, updatedAt: new Date() })
+    .where(and(eq(properties.id, id), eq(properties.hostId, hostId)));
+  revalidatePath(`/properties/${id}/knowledge`);
+}

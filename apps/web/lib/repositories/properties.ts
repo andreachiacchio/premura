@@ -15,6 +15,8 @@ export type PropertyRow = {
   id: string;
   name: string;
   city: string;
+  /** Link della guida ospite, per struttura. Null = invito non parte. */
+  guestAppUrl: string | null;
   /** Colore fisso della struttura (#RRGGBB) — sistema colori 30/07. */
   color: string | null;
 };
@@ -30,6 +32,7 @@ export async function findByHostId(args: {
       name: properties.name,
       city: properties.city,
       color: properties.color,
+      guestAppUrl: properties.guestAppUrl,
     })
     .from(properties)
     .where(eq(properties.hostId, hostId))

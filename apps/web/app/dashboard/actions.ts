@@ -291,7 +291,12 @@ export async function buildGuestInviteAction(bookingId: string): Promise<GuestIn
       guestFullName: row.guestFullName,
       propertyName: row.propertyName,
       language: row.guestLanguage,
-      guestAppUrl: process.env.WELCOME_GUEST_APP_URL?.trim() || null,
+      // 07/08: NON si legge piu' da WELCOME_GUEST_APP_URL. Era una
+      // variabile d'ambiente globale copiata in ogni struttura nuova:
+      // con due case, la seconda ereditava il link della prima e
+      // l'ospite riceveva la guida di un'altra casa. Il link e' un
+      // dato della singola struttura e si imposta da Info casa.
+      guestAppUrl: null,
     });
     return { ok: true, message };
   } catch (err) {
