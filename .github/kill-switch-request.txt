@@ -17,5 +17,13 @@
 #   07/08 — creato con `on`, cioe' lo stato in cui il sistema gia' si
 #           trova. Il primo giro serve a provare il meccanismo nella
 #           direzione innocua, prima di usarlo per abbassare davvero.
+#   07/08 — ABBASSATO a `off` per il test dell'invito guest app sulla
+#           prenotazione di prova (andrea test, check-in 12/08). Il
+#           primo giro ha risposto killSwitch:true, dryRun:false,
+#           invii:"BLOCCATI" dal processo riavviato: il meccanismo
+#           regge, quindi lo si puo' usare nella direzione che conta.
+#           Va rimesso a `on` appena il messaggio e' confermato
+#           arrivato. Sotto non c'e' nessun'altra rete: dry-run e'
+#           spento.
 
-on
+off
