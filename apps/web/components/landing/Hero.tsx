@@ -1,53 +1,91 @@
+import { Container } from '@/components/Container';
 import { GoogleCtaButton } from '@/components/landing/GoogleCtaButton';
+import { Eyebrow } from '@/components/Eyebrow';
+import { Heading } from '@/components/Heading';
 import Link from 'next/link';
 
-// Primo schermo (02/10): una scheda sola, sospesa. La missione resta
-// nella riga sotto il nome. L'azione è l'ingresso vero, non un finto campo:
-// Continua con Google, poi la casa si collega dentro.
+function ConversationDemo() {
+  return (
+    <div
+      aria-hidden="true"
+      className="rounded-[24px] border border-line bg-paper p-5 shadow-md md:p-6"
+    >
+      <div className="flex items-center gap-2 border-b border-line-soft pb-4">
+        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-terracotta" />
+        <p className="text-body-sm font-semibold text-ink">La Goccia di San Gennaro</p>
+        <p className="ml-auto text-body-sm text-ink-mute">WhatsApp</p>
+      </div>
+
+      <p className="mt-4 text-eyebrow font-semibold uppercase text-ink-mute">
+        23:47 · l’ospite scrive
+      </p>
+      <div className="mt-2 max-w-[85%] rounded-[16px] rounded-tl-[4px] bg-ivory-warm px-4 py-3">
+        <p className="text-body text-ink">
+          A che ora possiamo entrare domani? E c’è un parcheggio vicino?
+        </p>
+      </div>
+
+      <p className="mt-5 text-eyebrow font-semibold uppercase text-ink-mute">
+        23:48 · la risposta è già pronta
+      </p>
+      <div className="ml-auto mt-2 max-w-[85%] rounded-[16px] rounded-tr-[4px] border border-terracotta-soft bg-paper-deep px-4 py-3">
+        <p className="text-body-sm text-ink-mute">
+          Ciao! Ti risponde l’assistente automatico de La Goccia di San Gennaro.
+        </p>
+        <p className="mt-1.5 text-body text-ink">
+          Benvenuti! Potete entrare dalle 15:00 — codici e parcheggio sono nella guida della casa,
+          ve la lascio qui sotto. A domani!
+        </p>
+      </div>
+
+      <p className="mt-5 text-eyebrow font-semibold uppercase text-ink-mute">
+        07:42 · tu approvi col caffè in mano
+      </p>
+      <div className="mt-2 flex items-center gap-3">
+        <span className="inline-flex items-center gap-2 rounded-full bg-ok px-3 py-1 text-body-sm font-semibold text-paper">
+          Approvata e inviata
+        </span>
+        <p className="text-body-sm text-ink-mute">Un tocco. Niente parte senza di te.</p>
+      </div>
+    </div>
+  );
+}
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden bg-[#07080c] px-5 pt-16 pb-24 text-[#f6f1ea] md:pt-24 md:pb-28">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(70% 45% at 80% -10%, rgb(224 122 76 / 0.22), transparent 55%), radial-gradient(80% 40% at 50% 120%, rgb(40 70 110 / 0.35), transparent 60%)',
-        }}
-      />
-      <div className="relative mx-auto max-w-xl" style={{ perspective: '1400px' }}>
-        <p className="text-eyebrow font-semibold uppercase text-[#b7aea4]">Premura</p>
-        <p className="mt-4 font-serif text-display leading-none">La tua casa</p>
-        <p className="mt-3 max-w-md text-body-lg text-[#b7aea4]">
-          Un minuto. Poi non apri più la chat.
-        </p>
+    <section className="pt-12 pb-12 md:pt-24 md:pb-24">
+      <Container>
+        <div className="grid gap-8 lg:grid-cols-2 lg:items-center lg:gap-12">
+          <div>
+            <Eyebrow>Premura · una categoria che non esisteva</Eyebrow>
 
-        <div
-          className="mt-10 rounded-[28px] border border-white/15 p-6 shadow-[0_50px_80px_-36px_rgb(0_0_0/0.85)] md:p-8"
-          style={{
-            transform: 'rotateX(8deg)',
-            background: 'linear-gradient(180deg, rgb(255 255 255 / 0.09), rgb(255 255 255 / 0.03))',
-            boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.22), 0 50px 80px -36px rgb(0 0 0 / 0.85)',
-          }}
-        >
-          <p className="text-eyebrow font-semibold uppercase text-terracotta">La casa</p>
-          <h1 className="mt-2 font-serif text-h1 text-[#f6f1ea]">Mettila qui.</h1>
-          <p className="mt-3 text-body text-[#b7aea4]">
-            Un host AI accanto a ogni ospite, per tutto il soggiorno. Entri, e da quel momento le
-            date le vede Premura.
-          </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <GoogleCtaButton href="/auth/google" />
-            <Link
-              href="/login"
-              className="text-body-sm text-[#b7aea4] underline decoration-white/30 underline-offset-4 hover:text-[#f6f1ea]"
-            >
-              Sei già host Premura? Accedi
-            </Link>
+            <Heading level={1} soft={50} className="mt-6">
+              Un host AI accanto a ogni ospite,{' '}
+              <em className="not-italic text-terracotta" style={{ fontVariationSettings: '"SOFT" 100' }}>
+                per tutto il soggiorno.
+              </em>
+            </Heading>
+
+            <p className="mt-8 max-w-2xl text-body-lg text-ink-soft">
+              Ascolta, capisce, agisce — anche alle due di notte. Tu intervieni solo quando c’è
+              una decisione di soldi. Non finge di essere te: l’ospite sa che è
+              l’assistente della casa, e scrive lo stesso, perché ottiene risposta subito.
+            </p>
+
+            <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <GoogleCtaButton href="/auth/google" />
+              <Link
+                href="/login"
+                className="text-body-sm text-ink-soft underline decoration-line underline-offset-4 transition-colors hover:text-ink hover:decoration-ink"
+              >
+                Sei già host Premura? Accedi
+              </Link>
+            </div>
           </div>
+
+          <ConversationDemo />
         </div>
-      </div>
+      </Container>
     </section>
   );
 }
