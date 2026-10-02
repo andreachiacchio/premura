@@ -5,7 +5,7 @@ import { buildGuestInviteAction } from '../actions';
 import { decisionActionClass } from './DecisionCard';
 
 // La frase da incollare nell'inbox Booking o Airbnb quando il numero
-// non c'\u00e8. Usa lo stesso testo gi\u00e0 pronto (composeGuestInvite): la card
+// non c'è. Usa lo stesso testo già pronto (composeGuestInvite): la card
 // della home non ne inventa un altro. Copiare non chiude la card: si
 // chiude quando il numero arriva.
 
@@ -46,7 +46,7 @@ export function CopyInboxPhrase({ bookingId }: { bookingId: string }): React.JSX
         disabled={pending}
         className={`${decisionActionClass} border border-terracotta-soft text-terracotta-2 hover:bg-peach`}
       >
-        {pending ? 'Preparo la frase\u2026' : copied ? 'Copiata. Incolla nell\u2019inbox.' : 'Copia frase'}
+        {pending ? 'Preparo la frase…' : copied ? 'Copiata. Incolla nell’inbox.' : 'Copia frase'}
       </button>
       {message ? (
         <p className="whitespace-pre-wrap rounded-card border border-line bg-paper px-3 py-2 text-body text-ink">
