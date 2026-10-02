@@ -38,10 +38,9 @@ export function LiveLanding() {
         </section>
 
         <section className="mt-8 border-t border-white/10 pt-6">
-          <Block kicker="I servizi" title="Una cosa da offrire. Il prezzo è già scritto.">
-            In costiera può essere il gozzo, il transfer o il cuoco. A Napoli il gozzo non c’è. L’ospite vede
-            un’offerta sola, con il prezzo. Il fornitore non si nomina. Su ogni sì, Premura tiene il quindici per
-            cento, già dentro quella cifra.
+          <Block kicker="I servizi" title="Vicino alla casa. Non un listino nostro.">
+            L’host mette l’indirizzo. Premura cerca esperienze lì intorno e le propone all’ospite, col prezzo.
+            Il fornitore non si nomina. Su ogni sì, Premura tiene il quindici per cento, già dentro quella cifra.
           </Block>
         </section>
 
