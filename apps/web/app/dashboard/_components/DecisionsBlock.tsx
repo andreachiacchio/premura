@@ -4,54 +4,28 @@ import type { PossibleCancellation } from '@/lib/repositories/possible-cancellat
 import { countOpenDecisions } from '@/lib/repositories/open-decisions';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import { CopyInboxPhrase } from './CopyInboxPhrase';
 import { DecisionCard } from './DecisionCard';
 import { InlinePhoneFix } from './InlinePhoneFix';
 import { PossibleCancellationActions } from './PossibleCancellationActions';
 
-// "Serve una tua decisione" — la risposta alla domanda della dashboard.
-//
-// SOLO cio' che e' fermo in attesa dell'host, ogni voce con l'azione che
-// la risolve. Vuoto = il blocco non si renderizza affatto. Il silenzio
-// e' l'informazione: non c'e' niente che aspetta te, e non serve una
-// riga che lo dica — una riga che dice "tutto ok" e' esattamente la
-// bugia che abbiamo tolto dalla agent card.
-//
-// Ogni voce e' una DecisionCard: titolo su una riga, corpo su due, il
-// resto dietro "Dettagli".
-
 const ARRIVO_FMT = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric' });
 
-/**
- * Bozza in attesa. La card (ReplyDraftCard, client component con
- * anteprima e azioni inline) arriva come ReactNode gia' costruito dalla
- * pagina: questo componente resta server-side.
- */
 export type DecisionDraftItem = {
   key: string;
-  /** "in attesa da 12 min" — calcolato server-side al render. */
   waitingLabel: string;
   guestLabel: string;
   card: React.ReactNode;
 };
 
 export type DecisionsData = {
-  /**
-   * Bozze dell'agente in attesa di ok. PRIME nella lista: in modalita'
-   * bozza sono l'unica cosa tra un ospite che ha scritto e la risposta,
-   * quindi ogni minuto di attesa e' un minuto di silenzio verso l'ospite.
-   */
   draftItems: DecisionDraftItem[];
-  /** Ospiti senza numero con arrivo entro 3 giorni — fix inline. */
   missingPhoneSoon: GuestMissingPhoneSoon[];
-  /** Prenotazioni con dati incompleti (schermata a lista dedicata). */
   incompleteCount: number;
-  /** Kit proposti in attesa di approvazione. */
   pendingKitsCount: number;
-  /** Eventi iCal spariti da 2 poll riusciti: l'host conferma o smentisce. */
   possibleCancellations: PossibleCancellation[];
 };
 
-/** Stessa definizione del badge in navigazione: mai due conteggi. */
 export function decisionsCount(d: DecisionsData): number {
   return countOpenDecisions({
     replyDrafts: d.draftItems,
@@ -99,9 +73,6 @@ export function DecisionsBlock({
           />
         ))}
 
-        {/* Possibili cancellazioni subito dopo le bozze: rischio
-            concreto di preparare kit e pulizie per ospiti che hanno
-            disdetto (30/07). */}
         {data.possibleCancellations.map((c) => (
           <DecisionCard
             key={c.bookingId}
@@ -129,19 +100,20 @@ export function DecisionsBlock({
             key={g.bookingId}
             kind="phone"
             title={`${g.guestFirstName ?? g.guestFullName} · ${g.propertyName}`}
-            body={`${arrivalPhrase(g.checkinAt, now)} e non ha un numero WhatsApp.`}
+            body={`${arrivalPhrase(g.checkinAt, now)}. Manca il WhatsApp: copia la frase e incollala nell'inbox.`}
             details={
-              <p>
-                Senza numero non posso mandare il benvenuto né rispondere se scrive. Puoi
-                inserirlo qui: da quel momento me ne occupo io.
-              </p>
+              <div className="flex flex-col gap-3">
+                <p>
+                  L'ospite apre la guida e risponde col numero. Quando ce l'hai, scrivilo qui: da
+                  quel momento me ne occupo io.
+                </p>
+                <InlinePhoneFix
+                  bookingId={g.bookingId}
+                  guestName={g.guestFirstName ?? g.guestFullName}
+                />
+              </div>
             }
-            actions={
-              <InlinePhoneFix
-                bookingId={g.bookingId}
-                guestName={g.guestFirstName ?? g.guestFullName}
-              />
-            }
+            actions={<CopyInboxPhrase bookingId={g.bookingId} />}
           />
         ))}
 
