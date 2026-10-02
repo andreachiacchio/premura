@@ -4,6 +4,7 @@ import type { PossibleCancellation } from '@/lib/repositories/possible-cancellat
 import { countOpenDecisions } from '@/lib/repositories/open-decisions';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import { CopyInboxPhrase } from './CopyInboxPhrase';
 import { DecisionCard } from './DecisionCard';
 import { InlinePhoneFix } from './InlinePhoneFix';
 import { PossibleCancellationActions } from './PossibleCancellationActions';
@@ -41,7 +42,7 @@ export type DecisionsData = {
    * quindi ogni minuto di attesa e' un minuto di silenzio verso l'ospite.
    */
   draftItems: DecisionDraftItem[];
-  /** Ospiti senza numero con arrivo entro 3 giorni — fix inline. */
+  /** Ospiti senza numero con arrivo entro 3 giorni — frase da inbox, poi il numero. */
   missingPhoneSoon: GuestMissingPhoneSoon[];
   /** Prenotazioni con dati incompleti (schermata a lista dedicata). */
   incompleteCount: number;
@@ -129,19 +130,20 @@ export function DecisionsBlock({
             key={g.bookingId}
             kind="phone"
             title={`${g.guestFirstName ?? g.guestFullName} · ${g.propertyName}`}
-            body={`${arrivalPhrase(g.checkinAt, now)} e non ha un numero WhatsApp.`}
+            body={`${arrivalPhrase(g.checkinAt, now)}. Manca il WhatsApp: copia la frase e incollala nell'inbox.`}
             details={
-              <p>
-                Senza numero non posso mandare il benvenuto né rispondere se scrive. Puoi
-                inserirlo qui: da quel momento me ne occupo io.
-              </p>
+              <div className="flex flex-col gap-3">
+                <p>
+                  L'ospite apre la guida e risponde col numero. Quando ce l'hai, scrivilo qui: da
+                  quel momento me ne occupo io.
+                </p>
+                <InlinePhoneFix
+                  bookingId={g.bookingId}
+                  guestName={g.guestFirstName ?? g.guestFullName}
+                />
+              </div>
             }
-            actions={
-              <InlinePhoneFix
-                bookingId={g.bookingId}
-                guestName={g.guestFirstName ?? g.guestFullName}
-              />
-            }
+            actions={<CopyInboxPhrase bookingId={g.bookingId} />}
           />
         ))}
 
