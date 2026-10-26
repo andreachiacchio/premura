@@ -130,8 +130,8 @@ export type ThreadMessage = {
   createdAt: Date;
   /**
    * La bozza per questo messaggio non e' mai partita (metadata scritto
-   * dal webhook dopo due enqueue falliti, 26/10). Il thread lo dice
-   * invece di tacere.
+   * dal webhook dopo due enqueue falliti, 26/10) E non esiste nessuna
+   * bozza per lui. Il thread lo dice invece di tacere.
    */
   draftEnqueueFailed: boolean;
 };
@@ -199,12 +199,15 @@ export async function getConversationThread(
     .orderBy(asc(messages.createdAt));
 
   const msgIds = msgs.map((m) => m.id);
-  const drafts =
+  // Bozze di OGNI stato: le pendenti si mostrano, e tutte dicono quali
+  // messaggi una risposta l'hanno avuta.
+  const replyDrafts =
     msgIds.length === 0
       ? []
       : await db
           .select({
             id: pendingDrafts.id,
+            status: pendingDrafts.status,
             replyToMessageId: pendingDrafts.replyToMessageId,
             draftBody: pendingDrafts.draftResponse,
             reasoning: pendingDrafts.reasoning,
@@ -215,11 +218,12 @@ export async function getConversationThread(
           .where(
             and(
               eq(pendingDrafts.kind, 'reply_draft'),
-              eq(pendingDrafts.status, 'pending'),
               inArray(pendingDrafts.replyToMessageId, msgIds),
             ),
           )
           .orderBy(asc(pendingDrafts.createdAt));
+  const drafts = replyDrafts.filter((d) => d.status === 'pending');
+  const answered = new Set(replyDrafts.map((d) => d.replyToMessageId));
 
   return {
     conversation: {
@@ -245,7 +249,10 @@ export async function getConversationThread(
       status: m.status,
       sentAt: m.sentAt,
       createdAt: m.createdAt,
-      draftEnqueueFailed: m.metadata?.draft_enqueue_failed === true,
+      // R2: "non ha una risposta pronta" deriva dalle bozze che la pagina
+      // mostra accanto, non dal solo segno. Un enqueue scaduto puo' ancora
+      // andare a buon fine e la bozza nascere su un messaggio segnato.
+      draftEnqueueFailed: m.metadata?.draft_enqueue_failed === true && !answered.has(m.id),
     })),
     drafts: drafts.map((d) => ({
       id: d.id,

@@ -7,6 +7,32 @@ export type DraftEnqueueOutcome =
   | { status: 'failed'; error: string; marked: boolean };
 
 /**
+ * Un Redis irraggiungibile NON fa fallire add(): la connessione condivisa
+ * (maxRetriesPerRequest null, obbligatorio per i Worker) tiene il comando
+ * in sospeso e riconnette all'infinito. Senza un limite il catch non
+ * arriva mai, e l'enqueue fallito torna muto. Un add sano risponde in
+ * millisecondi.
+ *
+ * Un add scaduto puo' ancora andare a buon fine quando Redis torna: la
+ * bozza allora nasce su un messaggio gia' segnato. Per questo la frase
+ * in conversazione guarda anche le bozze, non solo il segno.
+ */
+export const ENQUEUE_ATTEMPT_TIMEOUT_MS = 3_000;
+
+async function withTimeout(attempt: Promise<void>): Promise<void> {
+  const message = `nessuna risposta dalla coda dopo ${ENQUEUE_ATTEMPT_TIMEOUT_MS}ms (Redis irraggiungibile?)`;
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ENQUEUE_ATTEMPT_TIMEOUT_MS);
+  });
+  try {
+    await Promise.race([attempt, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Accoda la bozza per un messaggio GIA' salvato.
  *
  * Un enqueue fallito non e' piu' solo un log (R2, 26/10): si riprova una
@@ -25,11 +51,11 @@ export async function enqueueDraftOrMarkFailed(
   enqueue: (messageId: string) => Promise<void>,
 ): Promise<DraftEnqueueOutcome> {
   try {
-    await enqueue(messageId);
+    await withTimeout(enqueue(messageId));
     return { status: 'enqueued', attempts: 1 };
   } catch {
     try {
-      await enqueue(messageId);
+      await withTimeout(enqueue(messageId));
       return { status: 'enqueued', attempts: 2 };
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);

@@ -18,6 +18,12 @@ import { config as loadEnv } from 'dotenv';
 // L'esito si legge, non si assume (R2): dopo l'enqueue lo script aspetta
 // fino a 90 secondi che il worker scriva la bozza in pending_drafts, e
 // stampa cosa e' successo davvero. Riga finale "[requeue-draft] ESITO: ...".
+// Il segno draft_enqueue_failed si toglie solo con la bozza in mano: se
+// la generazione fallisce, "non ha una risposta pronta" resta vero.
+//
+// Rilanciabile: un job gia' finito senza bozza (failed, oppure completed
+// con generator_error o skipped_*, che il worker non tratta da errore)
+// viene rieseguito. Un secondo add con lo stesso id sarebbe scartato.
 //
 // Exit code: 0 bozza pronta (o gia' presente), 1 tutto il resto.
 
@@ -48,6 +54,14 @@ async function main(): Promise<void> {
   const { getRedisConnection } = await import('../jobs/redis-connection');
 
   const client = createServerClient();
+  const clearFlag = async () => {
+    await client.db
+      .update(messages)
+      .set({
+        metadata: sql`coalesce(${messages.metadata}, '{}'::jsonb) - 'draft_enqueue_failed' - 'draft_enqueue_error'`,
+      })
+      .where(eq(messages.id, messageId));
+  };
   const draftFor = async () => {
     const [row] = await client.db
       .select({ id: pendingDrafts.id, status: pendingDrafts.status })
@@ -78,6 +92,7 @@ async function main(): Promise<void> {
 
     const existingDraft = await draftFor();
     if (existingDraft) {
+      await clearFlag();
       esito(`BOZZA GIA PRESENTE: ${existingDraft.id} (${existingDraft.status})`, true);
       return;
     }
@@ -85,9 +100,9 @@ async function main(): Promise<void> {
     const existingJob = await draftGenerationQueue.getJob(draftJobId(messageId));
     if (existingJob) {
       const state = await existingJob.getState();
-      if (state === 'failed') {
-        await existingJob.retry();
-        console.log(`[requeue-draft] job ${existingJob.id} era failed: riprovato`);
+      if (state === 'failed' || state === 'completed') {
+        await existingJob.retry(state);
+        console.log(`[requeue-draft] job ${existingJob.id} era ${state} senza bozza: rieseguito`);
       } else {
         console.log(`[requeue-draft] job ${existingJob.id} gia in coda, stato ${state}`);
       }
@@ -96,18 +111,11 @@ async function main(): Promise<void> {
       console.log(`[requeue-draft] accodato job ${draftJobId(messageId)}`);
     }
 
-    // La bozza e' partita: il segno di enqueue fallito non e' piu' vero.
-    await client.db
-      .update(messages)
-      .set({
-        metadata: sql`coalesce(${messages.metadata}, '{}'::jsonb) - 'draft_enqueue_failed' - 'draft_enqueue_error'`,
-      })
-      .where(eq(messages.id, messageId));
-
     const deadline = Date.now() + WAIT_MS;
     while (Date.now() < deadline) {
       const draft = await draftFor();
       if (draft) {
+        await clearFlag();
         esito(`BOZZA PRONTA: ${draft.id} (${draft.status})`, true);
         return;
       }

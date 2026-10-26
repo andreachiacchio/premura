@@ -39,9 +39,9 @@ function makeNoopDb(): Database {
   return {} as unknown as Database;
 }
 
-async function buildApp(): Promise<ReturnType<typeof Fastify>> {
+async function buildApp(db: Database = makeNoopDb()): Promise<ReturnType<typeof Fastify>> {
   const app = Fastify({ logger: false });
-  await app.register(whatsappWebhookRoutes, { db: makeNoopDb() });
+  await app.register(whatsappWebhookRoutes, { db });
   return app;
 }
 
@@ -255,8 +255,17 @@ describe('webhook POST -> draft-generation enqueue connector', () => {
     });
     enqueueMock.mockRejectedValueOnce(new Error('Redis down'));
     enqueueMock.mockRejectedValueOnce(new Error('Redis down'));
+    const sets: unknown[] = [];
+    const db = {
+      update: () => ({
+        set: (v: unknown) => {
+          sets.push(v);
+          return { where: async () => undefined };
+        },
+      }),
+    } as unknown as Database;
 
-    const app = await buildApp();
+    const app = await buildApp(db);
     const payload = buildPayload([{ id: 'wamid.X', from: '393331234567', body: 'test' }]);
     const res = await app.inject({
       method: 'POST',
@@ -270,6 +279,7 @@ describe('webhook POST -> draft-generation enqueue connector', () => {
 
     expect(res.statusCode).toBe(200);
     expect(enqueueMock).toHaveBeenCalledTimes(2);
+    expect(sets).toHaveLength(1);
     await app.close();
   });
 });

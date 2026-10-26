@@ -1,6 +1,6 @@
 import type { Database } from '@premura/db';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { enqueueDraftOrMarkFailed } from '../src/jobs/draft-enqueue';
+import { ENQUEUE_ATTEMPT_TIMEOUT_MS, enqueueDraftOrMarkFailed } from '../src/jobs/draft-enqueue';
 
 // 26/10, produzione: dopo waha.persist.inserted
 //   waha.draft.enqueue_error — Error: Custom Id cannot contain :
@@ -161,5 +161,22 @@ describe('enqueueDraftOrMarkFailed', () => {
       status: 'failed',
       marked: false,
     });
+  });
+
+  // Redis irraggiungibile: add() resta appeso invece di fallire. Senza il
+  // limite per tentativo il segno non verrebbe mai scritto.
+  it('coda che non risponde: due tentativi a tempo, poi il segno', async () => {
+    vi.useFakeTimers();
+    try {
+      const { db, sets } = fakeDb();
+      const enqueue = vi.fn(() => new Promise<void>(() => {}));
+      const outcome = enqueueDraftOrMarkFailed(db, MESSAGE_ID, enqueue);
+      await vi.advanceTimersByTimeAsync(2 * ENQUEUE_ATTEMPT_TIMEOUT_MS);
+      await expect(outcome).resolves.toMatchObject({ status: 'failed', marked: true });
+      expect(enqueue).toHaveBeenCalledTimes(2);
+      expect(sets).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
