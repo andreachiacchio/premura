@@ -1,6 +1,8 @@
 import { createHmac } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
-import { toFlatInbound, verifyWahaSignature } from '../src/api/webhooks/waha';
+import type { Database } from '@premura/db';
+import Fastify from 'fastify';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toFlatInbound, verifyWahaSignature, wahaWebhookRoutes } from '../src/api/webhooks/waha';
 
 describe('verifyWahaSignature', () => {
   const secret = 'segreto-di-test';
@@ -53,6 +55,7 @@ describe('toFlatInbound', () => {
     session: 'default',
     messageId: 'false_4748356805@c.us_XYZ',
     from: '4748356805',
+    senderLid: null,
     fromMe: false,
     timestamp: new Date('2026-08-01T10:00:00Z'),
     text: 'What time is check-in?',
@@ -93,5 +96,157 @@ describe('toFlatInbound', () => {
     // un errore di insert al primo messaggio senza corpo.
     const flat = toFlatInbound({ ...base, text: null });
     expect(flat.message).toMatchObject({ type: 'text', text: { body: '' } });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// 26/10: la route con il payload reale. Persistenza, coda bozze e
+// risoluzione LID sono finte: qui si verifica cosa arriva a
+// persistInboundMessage e cosa finisce nei log.
+
+const persistMock = vi.hoisted(() => vi.fn());
+const enqueueMock = vi.hoisted(() => vi.fn());
+const resolveLidMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../src/api/webhooks/whatsapp-persist', () => ({ persistInboundMessage: persistMock }));
+vi.mock('../src/jobs/draft-generation-queue', () => ({ enqueueDraftGeneration: enqueueMock }));
+vi.mock('@premura/integrations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@premura/integrations')>()),
+  resolveLidToPhone: resolveLidMock,
+}));
+
+const REAL_ENVELOPE = {
+  event: 'message',
+  session: 'default',
+  engine: 'WEBJS',
+  payload: {
+    id: 'false_163505126793314@lid_3A7B3B34FB8CEF55FFE9',
+    from: '163505126793314@lid',
+    to: '393514512070@c.us',
+    body: 'Test premura',
+    fromMe: false,
+    hasMedia: false,
+    media: null,
+    ack: 1,
+    ackName: 'SERVER',
+    location: null,
+    vCards: [],
+    _data: {},
+  },
+};
+
+type LogLine = { level: number; event?: string; msg?: string; [k: string]: unknown };
+
+async function buildWahaApp(): Promise<{ app: ReturnType<typeof Fastify>; logs: LogLine[] }> {
+  const logs: LogLine[] = [];
+  const app = Fastify({
+    logger: {
+      level: 'debug',
+      stream: { write: (line: string) => logs.push(JSON.parse(line) as LogLine) },
+    },
+  });
+  await app.register(wahaWebhookRoutes, { db: {} as Database });
+  return { app, logs };
+}
+
+const post = (app: ReturnType<typeof Fastify>, body: unknown) =>
+  app.inject({
+    method: 'POST',
+    url: '/webhooks/waha',
+    headers: { 'content-type': 'application/json' },
+    payload: JSON.stringify(body),
+  });
+
+const WARN = 40;
+
+describe('POST /webhooks/waha', () => {
+  beforeEach(() => {
+    persistMock.mockReset();
+    enqueueMock.mockReset();
+    resolveLidMock.mockReset();
+    persistMock.mockResolvedValue({
+      messageId: 'm-1',
+      conversationId: 'c-1',
+      bookingId: null,
+      status: 'orphan_inserted',
+    });
+  });
+
+  it('payload reale, LID risolto: si salva con il numero', async () => {
+    resolveLidMock.mockResolvedValue('393383963307');
+    const { app } = await buildWahaApp();
+    const res = await post(app, REAL_ENVELOPE);
+
+    expect(res.statusCode).toBe(200);
+    expect(resolveLidMock).toHaveBeenCalledWith('163505126793314@lid', 'default');
+    expect(persistMock).toHaveBeenCalledTimes(1);
+    const flat = persistMock.mock.calls[0]?.[1];
+    expect(flat.message).toMatchObject({
+      from: '393383963307',
+      id: 'false_163505126793314@lid_3A7B3B34FB8CEF55FFE9',
+      text: { body: 'Test premura' },
+    });
+  });
+
+  it('payload reale, LID non risolto: si salva COMUNQUE col LID, e lo si dice a WARN', async () => {
+    resolveLidMock.mockResolvedValue(null);
+    const { app, logs } = await buildWahaApp();
+    const res = await post(app, REAL_ENVELOPE);
+
+    expect(res.statusCode).toBe(200);
+    expect(persistMock).toHaveBeenCalledTimes(1);
+    expect(persistMock.mock.calls[0]?.[1].message.from).toBe('163505126793314@lid');
+    expect(logs.some((l) => l.event === 'waha.lid.unresolved' && l.level === WARN)).toBe(true);
+  });
+
+  it('payload non leggibile: 200, niente salvataggio, WARN con chiavi e problemi', async () => {
+    const { app, logs } = await buildWahaApp();
+    const res = await post(app, {
+      event: 'message',
+      payload: { from: '4748356805@c.us', body: 'segreto' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(persistMock).not.toHaveBeenCalled();
+    const warn = logs.find((l) => l.event === 'waha.parse.invalid');
+    expect(warn?.level).toBe(WARN);
+    expect(warn?.payloadKeys).toEqual(['from', 'body']);
+    expect((warn?.issues as string[]).some((i) => i.startsWith('payload.id'))).toBe(true);
+    expect(JSON.stringify(logs)).not.toContain('segreto');
+  });
+
+  it('gruppo: ignorato a debug, niente salvataggio, niente WARN di parsing', async () => {
+    const { app, logs } = await buildWahaApp();
+    const res = await post(app, {
+      event: 'message',
+      session: 'default',
+      payload: { id: 'g1', from: '120363025246125486@g.us', author: '4748356805@c.us', body: 'x' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(persistMock).not.toHaveBeenCalled();
+    expect(logs.some((l) => l.event === 'waha.skip' && l.level === 20)).toBe(true);
+    expect(logs.some((l) => l.event === 'waha.parse.invalid')).toBe(false);
+  });
+
+  it('evento che non e un messaggio: ignorato, non invalido', async () => {
+    const { app, logs } = await buildWahaApp();
+    const res = await post(app, { event: 'session.status', payload: { status: 'WORKING' } });
+
+    expect(res.statusCode).toBe(200);
+    expect(persistMock).not.toHaveBeenCalled();
+    expect(logs.some((l) => l.event === 'waha.parse.invalid')).toBe(false);
+  });
+
+  it('numero gia in chiaro (@c.us): nessuna chiamata per il LID', async () => {
+    const { app } = await buildWahaApp();
+    await post(app, {
+      event: 'message',
+      session: 'default',
+      payload: { id: 'x', from: '4748356805@c.us', body: 'What time is check-in?', media: null },
+    });
+
+    expect(resolveLidMock).not.toHaveBeenCalled();
+    expect(persistMock.mock.calls[0]?.[1].message.from).toBe('4748356805');
   });
 });

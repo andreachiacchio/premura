@@ -1,7 +1,11 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { Database } from '@premura/db';
-import { type WahaInboundMessage, parseWahaWebhook } from '@premura/integrations';
-import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
+import {
+  type WahaInboundMessage,
+  parseWahaWebhook,
+  resolveLidToPhone,
+} from '@premura/integrations';
+import type { FastifyBaseLogger, FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { enqueueDraftGeneration } from '../../jobs/draft-generation-queue';
 import { maskPhone } from './whatsapp';
 import type { FlatInboundMessage } from './whatsapp-payload';
@@ -85,6 +89,32 @@ export function toFlatInbound(msg: WahaInboundMessage): FlatInboundMessage {
   };
 }
 
+/**
+ * Il mittente da usare per l'attribuzione: il numero, se si conosce.
+ *
+ * Quando WhatsApp manda solo il LID e il payload non porta il numero, lo
+ * si chiede a WAHA. Se nemmeno WAHA lo sa, il messaggio si salva lo
+ * stesso con il LID come mittente (conversazione non attribuita) e lo si
+ * dice a WARN: mai bloccare l'inbound per questo.
+ */
+export async function resolveSender(
+  msg: WahaInboundMessage,
+  log: Pick<FastifyBaseLogger, 'info' | 'warn'>,
+): Promise<string> {
+  if (!msg.senderLid || msg.from !== msg.senderLid) return msg.from;
+
+  const phone = await resolveLidToPhone(msg.senderLid, msg.session);
+  if (phone) {
+    log.info({ event: 'waha.lid.resolved', messageId: msg.messageId }, 'lid risolto');
+    return phone;
+  }
+  log.warn(
+    { event: 'waha.lid.unresolved', messageId: msg.messageId, lidMasked: maskPhone(msg.senderLid) },
+    'lid non risolto: messaggio salvato senza attribuzione',
+  );
+  return msg.senderLid;
+}
+
 export const wahaWebhookRoutes: FastifyPluginAsync<WahaWebhookPluginOptions> = async (
   app,
   opts,
@@ -130,13 +160,35 @@ export const wahaWebhookRoutes: FastifyPluginAsync<WahaWebhookPluginOptions> = a
       );
     }
 
-    const msg = parseWahaWebhook(req.body);
-    if (!msg) {
-      // Ack comunque: WAHA riprova sui non-2xx, e un payload che non
-      // sappiamo leggere non migliora al secondo tentativo.
-      req.log.debug({ event: 'waha.parse.skip' }, 'payload WAHA non riconosciuto');
-      return reply.code(200).send({ received: true, persisted: 0 });
+    const parsed = parseWahaWebhook(req.body);
+
+    // Gruppi, stati, canali, eventi che non sono messaggi: non ci
+    // riguardano, e lo si dice a debug col motivo.
+    if (parsed.kind === 'ignored') {
+      req.log.debug({ event: 'waha.skip', reason: parsed.reason }, 'evento WAHA ignorato');
+      return reply.code(200).send({ received: true, persisted: 0, reason: parsed.reason });
     }
+
+    // Un payload che non sappiamo leggere e' un messaggio perso: a WARN,
+    // con cosa non andava (26/10: media null scartava ogni messaggio a
+    // livello debug, cioe' in silenzio). Chiavi del payload e problemi
+    // Zod, mai i valori: il testo dell'ospite non finisce nei log.
+    // Resta 200: WAHA riprova sui non-2xx, e lo stesso payload non
+    // migliora al secondo tentativo.
+    if (parsed.kind === 'invalid') {
+      req.log.warn(
+        {
+          event: 'waha.parse.invalid',
+          wahaEvent: parsed.event,
+          payloadKeys: parsed.payloadKeys,
+          issues: parsed.issues,
+        },
+        'payload WAHA non letto: messaggio NON salvato',
+      );
+      return reply.code(200).send({ received: true, persisted: 0, error: 'invalid_payload' });
+    }
+
+    const msg = parsed.message;
 
     // I messaggi che abbiamo mandato noi tornano indietro su 'message.any'.
     // Non vanno persistiti come inbound: creerebbero un doppione outbound
@@ -149,14 +201,9 @@ export const wahaWebhookRoutes: FastifyPluginAsync<WahaWebhookPluginOptions> = a
       return reply.code(200).send({ received: true, persisted: 0, reason: 'from_me' });
     }
 
-    // Gli ack (message.ack) non sono messaggi: hanno il loro percorso e
-    // qui non c'e' niente da persistire.
-    if (msg.event === 'message.ack') {
-      return reply.code(200).send({ received: true, persisted: 0, reason: 'ack' });
-    }
-
     try {
-      const result = await persistInboundMessage(db, toFlatInbound(msg));
+      const sender = await resolveSender(msg, req.log);
+      const result = await persistInboundMessage(db, toFlatInbound({ ...msg, from: sender }));
 
       if (result.status === 'inserted' && result.messageId) {
         req.log.info(
@@ -180,7 +227,7 @@ export const wahaWebhookRoutes: FastifyPluginAsync<WahaWebhookPluginOptions> = a
         }
       } else if (result.status === 'orphan_inserted') {
         req.log.warn(
-          { event: 'waha.persist.orphan', fromMasked: maskPhone(msg.from) },
+          { event: 'waha.persist.orphan', fromMasked: maskPhone(sender) },
           'messaggio WAHA senza prenotazione corrispondente',
         );
       }
