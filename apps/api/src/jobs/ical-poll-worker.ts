@@ -6,7 +6,7 @@ import { getRedisConnection } from './redis-connection';
 import type { IcalPollJobData } from './queues';
 import { mapIcalEventToBookingShell } from './ical-event-mapper';
 import { upsertBookingShell } from './booking-upsert-repository';
-import { reconcileMissingEvents } from './feed-reconciliation';
+import { type SeenRange, reconcileMissingEvents } from './feed-reconciliation';
 import { recordFeedOutcome } from './feed-sync-state';
 import { redactIcalUrl } from './redact-ical-url';
 
@@ -86,11 +86,12 @@ export const icalPollWorker = new Worker<IcalPollJobData>(
       // UID visti in QUESTO poll (anche di eventi-blocco che il mapper
       // scarta): servono alla riconciliazione cancellazioni.
       const seenRefs = new Set<string>();
-      // Le DATE viste, non solo gli UID. Booking riemette la stessa
-      // fascia con un UID nuovo ogni notte: senza le date, la riga
-      // vecchia sembra sparita e viene marcata come cancellazione
-      // mentre l'ospite e' ancora in casa (06/08).
-      const seenRanges: Array<{ checkinAt: Date; checkoutAt: Date }> = [];
+      // Le DATE viste, non solo gli UID, con la riga a cui l'upsert le
+      // ha assegnate. Booking riemette la stessa fascia con un UID nuovo
+      // ogni notte (06/08). Dal 26/10 una riga coperta dalla fascia di
+      // un'ALTRA riga viene cancellata come superseded: per questo la
+      // fascia si registra solo dopo un upsert RIUSCITO (R2).
+      const seenRanges: SeenRange[] = [];
       let hasVcalendar = false;
 
       for (const component of components) {
@@ -102,11 +103,15 @@ export const icalPollWorker = new Worker<IcalPollJobData>(
         const shell = mapIcalEventToBookingShell(component, propertyId, source);
         if (!shell) continue;
         seenRefs.add(shell.platformBookingRef);
-        seenRanges.push({ checkinAt: shell.checkinAt, checkoutAt: shell.checkoutAt });
         mapped += 1;
 
         try {
           const result = await upsertBookingShell(client.db, shell);
+          seenRanges.push({
+            checkinAt: shell.checkinAt,
+            checkoutAt: shell.checkoutAt,
+            bookingId: result.bookingId,
+          });
           // MAI sopprimere in silenzio (Andrea 30/07): ogni fascia
           // anonima scartata perche' coperta lascia traccia completa —
           // e' cio' che permettera' di recuperare eventi scartati per
@@ -193,6 +198,12 @@ export const icalPollWorker = new Worker<IcalPollJobData>(
             logger.warn(
               { propertyId, source, bookingId: cancelledId, reason: 'feed_missing_3d' },
               'prenotazione cancellata da Premura: assente dal feed da 3 giorni di poll riusciti',
+            );
+          }
+          for (const revivedId of cancellations.revived) {
+            logger.warn(
+              { propertyId, source, bookingId: revivedId },
+              "prenotazione riattivata: Premura l'aveva cancellata, ma il suo UID e' tornato nel feed",
             );
           }
           for (const supersededId of cancellations.superseded) {

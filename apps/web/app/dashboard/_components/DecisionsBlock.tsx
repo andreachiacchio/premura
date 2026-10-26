@@ -152,6 +152,7 @@ export function DecisionsBlock({
             items={removals.map((r) => ({
               bookingId: r.bookingId,
               label: `${formatDayMonth(r.checkinAt, now)} – ${formatDayMonth(r.checkoutAt, now)} · ${r.propertyName}`,
+              removedLabel: `tolta dal calendario il ${formatDayMonth(r.removedAt, now)}`,
             }))}
           />
         ) : null}

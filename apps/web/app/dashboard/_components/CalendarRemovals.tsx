@@ -14,7 +14,12 @@ import { decisionActionClass } from './DecisionCard';
 //
 // Prima erano N card identiche con due bottoni, e nessuno le apriva.
 
-export type CalendarRemovalItem = { bookingId: string; label: string };
+export type CalendarRemovalItem = {
+  bookingId: string;
+  label: string;
+  /** "tolta il 21 ott": la data viene dalla riga, non da un'assunzione. */
+  removedLabel: string;
+};
 
 export function CalendarRemovals({
   headline,
@@ -32,6 +37,13 @@ export function CalendarRemovals({
   const [error, setError] = useState<string | null>(null);
 
   const restore = (item: CalendarRemovalItem): void => {
+    // Conferma: dopo il ripristino Premura la segue di nuovo come
+    // prenotazione vera, e dalla home non si torna indietro.
+    if (
+      !window.confirm(`Ripristino ${item.label}? Premura tornerà a seguirla come prenotazione.`)
+    ) {
+      return;
+    }
     setError(null);
     setRestoringId(item.bookingId);
     startTransition(async () => {
@@ -70,8 +82,8 @@ export function CalendarRemovals({
       {open ? (
         <div className="mt-3 flex flex-col gap-3">
           <p className="text-body text-ink-soft">
-            Erano sparite dal calendario da 3 giorni: le ho tolte io. Se una era ancora attiva,
-            ripristinala e non la toccherò più.
+            Erano sparite dal calendario da almeno 3 giorni: le ho tolte io. Se una era ancora
+            attiva, ripristinala e non la toglierò più finché non ricompare nel calendario.
           </p>
           <ul className="flex flex-col gap-2">
             {items.map((item) => (
@@ -79,7 +91,10 @@ export function CalendarRemovals({
                 key={item.bookingId}
                 className="flex flex-col gap-2 border-t border-line-soft pt-2 sm:flex-row sm:items-center sm:justify-between"
               >
-                <span className="text-body text-ink">{item.label}</span>
+                <span className="flex flex-col">
+                  <span className="text-body text-ink">{item.label}</span>
+                  <span className="text-[13px] text-ink-mute">{item.removedLabel}</span>
+                </span>
                 <button
                   type="button"
                   onClick={() => restore(item)}
