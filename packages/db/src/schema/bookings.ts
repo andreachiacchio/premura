@@ -15,6 +15,19 @@ import { bookingStatusEnum, platformEnum } from './enums';
 import { hosts } from './hosts';
 import { properties } from './properties';
 
+/**
+ * Perche' Premura ha cancellato da sola una prenotazione (26/10).
+ *
+ *  feed_missing_3d -> assente dal feed iCal per 3 giorni di poll riusciti
+ *  superseded      -> UID sparito, date coperte da un altro evento dello
+ *                     stesso feed: e' la stessa prenotazione rinominata
+ *
+ * NULL su una riga 'cancelled' = l'ha cancellata qualcun altro (host,
+ * email della piattaforma). Fonte unica per worker e dashboard.
+ */
+export const CANCELLATION_REASONS = ['feed_missing_3d', 'superseded'] as const;
+export type CancellationReason = (typeof CANCELLATION_REASONS)[number];
+
 // Prenotazione. Entry point di ogni workflow Premura.
 // Ingested via iCal polling (M2a.1) o email parsing Gmail (M2a.3 Fase 2).
 //
@@ -121,10 +134,17 @@ export const bookings = pgTable(
     // in cui l'evento iCal non compare piu' nel feed. Un poll fallito
     // (HTTP error, timeout, body non parsabile) NON incrementa mai.
     feedMissingCount: integer('feed_missing_count').notNull().default(0),
-    // Valorizzato al secondo poll mancante: "possibile cancellazione",
-    // mostrata in "Serve una tua decisione". L'host conferma (cancellata)
-    // o smentisce (ancora attiva: si azzera contatore e sospetto).
+    // Valorizzato al secondo poll mancante: la prenotazione e' in
+    // osservazione. Non e' una decisione per l'host (26/10): dopo 3
+    // giorni Premura la cancella da sola, e questo timestamp resta come
+    // momento in cui Booking/Airbnb l'ha tolta dal calendario.
     possibleCancellationAt: timestamp('possible_cancellation_at', { withTimezone: true }),
+    // Migration 0038. Valorizzato SOLO quando a cancellare e' Premura.
+    cancellationReason: varchar('cancellation_reason', { length: 32 }).$type<CancellationReason>(),
+    // L'host ha detto "era ancora attiva" su una cancellazione di
+    // Premura. Da quel momento la riconciliazione non la tocca piu':
+    // senza questo segno, tre giorni dopo la ricancellerebbe da sola.
+    hostKeptActiveAt: timestamp('host_kept_active_at', { withTimezone: true }),
 
     // Origine dei dati prenotazione: determina se il workflow agente AI parte
     // (Guest DNA, messaggi pre-arrivo, kit composer) o resta silente per

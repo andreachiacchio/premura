@@ -5,7 +5,7 @@ import { cache } from 'react';
 import { findByHostId } from './bookings';
 import { listGuestsMissingPhoneSoon } from './home-summary';
 import { countKitsByStatusForHost } from './kits';
-import { listPossibleCancellations } from './possible-cancellations';
+import { listCalendarRemovals } from './possible-cancellations';
 import { listPendingReplyDraftsForHost } from './reply-drafts';
 
 // Tutto cio' che aspetta l'host, letto UNA VOLTA per richiesta.
@@ -23,7 +23,12 @@ import { listPendingReplyDraftsForHost } from './reply-drafts';
 export type OpenDecisions = {
   replyDrafts: Awaited<ReturnType<typeof listPendingReplyDraftsForHost>>;
   missingPhoneSoon: Awaited<ReturnType<typeof listGuestsMissingPhoneSoon>>;
-  possibleCancellations: Awaited<ReturnType<typeof listPossibleCancellations>>;
+  /**
+   * Prenotazioni che Premura ha tolto perche' sparite dal feed. NON
+   * entrano nel conteggio: la decisione l'ha gia' presa Premura, l'host
+   * interviene solo se vuole (26/10).
+   */
+  calendarRemovals: Awaited<ReturnType<typeof listCalendarRemovals>>;
   incompleteCount: number;
   pendingKitsCount: number;
   /**
@@ -38,7 +43,7 @@ export type OpenDecisions = {
 const EMPTY: OpenDecisions = {
   replyDrafts: [],
   missingPhoneSoon: [],
-  possibleCancellations: [],
+  calendarRemovals: [],
   incompleteCount: 0,
   pendingKitsCount: 0,
   bookings: [],
@@ -69,11 +74,11 @@ export const loadOpenDecisions = cache(async (): Promise<OpenDecisions> => {
     return EMPTY;
   }
 
-  const [replyDrafts, missingPhoneSoon, possibleCancellations, kitStatusCounts, bookings] =
+  const [replyDrafts, missingPhoneSoon, calendarRemovals, kitStatusCounts, bookings] =
     await Promise.all([
       section('bozze', [], () => listPendingReplyDraftsForHost(db, hostId)),
       section('numeri mancanti', [], () => listGuestsMissingPhoneSoon(db, hostId)),
-      section('possibili cancellazioni', [], () => listPossibleCancellations(db, hostId)),
+      section('tolte dal calendario', [], () => listCalendarRemovals(db, hostId)),
       section('kit', {} as Record<string, number>, () => countKitsByStatusForHost(db, hostId)),
       section('prenotazioni', [] as Awaited<ReturnType<typeof findByHostId>>, () =>
         findByHostId({ db, hostId }),
@@ -88,14 +93,13 @@ export const loadOpenDecisions = cache(async (): Promise<OpenDecisions> => {
   return {
     replyDrafts,
     missingPhoneSoon,
-    possibleCancellations,
+    calendarRemovals,
     incompleteCount,
     pendingKitsCount,
     bookings,
     count: countOpenDecisions({
       replyDrafts,
       missingPhoneSoon,
-      possibleCancellations,
       incompleteCount,
       pendingKitsCount,
     }),
@@ -109,18 +113,20 @@ export const loadOpenDecisions = cache(async (): Promise<OpenDecisions> => {
  * il numero sottostante e' dieci: sono una voce sola nella lista, con un
  * link che le apre tutte. Contarle a una a una gonfierebbe il badge
  * rispetto a quello che l'host vede davvero sotto.
+ *
+ * Le cancellazioni dal feed non ci sono piu' (26/10): quelle in
+ * osservazione non sono ancora un fatto, quelle tolte le ha gia'
+ * decise Premura. Nessuna delle due aspetta l'host.
  */
 export function countOpenDecisions(d: {
   replyDrafts: { length: number };
   missingPhoneSoon: { length: number };
-  possibleCancellations: { length: number };
   incompleteCount: number;
   pendingKitsCount: number;
 }): number {
   return (
     d.replyDrafts.length +
     d.missingPhoneSoon.length +
-    d.possibleCancellations.length +
     (d.incompleteCount > 0 ? 1 : 0) +
     (d.pendingKitsCount > 0 ? 1 : 0)
   );

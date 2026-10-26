@@ -1,7 +1,7 @@
 'use client';
 
 import { useToast } from '@/components/Toast';
-import { AlertTriangle, CalendarX, ChevronDown, Gift, MessageSquare, Phone } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Gift, MessageSquare, Phone } from 'lucide-react';
 import { createContext, useCallback, useContext, useState } from 'react';
 
 // DecisionCard — una cosa che aspetta l'host, con l'azione che la
@@ -19,16 +19,12 @@ import { createContext, useCallback, useContext, useState } from 'react';
 
 const EXIT_MS = 200;
 
-export type DecisionKind = 'draft' | 'cancellation' | 'phone' | 'kit' | 'incomplete';
+export type DecisionKind = 'draft' | 'phone' | 'kit' | 'incomplete';
 
 // Icona e colore per tipo: l'host riconosce di cosa si tratta prima di
 // leggere. I colori sono quelli dei token, non nuovi.
-const KIND: Record<
-  DecisionKind,
-  { Icon: typeof MessageSquare; tone: string; label: string }
-> = {
+const KIND: Record<DecisionKind, { Icon: typeof MessageSquare; tone: string; label: string }> = {
   draft: { Icon: MessageSquare, tone: 'text-terracotta-2 bg-peach', label: 'Risposta pronta' },
-  cancellation: { Icon: CalendarX, tone: 'text-alert bg-alert/10', label: 'Possibile cancellazione' },
   phone: { Icon: Phone, tone: 'text-terracotta-2 bg-peach', label: 'Numero mancante' },
   kit: { Icon: Gift, tone: 'text-terracotta-2 bg-peach', label: 'Kit da approvare' },
   incomplete: { Icon: AlertTriangle, tone: 'text-ink-soft bg-line-soft', label: 'Dati mancanti' },
