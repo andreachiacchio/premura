@@ -44,18 +44,12 @@ export function decisionsCount(d: DecisionsData): number {
  * righe che la riga apre: mai "Booking" se le ha tolte Airbnb.
  * Le righe arrivano solo da feed iCal, quindi la piattaforma e' una
  * delle due.
- *
- * Il soggetto e' Premura (26/10): la finestra conta le SUE
- * cancellazioni, non quando il feed ha tolto la riga. "Booking ha tolto
- * N negli ultimi 30 giorni" sarebbe falso per una riga sparita ad agosto
- * e cancellata oggi. La data in cui l'ha tolta il feed sta su ogni riga.
  */
 export function calendarRemovalsHeadline(items: CalendarRemoval[]): string {
   const names = [...new Set(items.map((i) => (i.platform === 'airbnb' ? 'Airbnb' : 'Booking')))];
-  const source = names.length === 1 ? names[0] : 'Booking e Airbnb';
+  const subject = names.length === 1 ? `${names[0]} ha tolto` : 'Booking e Airbnb hanno tolto';
   const n = items.length;
-  const what = n === 1 ? 'prenotazione sparita' : 'prenotazioni sparite';
-  return `Negli ultimi ${CALENDAR_REMOVALS_WINDOW_DAYS} giorni ho tolto ${n} ${what} dal calendario di ${source}`;
+  return `${subject} ${n} ${n === 1 ? 'prenotazione' : 'prenotazioni'} dal calendario negli ultimi ${CALENDAR_REMOVALS_WINDOW_DAYS} giorni`;
 }
 
 function arrivalPhrase(checkinAt: Date, now: Date): string {

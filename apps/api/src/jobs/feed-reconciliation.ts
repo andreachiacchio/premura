@@ -1,5 +1,5 @@
 import { CANCELLATION_REASONS, type Database, bookings } from '@premura/db';
-import { and, eq, gte, inArray, lt, ne, or } from 'drizzle-orm';
+import { and, eq, gte, inArray, ne } from 'drizzle-orm';
 
 // Cancellazioni dal feed iCal: decide Premura, non l'host (26/10).
 //
@@ -22,10 +22,7 @@ import { and, eq, gte, inArray, lt, ne, or } from 'drizzle-orm';
 //    struttura e' un'unita' sola: due prenotazioni sovrapposte non
 //    esistono, e quella che copre e' la stessa che Booking ha rinominato.
 //  - Mai cancellare un soggiorno gia' iniziato: l'ospite e' in casa.
-//    Tranne se la riga era gia' sparita PRIMA dell'arrivo (Andrea 26/10):
-//    l'ospite non e' mai arrivato, e l'osservazione si porta a termine
-//    finche' il soggiorno non e' finito. "Oggi" e' il giorno di Roma,
-//    non quello del server (UTC su Fly).
+//    "Oggi" e' il giorno di Roma, non quello del server (UTC su Fly).
 //  - "Era ancora attiva" dell'host (host_kept_active_at) vince finche'
 //    l'UID resta assente: la riga si osserva ma non si cancella. Quando
 //    l'UID ricompare l'esenzione cade, e una nuova sparizione si conta.
@@ -121,12 +118,7 @@ export function planMissingUpdates(
 
     // Un soggiorno gia' iniziato non si cancella mai: l'ospite e' in
     // casa, e un feed che lo accorcia o lo rinomina non lo fa uscire.
-    // Tranne la riga sparita gia' prima dell'arrivo: quell'ospite in
-    // casa non c'e' mai entrato, e si continua a contare (26/10).
-    const arrived = t.checkinAt < startOfToday;
-    const vanishedBeforeArrival =
-      t.possibleCancellationAt !== null && t.possibleCancellationAt < t.checkinAt;
-    if (arrived && !vanishedBeforeArrival) continue;
+    if (t.checkinAt < startOfToday) continue;
 
     // 06/08 il caso Julian: Booking riemette la fascia col periodo
     // residuo e un UID nuovo. Allora si concluse "non e' una
@@ -137,7 +129,7 @@ export function planMissingUpdates(
     // riga: quella vera e' l'altra — purche' la fascia sia andata
     // davvero a un'ALTRA riga.
     const coveredByAnother = seenRanges.some((r) => r.bookingId !== t.id && overlaps(r, t));
-    if (coveredByAnother && !arrived && !t.hostKeptActive) {
+    if (coveredByAnother && !t.hostKeptActive) {
       supersededIds.push(t.id);
       continue;
     }
@@ -172,9 +164,8 @@ export type ReconcileSummary = {
 
 /**
  * Da chiamare SOLO dopo un fetch+parse riuscito del feed di
- * (propertyId, source). Considera gli arrivi da oggi in poi, piu' i
- * soggiorni non ancora finiti la cui riga era sparita prima dell'arrivo:
- * un soggiorno in corso che esce dalla finestra del feed non e' una
+ * (propertyId, source). Considera solo arrivi da oggi in poi: un
+ * soggiorno in corso che esce dalla finestra del feed non e' una
  * cancellazione.
  */
 export async function reconcileMissingEvents(
@@ -190,11 +181,7 @@ export async function reconcileMissingEvents(
     eq(bookings.propertyId, propertyId),
     eq(bookings.dataSource, `${source}_ical_only`),
     eq(bookings.isCalendarBlock, false),
-  );
-  const notOver = gte(bookings.checkoutAt, startOfToday);
-  const watched = or(
     gte(bookings.checkinAt, startOfToday),
-    and(lt(bookings.possibleCancellationAt, bookings.checkinAt), notOver),
   );
 
   const rows = await db
@@ -208,7 +195,7 @@ export async function reconcileMissingEvents(
       hostKeptActiveAt: bookings.hostKeptActiveAt,
     })
     .from(bookings)
-    .where(and(sameFeed, watched, ne(bookings.status, 'cancelled')));
+    .where(and(sameFeed, ne(bookings.status, 'cancelled')));
   const targets = rows.map(({ hostKeptActiveAt, ...t }) => ({
     ...t,
     hostKeptActive: hostKeptActiveAt !== null,
@@ -234,7 +221,6 @@ export async function reconcileMissingEvents(
     .where(
       and(
         sameFeed,
-        notOver,
         eq(bookings.status, 'cancelled'),
         inArray(bookings.cancellationReason, [...CANCELLATION_REASONS]),
       ),
@@ -246,7 +232,6 @@ export async function reconcileMissingEvents(
       .set({
         status: 'confirmed',
         cancellationReason: null,
-        autoCancelledAt: null,
         feedMissingCount: 0,
         possibleCancellationAt: null,
         updatedAt: now,
@@ -257,12 +242,7 @@ export async function reconcileMissingEvents(
   if (plan.supersededIds.length > 0) {
     await db
       .update(bookings)
-      .set({
-        status: 'cancelled',
-        cancellationReason: 'superseded',
-        autoCancelledAt: now,
-        updatedAt: now,
-      })
+      .set({ status: 'cancelled', cancellationReason: 'superseded', updatedAt: now })
       .where(inArray(bookings.id, plan.supersededIds));
   }
 
@@ -278,11 +258,7 @@ export async function reconcileMissingEvents(
         // data che la home mostra all'host.
         ...(u.flagNow ? { possibleCancellationAt: now } : {}),
         ...(u.cancelNow
-          ? {
-              status: 'cancelled' as const,
-              cancellationReason: 'feed_missing_3d' as const,
-              autoCancelledAt: now,
-            }
+          ? { status: 'cancelled' as const, cancellationReason: 'feed_missing_3d' as const }
           : {}),
         updatedAt: now,
       })
