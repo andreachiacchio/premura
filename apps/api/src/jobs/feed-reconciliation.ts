@@ -1,5 +1,5 @@
-import { CANCELLATION_REASONS, type Database, bookings } from '@premura/db';
-import { and, eq, gte, inArray, ne } from 'drizzle-orm';
+import { type Database, bookings } from '@premura/db';
+import { and, eq, gte, inArray, isNull, ne } from 'drizzle-orm';
 
 // Cancellazioni dal feed iCal: decide Premura, non l'host (26/10).
 //
@@ -22,15 +22,8 @@ import { and, eq, gte, inArray, ne } from 'drizzle-orm';
 //    struttura e' un'unita' sola: due prenotazioni sovrapposte non
 //    esistono, e quella che copre e' la stessa che Booking ha rinominato.
 //  - Mai cancellare un soggiorno gia' iniziato: l'ospite e' in casa.
-//    "Oggi" e' il giorno di Roma, non quello del server (UTC su Fly).
-//  - "Era ancora attiva" dell'host (host_kept_active_at) vince finche'
-//    l'UID resta assente: la riga si osserva ma non si cancella. Quando
-//    l'UID ricompare l'esenzione cade, e una nuova sparizione si conta.
-//  - Una riga cancellata da Premura il cui UID ricompare nel feed torna
-//    confirmed: la decisione era di Premura, e il feed la smentisce.
-//  - Un feed che risponde senza nessun evento non prova niente: non si
-//    conta (26/10, revisione). Tre giorni di feed vuoto cancellerebbero
-//    tutta la struttura.
+//  - "Era ancora attiva" dell'host (host_kept_active_at) vince: quella
+//    riga non viene piu' toccata.
 //
 // VINCOLO OBBLIGATORIO (Andrea 30/07): "feed risponde e l'evento non c'e'"
 // e' diverso da "feed non risponde". Solo il primo caso conta. Un poll
@@ -53,33 +46,14 @@ export type ReconcileTarget = {
   possibleCancellationAt: Date | null;
   checkinAt: Date;
   checkoutAt: Date;
-  /** L'host ha detto "era ancora attiva" (host_kept_active_at). */
-  hostKeptActive: boolean;
 };
 
-/**
- * Una fascia vista nel poll e la riga a cui l'upsert l'ha assegnata.
- * Si registra DOPO un upsert riuscito (R2): una fascia il cui upsert e'
- * fallito non prova che un'altra riga abbia preso il posto di questa.
- */
-export type SeenRange = { checkinAt: Date; checkoutAt: Date; bookingId: string };
-
-type Range = { checkinAt: Date; checkoutAt: Date };
+/** Una fascia vista nel poll: serve a capire se copre ancora una riga. */
+export type SeenRange = { checkinAt: Date; checkoutAt: Date };
 
 /** Sovrapposizione STRETTA: due soggiorni consecutivi si toccano, non si coprono. */
-function overlaps(a: Range, b: Range): boolean {
+function overlaps(a: SeenRange, b: SeenRange): boolean {
   return a.checkinAt < b.checkoutAt && b.checkinAt < a.checkoutAt;
-}
-
-/**
- * Inizio di oggi a Roma, nel formato in cui l'iCal salva checkin_at
- * (mezzanotte UTC della data). Su Fly il processo e' in UTC: con
- * setHours(0), fra le 23 e le 24 UTC un arrivo di ieri risultava ancora
- * di oggi — proprio l'ora in cui Booking riemette i residui.
- */
-export function romeStartOfDay(now: Date): Date {
-  const romeDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' }).format(now);
-  return new Date(`${romeDate}T00:00:00Z`);
 }
 
 export type MissingUpdatePlan = {
@@ -102,17 +76,9 @@ export function planMissingUpdates(
   const resetIds: string[] = [];
   const supersededIds: string[] = [];
   const updates: MissingUpdatePlan['updates'] = [];
-
-  // Nessun evento nel feed: non e' la prova che tutte le prenotazioni
-  // siano sparite, e' la prova che il feed e' vuoto (calendario
-  // scollegato, struttura disattivata). Come un poll fallito: non conta.
-  if (seenRefs.size === 0) return { resetIds, supersededIds, updates };
-
   for (const t of targets) {
     if (seenRefs.has(t.platformBookingRef)) {
-      if (t.feedMissingCount > 0 || t.possibleCancellationAt || t.hostKeptActive) {
-        resetIds.push(t.id);
-      }
+      if (t.feedMissingCount > 0 || t.possibleCancellationAt) resetIds.push(t.id);
       continue;
     }
 
@@ -126,10 +92,8 @@ export function planMissingUpdates(
     // quando la riga che copre era un'ALTRA riga del database (26/10:
     // 22-30 ott e 27-30 ott, la seconda ferma dal 21/09). Le date
     // coperte dicono che la prenotazione esiste, non che esiste QUESTA
-    // riga: quella vera e' l'altra — purche' la fascia sia andata
-    // davvero a un'ALTRA riga.
-    const coveredByAnother = seenRanges.some((r) => r.bookingId !== t.id && overlaps(r, t));
-    if (coveredByAnother && !t.hostKeptActive) {
+    // riga: quella vera e' l'altra.
+    if (seenRanges.some((r) => overlaps(r, t))) {
       supersededIds.push(t.id);
       continue;
     }
@@ -139,18 +103,10 @@ export function planMissingUpdates(
       id: t.id,
       nextCount,
       flagNow: nextCount >= MISSING_POLLS_THRESHOLD && !t.possibleCancellationAt,
-      cancelNow: nextCount >= CANCEL_AFTER_MISSING_POLLS && !t.hostKeptActive,
+      cancelNow: nextCount >= CANCEL_AFTER_MISSING_POLLS,
     });
   }
   return { resetIds, supersededIds, updates };
-}
-
-/** Righe cancellate da Premura il cui UID e' tornato nel feed. */
-export function planRevivals(
-  cancelledByPremura: ReadonlyArray<{ id: string; platformBookingRef: string }>,
-  seenRefs: ReadonlySet<string>,
-): string[] {
-  return cancelledByPremura.filter((c) => seenRefs.has(c.platformBookingRef)).map((c) => c.id);
 }
 
 export type ReconcileSummary = {
@@ -159,7 +115,6 @@ export type ReconcileSummary = {
   flagged: string[];
   cancelled: string[];
   superseded: string[];
-  revived: string[];
 };
 
 /**
@@ -176,15 +131,10 @@ export async function reconcileMissingEvents(
   now: Date = new Date(),
   seenRanges: readonly SeenRange[] = [],
 ): Promise<ReconcileSummary> {
-  const startOfToday = romeStartOfDay(now);
-  const sameFeed = and(
-    eq(bookings.propertyId, propertyId),
-    eq(bookings.dataSource, `${source}_ical_only`),
-    eq(bookings.isCalendarBlock, false),
-    gte(bookings.checkinAt, startOfToday),
-  );
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
 
-  const rows = await db
+  const targets = await db
     .select({
       id: bookings.id,
       platformBookingRef: bookings.platformBookingRef,
@@ -192,51 +142,26 @@ export async function reconcileMissingEvents(
       possibleCancellationAt: bookings.possibleCancellationAt,
       checkinAt: bookings.checkinAt,
       checkoutAt: bookings.checkoutAt,
-      hostKeptActiveAt: bookings.hostKeptActiveAt,
     })
     .from(bookings)
-    .where(and(sameFeed, ne(bookings.status, 'cancelled')));
-  const targets = rows.map(({ hostKeptActiveAt, ...t }) => ({
-    ...t,
-    hostKeptActive: hostKeptActiveAt !== null,
-  }));
+    .where(
+      and(
+        eq(bookings.propertyId, propertyId),
+        eq(bookings.dataSource, `${source}_ical_only`),
+        eq(bookings.isCalendarBlock, false),
+        ne(bookings.status, 'cancelled'),
+        isNull(bookings.hostKeptActiveAt),
+        gte(bookings.checkinAt, startOfToday),
+      ),
+    );
 
   const plan = planMissingUpdates(targets, seenRefs, seenRanges, startOfToday);
 
   if (plan.resetIds.length > 0) {
     await db
       .update(bookings)
-      .set({
-        feedMissingCount: 0,
-        possibleCancellationAt: null,
-        hostKeptActiveAt: null,
-        updatedAt: now,
-      })
+      .set({ feedMissingCount: 0, possibleCancellationAt: null, updatedAt: now })
       .where(inArray(bookings.id, plan.resetIds));
-  }
-
-  const cancelledByPremura = await db
-    .select({ id: bookings.id, platformBookingRef: bookings.platformBookingRef })
-    .from(bookings)
-    .where(
-      and(
-        sameFeed,
-        eq(bookings.status, 'cancelled'),
-        inArray(bookings.cancellationReason, [...CANCELLATION_REASONS]),
-      ),
-    );
-  const revived = planRevivals(cancelledByPremura, seenRefs);
-  if (revived.length > 0) {
-    await db
-      .update(bookings)
-      .set({
-        status: 'confirmed',
-        cancellationReason: null,
-        feedMissingCount: 0,
-        possibleCancellationAt: null,
-        updatedAt: now,
-      })
-      .where(inArray(bookings.id, revived));
   }
 
   if (plan.supersededIds.length > 0) {
@@ -273,6 +198,5 @@ export async function reconcileMissingEvents(
     flagged,
     cancelled,
     superseded: plan.supersededIds,
-    revived,
   };
 }
