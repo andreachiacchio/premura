@@ -1,5 +1,5 @@
 import { type Database, bookings, properties } from '@premura/db';
-import { and, asc, eq, gte } from 'drizzle-orm';
+import { and, asc, eq, gte, isNotNull } from 'drizzle-orm';
 
 // Prenotazioni tolte dal calendario (26/10): le cancella Premura, non
 // l'host.
@@ -13,6 +13,11 @@ import { and, asc, eq, gte } from 'drizzle-orm';
 //
 // Le righe solo in osservazione (assenti da meno di 3 giorni) NON
 // passano di qui: non sono una decisione, sono un controllo in corso.
+//
+// La finestra dei 30 giorni si conta da quando Premura ha cancellato
+// (auto_cancelled_at), non da quando il feed ha tolto la riga (Andrea
+// 26/10): una prenotazione sparita ad agosto e cancellata oggi e' una
+// decisione di oggi, e l'host deve vederla.
 // Le righe 'superseded' nemmeno: non le ha tolte Booking, le ha
 // rinominate — dirlo all'host sarebbe falso.
 
@@ -24,7 +29,7 @@ export type CalendarRemoval = {
   platform: string;
   checkinAt: Date;
   checkoutAt: Date;
-  /** Quando il feed l'ha tolta (possible_cancellation_at), non quando Premura ha deciso. */
+  /** Quando il feed l'ha tolta (possible_cancellation_at), mostrato per riga. */
   removedAt: Date;
 };
 
@@ -51,11 +56,12 @@ export async function listCalendarRemovals(
         eq(bookings.status, 'cancelled'),
         eq(bookings.cancellationReason, 'feed_missing_3d'),
         eq(bookings.isCalendarBlock, false),
-        gte(bookings.possibleCancellationAt, since),
+        gte(bookings.autoCancelledAt, since),
+        isNotNull(bookings.possibleCancellationAt),
       ),
     )
     .orderBy(asc(bookings.checkinAt));
-  // removedAt non-null garantito dal filtro gte (NULL non passa).
+  // removedAt non-null garantito dal filtro isNotNull.
   return rows.map((r) => ({ ...r, removedAt: r.removedAt as Date }));
 }
 
@@ -96,6 +102,7 @@ export async function restoreCalendarRemoval(
     .set({
       status: 'confirmed',
       cancellationReason: null,
+      autoCancelledAt: null,
       feedMissingCount: 0,
       possibleCancellationAt: null,
       hostKeptActiveAt: now,

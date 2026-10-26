@@ -145,6 +145,10 @@ export const bookings = pgTable(
     // Premura. Da quel momento la riconciliazione non la tocca piu':
     // senza questo segno, tre giorni dopo la ricancellerebbe da sola.
     hostKeptActiveAt: timestamp('host_kept_active_at', { withTimezone: true }),
+    // Migration 0039. Quando Premura l'ha cancellata (regola A o B). La
+    // home conta "negli ultimi 30 giorni" da qui, non da quando il feed
+    // l'ha tolta (possible_cancellation_at): decisione Andrea 26/10.
+    autoCancelledAt: timestamp('auto_cancelled_at', { withTimezone: true }),
 
     // Origine dei dati prenotazione: determina se il workflow agente AI parte
     // (Guest DNA, messaggi pre-arrivo, kit composer) o resta silente per

@@ -20,21 +20,21 @@ const removal = (id: string, platform: 'booking' | 'airbnb'): CalendarRemoval =>
 });
 
 describe('calendarRemovalsHeadline', () => {
-  it('conta le righe e nomina la piattaforma che le ha tolte', () => {
+  it('conta le righe e nomina il calendario da cui erano sparite', () => {
     expect(calendarRemovalsHeadline([removal('a', 'booking'), removal('b', 'booking')])).toBe(
-      'Booking ha tolto 2 prenotazioni dal calendario negli ultimi 30 giorni',
+      'Negli ultimi 30 giorni ho tolto 2 prenotazioni sparite dal calendario di Booking',
     );
   });
 
   it('al singolare con una riga sola', () => {
     expect(calendarRemovalsHeadline([removal('a', 'airbnb')])).toBe(
-      'Airbnb ha tolto 1 prenotazione dal calendario negli ultimi 30 giorni',
+      'Negli ultimi 30 giorni ho tolto 1 prenotazione sparita dal calendario di Airbnb',
     );
   });
 
-  it('mai "Booking" se una le ha tolte Airbnb', () => {
+  it('mai solo "Booking" se una era sparita da Airbnb', () => {
     expect(calendarRemovalsHeadline([removal('a', 'booking'), removal('b', 'airbnb')])).toBe(
-      'Booking e Airbnb hanno tolto 2 prenotazioni dal calendario negli ultimi 30 giorni',
+      'Negli ultimi 30 giorni ho tolto 2 prenotazioni sparite dal calendario di Booking e Airbnb',
     );
   });
 });

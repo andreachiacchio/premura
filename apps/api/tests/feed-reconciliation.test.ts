@@ -174,8 +174,10 @@ describe('B) UID sparito ma date coperte: superseded', () => {
 
 // ─────────────────────────────────────────────────────────────────────
 // Mai cancellare un soggiorno gia' iniziato: l'ospite e' in casa.
+// (Il flag delle fixture e' del 20/10: qui l'arrivo e' il 18, quindi la
+// riga e' sparita DOPO l'arrivo. Il caso opposto e' piu' sotto.)
 describe('check-in passato: mai cancellata', () => {
-  const IN_CASA: [string, string] = ['2026-10-22T00:00:00Z', '2026-10-30T00:00:00Z'];
+  const IN_CASA: [string, string] = ['2026-10-18T00:00:00Z', '2026-10-30T00:00:00Z'];
 
   it('assente oltre la soglia ma gia arrivato: nessuna cancellazione', () => {
     const plan = planMissingUpdates([target('in-casa', 287, true, IN_CASA)], ALTRO, [], TODAY);
@@ -202,6 +204,70 @@ describe('check-in passato: mai cancellata', () => {
       TODAY,
     );
     expect(plan.updates).toEqual([{ id: 'oggi', nextCount: 288, flagNow: false, cancelNow: true }]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// Decisione Andrea 26/10: se la riga era gia' sparita PRIMA dell'arrivo,
+// l'ospite in casa non c'e' mai entrato. Si continua a contare anche dopo
+// il check-in, fino a 288, finche' il soggiorno non e' finito. Prima una
+// disdetta a meno di ~2,5 giorni dall'arrivo restava confirmed per sempre.
+describe('sparita prima dell arrivo: si continua a contare dopo il check-in', () => {
+  // Flag del 20/10, arrivo il 22: sparita due giorni prima di arrivare.
+  const MAI_ARRIVATO: [string, string] = ['2026-10-22T00:00:00Z', '2026-10-30T00:00:00Z'];
+
+  it('arrivo passato, sparita prima: il contatore sale', () => {
+    const plan = planMissingUpdates(
+      [target('disdetta', 250, true, MAI_ARRIVATO)],
+      ALTRO,
+      [],
+      TODAY,
+    );
+    expect(plan.updates).toEqual([
+      { id: 'disdetta', nextCount: 251, flagNow: false, cancelNow: false },
+    ]);
+  });
+
+  it('arrivo passato, sparita prima, 288 poll: cancellata', () => {
+    const plan = planMissingUpdates(
+      [target('disdetta', 287, true, MAI_ARRIVATO)],
+      ALTRO,
+      [],
+      TODAY,
+    );
+    expect(plan.updates).toEqual([
+      { id: 'disdetta', nextCount: 288, flagNow: false, cancelNow: true },
+    ]);
+  });
+
+  it('arrivo passato, sparita prima ma coperta: niente superseded, solo il contatore', () => {
+    const plan = planMissingUpdates(
+      [target('disdetta', 10, true, MAI_ARRIVATO)],
+      ALTRO,
+      [range('2026-10-26T00:00:00Z', '2026-10-30T00:00:00Z')],
+      TODAY,
+    );
+    expect(plan.supersededIds).toEqual([]);
+    expect(plan.updates).toEqual([
+      { id: 'disdetta', nextCount: 11, flagNow: false, cancelNow: false },
+    ]);
+  });
+
+  it('mai in osservazione prima dell arrivo: resta fuori', () => {
+    const plan = planMissingUpdates([target('ospite', 300, false, MAI_ARRIVATO)], ALTRO, [], TODAY);
+    expect(plan.updates).toEqual([]);
+  });
+
+  it('"Era ancora attiva" vince anche qui: si conta ma non si cancella', () => {
+    const plan = planMissingUpdates(
+      [target('tenuta', 300, true, MAI_ARRIVATO, true)],
+      ALTRO,
+      [],
+      TODAY,
+    );
+    expect(plan.updates).toEqual([
+      { id: 'tenuta', nextCount: 301, flagNow: false, cancelNow: false },
+    ]);
   });
 });
 
