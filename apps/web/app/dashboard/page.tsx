@@ -98,7 +98,7 @@ export default async function DashboardPage() {
   // richiesta: la stessa che alimenta il badge in navigazione. Due
   // conteggi scritti separatamente divergono, prima o poi.
   const decisions = await timed('loadOpenDecisions', () => loadOpenDecisions());
-  const { replyDrafts, missingPhoneSoon, possibleCancellations, bookings } = decisions;
+  const { replyDrafts, missingPhoneSoon, calendarRemovals, bookings } = decisions;
 
   // HOTFIX: ogni query e' isolata. Una fail non rompe le altre.
   // Defaults garantiscono empty-state UI graziosa.
@@ -167,7 +167,7 @@ export default async function DashboardPage() {
     missingPhoneSoon,
     incompleteCount: decisions.incompleteCount,
     pendingKitsCount: decisions.pendingKitsCount,
-    possibleCancellations,
+    calendarRemovals,
   };
 
   // "Serve te" sulla card, badge in navigazione e voci del blocco: un

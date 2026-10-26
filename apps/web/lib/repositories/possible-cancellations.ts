@@ -1,106 +1,106 @@
 import { type Database, bookings, properties } from '@premura/db';
-import { and, asc, eq, isNotNull, ne } from 'drizzle-orm';
+import { and, asc, eq, gte } from 'drizzle-orm';
 
-// Possibili cancellazioni (30/07): prenotazioni il cui evento iCal e'
-// assente da 2 poll RIUSCITI consecutivi (possible_cancellation_at
-// valorizzato dal worker). L'host decide: cancellata davvero (status
-// -> cancelled) o ancora attiva (il sospetto si azzera; se sparisce
-// di nuovo per 2 poll, risale).
+// Prenotazioni tolte dal calendario (26/10): le cancella Premura, non
+// l'host.
+//
+// Fino al 26/10 qui c'erano le "possibili cancellazioni", una card per
+// riga con due bottoni. Villa Cristina ne ha accumulate 7, ferme da 5 a
+// 67 giorni, mai risolte: erano cancellazioni vere. Adesso il worker
+// (apps/api/src/jobs/feed-reconciliation.ts) cancella da solo dopo 3
+// giorni di assenza dal feed, e la home mostra solo quanto ha tolto,
+// con una via per dire "era ancora attiva".
+//
+// Le righe solo in osservazione (assenti da meno di 3 giorni) NON
+// passano di qui: non sono una decisione, sono un controllo in corso.
+// Le righe 'superseded' nemmeno: non le ha tolte Booking, le ha
+// rinominate — dirlo all'host sarebbe falso.
 
-export type PossibleCancellation = {
+export const CALENDAR_REMOVALS_WINDOW_DAYS = 30;
+
+export type CalendarRemoval = {
   bookingId: string;
-  guestFullName: string;
-  guestFirstName: string | null;
   propertyName: string;
-  propertyColor: string | null;
   platform: string;
   checkinAt: Date;
   checkoutAt: Date;
-  flaggedAt: Date;
+  /** Quando il feed l'ha tolta (possible_cancellation_at), non quando Premura ha deciso. */
+  removedAt: Date;
 };
 
-export async function listPossibleCancellations(
+export async function listCalendarRemovals(
   db: Database,
   hostId: string,
-): Promise<PossibleCancellation[]> {
+  now: Date = new Date(),
+): Promise<CalendarRemoval[]> {
+  const since = new Date(now.getTime() - CALENDAR_REMOVALS_WINDOW_DAYS * 86_400_000);
   const rows = await db
     .select({
       bookingId: bookings.id,
-      guestFullName: bookings.guestFullName,
-      guestFirstName: bookings.guestFirstName,
       propertyName: properties.name,
-      propertyColor: properties.color,
       platform: bookings.platform,
       checkinAt: bookings.checkinAt,
       checkoutAt: bookings.checkoutAt,
-      flaggedAt: bookings.possibleCancellationAt,
+      removedAt: bookings.possibleCancellationAt,
     })
     .from(bookings)
     .innerJoin(properties, eq(properties.id, bookings.propertyId))
     .where(
       and(
         eq(properties.hostId, hostId),
-        isNotNull(bookings.possibleCancellationAt),
-        ne(bookings.status, 'cancelled'),
+        eq(bookings.status, 'cancelled'),
+        eq(bookings.cancellationReason, 'feed_missing_3d'),
         eq(bookings.isCalendarBlock, false),
+        gte(bookings.possibleCancellationAt, since),
       ),
     )
     .orderBy(asc(bookings.checkinAt));
-  // flaggedAt non-null garantito dal filtro isNotNull.
-  return rows.map((r) => ({ ...r, flaggedAt: r.flaggedAt as Date }));
+  // removedAt non-null garantito dal filtro gte (NULL non passa).
+  return rows.map((r) => ({ ...r, removedAt: r.removedAt as Date }));
 }
 
-export type ResolveCancellationResult =
+export type RestoreRemovalResult =
   | { ok: true }
-  | { ok: false; reason: 'not_found' | 'wrong_host' };
+  | { ok: false; reason: 'not_found' | 'wrong_host' | 'not_removed_by_premura' };
 
-async function assertOwnership(
+/**
+ * L'host dice "era ancora attiva": la prenotazione torna confirmed e
+ * Premura non la tocca piu' (host_kept_active_at). Solo su righe che ha
+ * cancellato Premura per assenza dal feed: una cancellazione dell'host o
+ * di un'email non si annulla da qui.
+ */
+export async function restoreCalendarRemoval(
   db: Database,
   hostId: string,
   bookingId: string,
-): Promise<ResolveCancellationResult | null> {
+  now: Date = new Date(),
+): Promise<RestoreRemovalResult> {
   const [row] = await db
-    .select({ ownerHostId: properties.hostId })
+    .select({
+      ownerHostId: properties.hostId,
+      status: bookings.status,
+      cancellationReason: bookings.cancellationReason,
+    })
     .from(bookings)
     .innerJoin(properties, eq(properties.id, bookings.propertyId))
     .where(eq(bookings.id, bookingId))
     .limit(1);
   if (!row) return { ok: false, reason: 'not_found' };
   if (row.ownerHostId !== hostId) return { ok: false, reason: 'wrong_host' };
-  return null;
-}
+  if (row.status !== 'cancelled' || row.cancellationReason !== 'feed_missing_3d') {
+    return { ok: false, reason: 'not_removed_by_premura' };
+  }
 
-/** L'host conferma: la prenotazione e' cancellata davvero. */
-export async function confirmCancellation(
-  db: Database,
-  hostId: string,
-  bookingId: string,
-): Promise<ResolveCancellationResult> {
-  const denied = await assertOwnership(db, hostId, bookingId);
-  if (denied) return denied;
   await db
     .update(bookings)
     .set({
-      status: 'cancelled',
-      possibleCancellationAt: null,
+      status: 'confirmed',
+      cancellationReason: null,
       feedMissingCount: 0,
-      updatedAt: new Date(),
+      possibleCancellationAt: null,
+      hostKeptActiveAt: now,
+      updatedAt: now,
     })
-    .where(eq(bookings.id, bookingId));
-  return { ok: true };
-}
-
-/** L'host smentisce: ancora attiva. Contatore e sospetto si azzerano. */
-export async function dismissCancellation(
-  db: Database,
-  hostId: string,
-  bookingId: string,
-): Promise<ResolveCancellationResult> {
-  const denied = await assertOwnership(db, hostId, bookingId);
-  if (denied) return denied;
-  await db
-    .update(bookings)
-    .set({ possibleCancellationAt: null, feedMissingCount: 0, updatedAt: new Date() })
     .where(eq(bookings.id, bookingId));
   return { ok: true };
 }

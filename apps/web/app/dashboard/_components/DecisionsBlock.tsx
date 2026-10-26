@@ -1,13 +1,16 @@
-import { dayPhrase, formatDayMonth } from '@/lib/format-date';
+import { formatDayMonth } from '@/lib/format-date';
 import type { GuestMissingPhoneSoon } from '@/lib/repositories/home-summary';
-import type { PossibleCancellation } from '@/lib/repositories/possible-cancellations';
 import { countOpenDecisions } from '@/lib/repositories/open-decisions';
+import {
+  CALENDAR_REMOVALS_WINDOW_DAYS,
+  type CalendarRemoval,
+} from '@/lib/repositories/possible-cancellations';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import { CalendarRemovals } from './CalendarRemovals';
 import { CopyInboxPhrase } from './CopyInboxPhrase';
 import { DecisionCard } from './DecisionCard';
 import { InlinePhoneFix } from './InlinePhoneFix';
-import { PossibleCancellationActions } from './PossibleCancellationActions';
 
 const ARRIVO_FMT = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric' });
 
@@ -23,17 +26,30 @@ export type DecisionsData = {
   missingPhoneSoon: GuestMissingPhoneSoon[];
   incompleteCount: number;
   pendingKitsCount: number;
-  possibleCancellations: PossibleCancellation[];
+  /** Fuori dal conteggio: le ha gia' decise Premura (26/10). */
+  calendarRemovals: CalendarRemoval[];
 };
 
 export function decisionsCount(d: DecisionsData): number {
   return countOpenDecisions({
     replyDrafts: d.draftItems,
     missingPhoneSoon: d.missingPhoneSoon,
-    possibleCancellations: d.possibleCancellations,
     incompleteCount: d.incompleteCount,
     pendingKitsCount: d.pendingKitsCount,
   });
+}
+
+/**
+ * La frase della riga chiusa. Numero e piattaforma vengono dalle stesse
+ * righe che la riga apre: mai "Booking" se le ha tolte Airbnb.
+ * Le righe arrivano solo da feed iCal, quindi la piattaforma e' una
+ * delle due.
+ */
+export function calendarRemovalsHeadline(items: CalendarRemoval[]): string {
+  const names = [...new Set(items.map((i) => (i.platform === 'airbnb' ? 'Airbnb' : 'Booking')))];
+  const subject = names.length === 1 ? `${names[0]} ha tolto` : 'Booking e Airbnb hanno tolto';
+  const n = items.length;
+  return `${subject} ${n} ${n === 1 ? 'prenotazione' : 'prenotazioni'} dal calendario negli ultimi ${CALENDAR_REMOVALS_WINDOW_DAYS} giorni`;
 }
 
 function arrivalPhrase(checkinAt: Date, now: Date): string {
@@ -57,11 +73,18 @@ export function DecisionsBlock({
   data: DecisionsData;
   now?: Date;
 }): React.JSX.Element | null {
-  if (decisionsCount(data) === 0) return null;
+  const count = decisionsCount(data);
+  const removals = data.calendarRemovals;
+  if (count === 0 && removals.length === 0) return null;
 
+  // Il titolo c'e' solo se qualcosa aspetta davvero l'host: le
+  // prenotazioni tolte da sole non sono una decisione, e "Serve una tua
+  // decisione" sopra una riga che non chiede niente sarebbe falso.
   return (
-    <section aria-label="Serve una tua decisione">
-      <h2 className="mb-3 font-serif text-h4 leading-tight text-ink">Serve una tua decisione</h2>
+    <section aria-label={count > 0 ? 'Serve una tua decisione' : 'Tolte dal calendario'}>
+      {count > 0 ? (
+        <h2 className="mb-3 font-serif text-h4 leading-tight text-ink">Serve una tua decisione</h2>
+      ) : null}
       <div className="flex flex-col gap-3">
         {data.draftItems.map((d) => (
           <DecisionCard
@@ -70,28 +93,6 @@ export function DecisionsBlock({
             title={`Risposta per ${d.guestLabel}`}
             body={d.waitingLabel}
             details={d.card}
-          />
-        ))}
-
-        {data.possibleCancellations.map((c) => (
-          <DecisionCard
-            key={c.bookingId}
-            kind="cancellation"
-            title={`${c.guestFirstName ?? c.guestFullName} · ${c.propertyName}`}
-            body={`Il calendario ${c.platform === 'booking' ? 'Booking' : 'Airbnb'} non la mostra più da 2 controlli.`}
-            details={
-              <p>
-                {formatDayMonth(c.checkinAt)} – {formatDayMonth(c.checkoutAt)}, arrivo{' '}
-                {dayPhrase(c.checkinAt, now)}. Verifica sull'extranet prima di confermare: se la
-                confermi cancellata, Premura smette di seguirla.
-              </p>
-            }
-            actions={
-              <PossibleCancellationActions
-                bookingId={c.bookingId}
-                guestLabel={c.guestFirstName ?? c.guestFullName}
-              />
-            }
           />
         ))}
 
@@ -142,6 +143,16 @@ export function DecisionsBlock({
                 <ChevronRight aria-hidden className="size-4" />
               </Link>
             }
+          />
+        ) : null}
+
+        {removals.length > 0 ? (
+          <CalendarRemovals
+            headline={calendarRemovalsHeadline(removals)}
+            items={removals.map((r) => ({
+              bookingId: r.bookingId,
+              label: `${formatDayMonth(r.checkinAt, now)} – ${formatDayMonth(r.checkoutAt, now)} · ${r.propertyName}`,
+            }))}
           />
         ) : null}
       </div>

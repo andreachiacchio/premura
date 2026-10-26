@@ -1,103 +1,188 @@
 import { describe, expect, it } from 'vitest';
-import { planMissingUpdates } from '../src/jobs/feed-reconciliation';
+import { CANCEL_AFTER_MISSING_POLLS, planMissingUpdates } from '../src/jobs/feed-reconciliation';
 
-// Cancellazioni 2-poll (30/07): la decisione pura. Il vincolo "un poll
+// Riconciliazione feed iCal: la decisione pura. Il vincolo "un poll
 // fallito non conta" sta nel CHIAMANTE (il worker chiama solo dopo un
-// parse riuscito); qui si verifica la meccanica del contatore.
+// parse riuscito); qui si verifica la meccanica del contatore e delle
+// cancellazioni che Premura decide da sola (26/10).
+
+const TODAY = new Date('2026-10-26T00:00:00Z');
 
 const target = (id: string, count: number, flagged = false, dates?: [string, string]) => ({
   id,
   platformBookingRef: `uid-${id}`,
   feedMissingCount: count,
-  possibleCancellationAt: flagged ? new Date('2026-07-30T10:00:00Z') : null,
+  possibleCancellationAt: flagged ? new Date('2026-10-20T10:00:00Z') : null,
   checkinAt: new Date(dates?.[0] ?? '2026-12-01T00:00:00Z'),
   checkoutAt: new Date(dates?.[1] ?? '2026-12-05T00:00:00Z'),
 });
 
-describe('planMissingUpdates', () => {
+const range = (from: string, to: string) => ({
+  checkinAt: new Date(from),
+  checkoutAt: new Date(to),
+});
+
+describe('planMissingUpdates — osservazione', () => {
   it('primo poll senza evento: contatore a 1, nessun flag', () => {
-    const plan = planMissingUpdates([target('a', 0)], new Set());
-    expect(plan.updates).toEqual([{ id: 'a', nextCount: 1, flagNow: false }]);
+    const plan = planMissingUpdates([target('a', 0)], new Set(), [], TODAY);
+    expect(plan.updates).toEqual([{ id: 'a', nextCount: 1, flagNow: false, cancelNow: false }]);
     expect(plan.resetIds).toEqual([]);
+    expect(plan.supersededIds).toEqual([]);
   });
 
-  it('secondo poll consecutivo senza evento: scatta "possibile cancellazione"', () => {
-    const plan = planMissingUpdates([target('a', 1)], new Set());
-    expect(plan.updates).toEqual([{ id: 'a', nextCount: 2, flagNow: true }]);
+  it('secondo poll consecutivo senza evento: in osservazione, non cancellata', () => {
+    const plan = planMissingUpdates([target('a', 1)], new Set(), [], TODAY);
+    expect(plan.updates).toEqual([{ id: 'a', nextCount: 2, flagNow: true, cancelNow: false }]);
   });
 
-  it('evento riapparso: contatore e sospetto si azzerano', () => {
-    const plan = planMissingUpdates([target('a', 1), target('b', 2, true)], new Set(['uid-a', 'uid-b']));
+  it('evento riapparso: contatore e osservazione si azzerano', () => {
+    const plan = planMissingUpdates(
+      [target('a', 1), target('b', 2, true)],
+      new Set(['uid-a', 'uid-b']),
+      [],
+      TODAY,
+    );
     expect(plan.resetIds).toEqual(['a', 'b']);
     expect(plan.updates).toEqual([]);
   });
 
   it('evento presente e mai mancato: nessun update inutile', () => {
-    const plan = planMissingUpdates([target('a', 0)], new Set(['uid-a']));
+    const plan = planMissingUpdates([target('a', 0)], new Set(['uid-a']), [], TODAY);
     expect(plan.resetIds).toEqual([]);
     expect(plan.updates).toEqual([]);
   });
 
-  it('gia flaggata e ancora assente: il contatore sale ma il flag non si sovrascrive', () => {
-    const plan = planMissingUpdates([target('a', 2, true)], new Set());
-    expect(plan.updates).toEqual([{ id: 'a', nextCount: 3, flagNow: false }]);
+  it('gia in osservazione e ancora assente: il contatore sale ma il flag non si sovrascrive', () => {
+    const plan = planMissingUpdates([target('a', 2, true)], new Set(), [], TODAY);
+    expect(plan.updates).toEqual([{ id: 'a', nextCount: 3, flagNow: false, cancelNow: false }]);
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────
-// 06/08 — il caso Julian Falch Milde, Villa Cristina.
-//
-// UNA prenotazione (1-8 agosto, codice 6382670828). Booking accorcia la
-// fascia al periodo residuo ogni notte e le assegna un UID NUOVO:
-//   5-8 ago · UID 6b27abfc…   (creata 05/08 09:15)
-//   6-8 ago · UID 8cbf50c9…   (creata 05/08 22:00)
-//   7-8 ago · UID 03dacfe9…   (creata 06/08 22:00)
-//
-// Il vecchio UID sparisce DAVVERO dal feed. Guardare solo gli UID
-// portava a concludere "possibile cancellazione" per un ospite che era
-// in casa — una prova che non riguardava la prenotazione, ma il modo in
-// cui il feed la nomina.
-describe('accorciamento progressivo di Booking', () => {
-  const AGO_5_8 = ['2026-08-05T00:00:00Z', '2026-08-08T00:00:00Z'] as [string, string];
+// A) Auto-risoluzione (26/10). Villa Cristina: 7 prenotazioni assenti
+// dal feed da 5 a 67 giorni, mai risolte dall'host. Erano cancellazioni
+// vere. Dopo 3 giorni di poll riusciti (288 a 15 minuti) decide Premura.
+describe('A) assente dal feed per 3 giorni: cancella Premura', () => {
+  it('la soglia e 3 giorni di poll a 15 minuti', () => {
+    expect(CANCEL_AFTER_MISSING_POLLS).toBe(288);
+  });
 
-  it('UID sparito ma date ancora coperte: NON e una cancellazione', () => {
-    const plan = planMissingUpdates(
-      [target('julian', 1, false, AGO_5_8)],
-      new Set(['uid-nuovo-03dacfe9']),
-      // La fascia riemessa: stesso soggiorno, periodo residuo.
-      [{ checkinAt: new Date('2026-08-07T00:00:00Z'), checkoutAt: new Date('2026-08-08T00:00:00Z') }],
-    );
+  it('assente 287 poll: ancora confirmed, solo in osservazione', () => {
+    const plan = planMissingUpdates([target('a', 286, true)], new Set(), [], TODAY);
+    expect(plan.updates).toEqual([{ id: 'a', nextCount: 287, flagNow: false, cancelNow: false }]);
+  });
+
+  it('assente 288 poll: cancellata', () => {
+    const plan = planMissingUpdates([target('a', 287, true)], new Set(), [], TODAY);
+    expect(plan.updates).toEqual([{ id: 'a', nextCount: 288, flagNow: false, cancelNow: true }]);
+  });
+
+  it('contatore gia oltre la soglia (le 7 del 26/10): cancellata al primo poll', () => {
+    const plan = planMissingUpdates([target('a', 6429, true)], new Set(), [], TODAY);
+    expect(plan.updates).toEqual([{ id: 'a', nextCount: 6430, flagNow: false, cancelNow: true }]);
+  });
+
+  it('riapparsa a 287: si azzera e non viene cancellata', () => {
+    const plan = planMissingUpdates([target('a', 287, true)], new Set(['uid-a']), [], TODAY);
+    expect(plan.resetIds).toEqual(['a']);
     expect(plan.updates).toEqual([]);
-    expect(plan.resetIds).toEqual(['julian']);
   });
+});
 
-  it('gia marcata per sbaglio: la copertura la riabilita', () => {
-    const plan = planMissingUpdates(
-      [target('julian', 8, true, AGO_5_8)],
-      new Set(),
-      [{ checkinAt: new Date('2026-08-06T00:00:00Z'), checkoutAt: new Date('2026-08-08T00:00:00Z') }],
-    );
-    expect(plan.resetIds).toEqual(['julian']);
-  });
+// ─────────────────────────────────────────────────────────────────────
+// B) Sovrapposizioni sulla stessa unita' (26/10).
+//
+// Booking accorcia la fascia al periodo residuo ogni notte e le assegna
+// un UID nuovo (06/08, caso Julian). L'upsert aggiorna la riga che si
+// sovrappone, ma se nel database ce n'erano GIA' due sovrapposte ne
+// aggiorna una sola: l'altra perde l'UID e resta coperta dalla fascia
+// nuova. Prima era "ancora coperta -> confirmed per sempre". Caso reale
+// Villa Cristina: 22-30 ott (viva) e 27-30 ott (ferma dal 21/09, il
+// "prossimo check-in" fantasma del 27).
+describe('B) UID sparito ma date coperte: superseded', () => {
+  const OTT_27_30: [string, string] = ['2026-10-27T00:00:00Z', '2026-10-30T00:00:00Z'];
+  // La fascia residua della 22-30, riemessa stanotte con un UID nuovo.
+  const RESIDUA_26_30 = range('2026-10-26T00:00:00Z', '2026-10-30T00:00:00Z');
 
-  it('una fascia che si TOCCA soltanto non copre: resta una cancellazione', () => {
-    // Checkout il 8, nuovo check-in il 8: sono due soggiorni diversi,
-    // non lo stesso accorciato. Sovrapposizione stretta, non inclusiva.
+  it('coperta da un altro evento dello stesso feed: superseded subito, senza contatore', () => {
     const plan = planMissingUpdates(
-      [target('partito', 1, false, AGO_5_8)],
-      new Set(),
-      [{ checkinAt: new Date('2026-08-08T00:00:00Z'), checkoutAt: new Date('2026-08-12T00:00:00Z') }],
+      [target('fantasma', 0, false, OTT_27_30)],
+      new Set(['uid-residua']),
+      [RESIDUA_26_30],
+      TODAY,
     );
-    expect(plan.updates).toEqual([{ id: 'partito', nextCount: 2, flagNow: true }]);
+    expect(plan.supersededIds).toEqual(['fantasma']);
+    expect(plan.updates).toEqual([]);
     expect(plan.resetIds).toEqual([]);
   });
 
-  it('sparita davvero, nessuna fascia che la copre: cancellazione vera', () => {
+  it('gia in osservazione e coperta: superseded, non resta confirmed', () => {
     const plan = planMissingUpdates(
-      [target('disdetta', 1, false, AGO_5_8)],
+      [target('fantasma', 8, true, OTT_27_30)],
       new Set(),
-      [{ checkinAt: new Date('2026-09-01T00:00:00Z'), checkoutAt: new Date('2026-09-04T00:00:00Z') }],
+      [RESIDUA_26_30],
+      TODAY,
     );
-    expect(plan.updates).toEqual([{ id: 'disdetta', nextCount: 2, flagNow: true }]);
+    expect(plan.supersededIds).toEqual(['fantasma']);
+    expect(plan.resetIds).toEqual([]);
+  });
+
+  it('una fascia che si TOCCA soltanto non copre: si conta come assente', () => {
+    // Checkout il 30, nuovo check-in il 30: due soggiorni diversi.
+    // Sovrapposizione stretta, non inclusiva.
+    const plan = planMissingUpdates(
+      [target('partito', 1, false, OTT_27_30)],
+      new Set(),
+      [range('2026-10-30T00:00:00Z', '2026-11-02T00:00:00Z')],
+      TODAY,
+    );
+    expect(plan.supersededIds).toEqual([]);
+    expect(plan.updates).toEqual([
+      { id: 'partito', nextCount: 2, flagNow: true, cancelNow: false },
+    ]);
+  });
+
+  it('UID ancora nel feed: vince l UID, la sovrapposizione non conta', () => {
+    const plan = planMissingUpdates(
+      [target('viva', 0, false, OTT_27_30)],
+      new Set(['uid-viva']),
+      [RESIDUA_26_30],
+      TODAY,
+    );
+    expect(plan.supersededIds).toEqual([]);
+    expect(plan.updates).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// Mai cancellare un soggiorno gia' iniziato: l'ospite e' in casa.
+describe('check-in passato: mai cancellata', () => {
+  const IN_CASA: [string, string] = ['2026-10-22T00:00:00Z', '2026-10-30T00:00:00Z'];
+
+  it('assente oltre la soglia ma gia arrivato: nessuna cancellazione', () => {
+    const plan = planMissingUpdates([target('in-casa', 287, true, IN_CASA)], new Set(), [], TODAY);
+    expect(plan.updates).toEqual([]);
+    expect(plan.supersededIds).toEqual([]);
+  });
+
+  it('coperta da un altro evento ma gia arrivato: nessun superseded', () => {
+    const plan = planMissingUpdates(
+      [target('in-casa', 0, false, IN_CASA)],
+      new Set(),
+      [range('2026-10-26T00:00:00Z', '2026-10-30T00:00:00Z')],
+      TODAY,
+    );
+    expect(plan.supersededIds).toEqual([]);
+    expect(plan.updates).toEqual([]);
+  });
+
+  it('check-in oggi conta come futuro: la regola vale', () => {
+    const plan = planMissingUpdates(
+      [target('oggi', 287, true, ['2026-10-26T00:00:00Z', '2026-10-28T00:00:00Z'])],
+      new Set(),
+      [],
+      TODAY,
+    );
+    expect(plan.updates).toEqual([{ id: 'oggi', nextCount: 288, flagNow: false, cancelNow: true }]);
   });
 });

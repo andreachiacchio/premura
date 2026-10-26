@@ -3,10 +3,7 @@
 import { completeBookingManual, skipBookingCompletion, triggerIcalPollNow } from '@/lib/api';
 import { getCurrentAccessToken, getCurrentHostId } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import {
-  confirmCancellation,
-  dismissCancellation,
-} from '@/lib/repositories/possible-cancellations';
+import { restoreCalendarRemoval } from '@/lib/repositories/possible-cancellations';
 import { getOrCreateDeflectionDraft, markDeflectionSent } from '@/lib/deflection-draft';
 import { composeGuestInvite } from '@/lib/guest-invite';
 import { normalizeEuroAmount } from '@/lib/euro-amount';
@@ -335,28 +332,17 @@ export async function buildGuestInviteAction(bookingId: string): Promise<GuestIn
   }
 }
 
-// ─── Possibili cancellazioni (30/07) ────────────────────────────────
+// ─── Prenotazioni tolte dal calendario (26/10) ──────────────────────
+//
+// Le cancella Premura dopo 3 giorni di assenza dal feed: l'host non
+// conferma piu' niente. Resta solo la smentita, "Era ancora attiva".
 
-export async function confirmCancellationAction(
-  bookingId: string,
-): Promise<{ ok: boolean }> {
+export async function restoreCalendarRemovalAction(bookingId: string): Promise<{ ok: boolean }> {
   const hostId = await getCurrentHostId();
   const parsed = idSchema.safeParse(bookingId);
   if (!parsed.success) return { ok: false };
   const { db } = await getDb();
-  const result = await confirmCancellation(db, hostId, parsed.data);
-  revalidatePath('/dashboard');
-  return { ok: result.ok };
-}
-
-export async function dismissCancellationAction(
-  bookingId: string,
-): Promise<{ ok: boolean }> {
-  const hostId = await getCurrentHostId();
-  const parsed = idSchema.safeParse(bookingId);
-  if (!parsed.success) return { ok: false };
-  const { db } = await getDb();
-  const result = await dismissCancellation(db, hostId, parsed.data);
+  const result = await restoreCalendarRemoval(db, hostId, parsed.data);
   revalidatePath('/dashboard');
   return { ok: result.ok };
 }

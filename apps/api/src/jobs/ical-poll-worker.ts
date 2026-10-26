@@ -184,7 +184,21 @@ export const icalPollWorker = new Worker<IcalPollJobData>(
           for (const flaggedId of cancellations.flagged) {
             logger.warn(
               { propertyId, source, bookingId: flaggedId },
-              'possibile cancellazione: evento assente da 2 poll riusciti consecutivi',
+              'in osservazione: evento assente da 2 poll riusciti consecutivi',
+            );
+          }
+          // Premura cancella da sola (26/10): ogni cancellazione lascia
+          // la sua riga di log col motivo — mai una decisione muta.
+          for (const cancelledId of cancellations.cancelled) {
+            logger.warn(
+              { propertyId, source, bookingId: cancelledId, reason: 'feed_missing_3d' },
+              'prenotazione cancellata da Premura: assente dal feed da 3 giorni di poll riusciti',
+            );
+          }
+          for (const supersededId of cancellations.superseded) {
+            logger.warn(
+              { propertyId, source, bookingId: supersededId, reason: 'superseded' },
+              'prenotazione cancellata da Premura: UID sparito, date coperte da un altro evento dello stesso feed',
             );
           }
         } catch (reconcileErr) {
