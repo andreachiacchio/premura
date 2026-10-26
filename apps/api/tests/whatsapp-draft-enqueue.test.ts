@@ -218,7 +218,7 @@ describe('webhook POST -> draft-generation enqueue connector', () => {
     await app.close();
   });
 
-  it('enqueue fallito -> webhook risponde comunque 200 (failure isolation)', async () => {
+  it('enqueue fallito una volta -> riprova subito, webhook 200 (26/10)', async () => {
     persistMock.mockResolvedValue({
       messageId: 'msg-uuid-1',
       conversationId: 'conv-1',
@@ -239,11 +239,37 @@ describe('webhook POST -> draft-generation enqueue connector', () => {
       payload,
     });
 
-    // Webhook risponde 200 perche' il messaggio e' stato persistito.
-    // L'enqueue failure e' loggata ma non rompe il batch — rimedia
-    // un reprocess manuale, non vogliamo Meta retry sul batch.
+    // Webhook risponde 200 perche' il messaggio e' stato persistito, e
+    // dal 26/10 un enqueue fallito si riprova una volta subito.
     expect(res.statusCode).toBe(200);
-    expect(enqueueMock).toHaveBeenCalledOnce();
+    expect(enqueueMock).toHaveBeenCalledTimes(2);
+    await app.close();
+  });
+
+  it('enqueue fallito due volte -> 200 comunque, niente eccezione (R2: segnato sul messaggio)', async () => {
+    persistMock.mockResolvedValue({
+      messageId: 'msg-uuid-1',
+      conversationId: 'conv-1',
+      bookingId: 'b1',
+      status: 'inserted',
+    });
+    enqueueMock.mockRejectedValueOnce(new Error('Redis down'));
+    enqueueMock.mockRejectedValueOnce(new Error('Redis down'));
+
+    const app = await buildApp();
+    const payload = buildPayload([{ id: 'wamid.X', from: '393331234567', body: 'test' }]);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/webhooks/whatsapp',
+      headers: {
+        'content-type': 'application/json',
+        'x-hub-signature-256': signBody(payload),
+      },
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(enqueueMock).toHaveBeenCalledTimes(2);
     await app.close();
   });
 });

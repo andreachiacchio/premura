@@ -35,7 +35,7 @@ function makeMockDb(messageRow: Record<string, unknown> | null): Database {
 function makeJob(messageId: string): Job<{ messageId: string }> {
   return {
     data: { messageId },
-    id: `draft:${messageId}`,
+    id: `draft-${messageId}`,
     name: 'generate',
   } as unknown as Job<{ messageId: string }>;
 }

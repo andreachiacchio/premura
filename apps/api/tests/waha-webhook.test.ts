@@ -238,6 +238,39 @@ describe('POST /webhooks/waha', () => {
     expect(logs.some((l) => l.event === 'waha.parse.invalid')).toBe(false);
   });
 
+  it('26/10: enqueue della bozza fallito due volte -> 200, lo stato finisce sul messaggio', async () => {
+    resolveLidMock.mockResolvedValue('393383963307');
+    persistMock.mockResolvedValue({
+      messageId: '9bf305fe-eb1d-4f0a-839e-5e8c66c83225',
+      conversationId: 'c-1',
+      bookingId: 'b-1',
+      status: 'inserted',
+    });
+    enqueueMock.mockRejectedValue(new Error('Custom Id cannot contain :'));
+    const sets: unknown[] = [];
+    const db = {
+      update: () => ({
+        set: (v: unknown) => {
+          sets.push(v);
+          return { where: async () => undefined };
+        },
+      }),
+    } as unknown as Database;
+    const logs: LogLine[] = [];
+    const app = Fastify({
+      logger: { level: 'debug', stream: { write: (l: string) => logs.push(JSON.parse(l)) } },
+    });
+    await app.register(wahaWebhookRoutes, { db });
+
+    const res = await post(app, REAL_ENVELOPE);
+
+    expect(res.statusCode).toBe(200);
+    expect(enqueueMock).toHaveBeenCalledTimes(2);
+    expect(sets).toHaveLength(1);
+    const err = logs.find((l) => l.event === 'waha.draft.enqueue_error');
+    expect(err?.marked).toBe(true);
+  });
+
   it('numero gia in chiaro (@c.us): nessuna chiamata per il LID', async () => {
     const { app } = await buildWahaApp();
     await post(app, {

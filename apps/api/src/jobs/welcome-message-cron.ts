@@ -18,7 +18,7 @@ import { runEarlyStaleCheck, runEscalationCheck } from './welcome-stale-alerts';
 //    se kit non set_up.
 //
 // Idempotenza:
-//  - jobId welcome:send:{kitId} dedup BullMQ (riusa ID se gia' enqueued).
+//  - jobId welcome-send-{kitId} dedup BullMQ (riusa ID se gia' enqueued).
 //  - handler ricontrolla welcomeMessageSentAt prima di inviare.
 //  - Edge alerts: fire one-shot al tick specifico, prossimo utile = domani.
 

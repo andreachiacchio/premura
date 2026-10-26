@@ -13,7 +13,7 @@ import { getRedisConnection } from './redis-connection';
 // shared @premura/agents (triggerDraftGeneration).
 //
 // Idempotenza:
-//   - JobId = `draft:${messageId}` (BullMQ scarta enqueue duplicati)
+//   - JobId = `draft-${messageId}` (BullMQ scarta enqueue duplicati)
 //   - Pipeline check pending_drafts.replyToMessageId pre-call LLM
 // Doppia barriera per evitare doppi draft / doppia spesa Anthropic.
 //

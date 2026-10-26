@@ -1,0 +1,59 @@
+# Rimette in coda la bozza per un messaggio gia' salvato (26/10).
+#
+# Nasce dal primo messaggio vero passato da Premura: salvato e attribuito,
+# ma l'enqueue della bozza e' fallito ("Custom Id cannot contain :").
+# Lo script gira sul worker (dove vivono Redis e la coda), accoda e poi
+# ASPETTA fino a 90 secondi che la bozza compaia in pending_drafts: il
+# verdetto in coda al log e' l'esito letto, non quello sperato (R2).
+#
+# Solo workflow_dispatch, di proposito: un file di richiesta su main
+# partirebbe insieme al deploy, cioe' sul worker vecchio.
+#
+# L'id finisce in un comando remoto: si accetta SOLO un uuid, e passa da
+# una variabile d'ambiente, mai interpolato nello script.
+
+name: Rimetti in coda una bozza
+
+on:
+  workflow_dispatch:
+    inputs:
+      message_id:
+        description: 'id del messaggio (uuid)'
+        required: true
+        type: string
+
+concurrency:
+  group: draft-requeue
+  cancel-in-progress: false
+
+jobs:
+  requeue:
+    name: requeue sul worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      MESSAGE_ID: ${{ inputs.message_id }}
+    steps:
+      - name: L'id deve essere un uuid
+        run: |
+          if ! printf '%s' "$MESSAGE_ID" | grep -Eqx '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'; then
+            echo "::error::message_id non e' un uuid. Niente e' stato toccato."
+            exit 1
+          fi
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # UN tentativo, mai retry (lezione fly-ping 30/07): flyctl ssh puo'
+      # uscire con codice != 0 anche a comando riuscito. L'esito vero e'
+      # la riga "[requeue-draft] ESITO:" stampata dallo script.
+      - name: Rimetti in coda e aspetta la bozza
+        run: |
+          out=$(flyctl ssh console --app premura-api-staging --process-group worker \
+            -C "pnpm exec tsx src/scripts/requeue-draft.ts $MESSAGE_ID" 2>&1) || true
+          echo "$out"
+          echo
+          echo "=== VERDETTO ==="
+          verdetto=$(printf '%s\n' "$out" | grep '\[requeue-draft\] ESITO:' | tail -1)
+          echo "${verdetto:-nessun esito dallo script: leggere il log sopra}"
+          printf '%s' "$verdetto" | grep -q 'ESITO: BOZZA \(PRONTA\|GIA PRESENTE\)' || exit 1

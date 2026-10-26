@@ -6,6 +6,10 @@ import { getRedisConnection } from './redis-connection';
 // Job types:
 //  - 'send-link': prepara survey + invia WA con link /s/[token]
 //  - 'mark-abandon': skip survey dopo 96h timeout
+//
+// JobId col trattino, mai i due punti (26/10): BullMQ rifiuta un id
+// custom con ':' (oggi se le parti non sono tre, dal prossimo rilascio
+// incompatibile sempre). Il draft col ':' falliva in produzione.
 
 export type SurveyJobData =
   | { type: 'send-link'; bookingId: string }
@@ -27,7 +31,7 @@ export async function enqueueSurveySend(bookingId: string): Promise<void> {
   await surveyQueue.add(
     'send-link',
     { type: 'send-link', bookingId },
-    { jobId: `survey:send:${bookingId}` },
+    { jobId: `survey-send-${bookingId}` },
   );
 }
 
@@ -35,6 +39,6 @@ export async function enqueueSurveyAbandon(quizId: string): Promise<void> {
   await surveyQueue.add(
     'mark-abandon',
     { type: 'mark-abandon', quizId },
-    { jobId: `survey:abandon:${quizId}` },
+    { jobId: `survey-abandon-${quizId}` },
   );
 }

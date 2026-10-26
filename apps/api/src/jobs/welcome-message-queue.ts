@@ -2,6 +2,8 @@ import { Queue } from 'bullmq';
 import { getRedisConnection } from './redis-connection';
 
 // Slice E — Queue BullMQ welcome message check-in.
+//
+// JobId col trattino, mai i due punti: vedi survey-queue.ts.
 
 export type WelcomeJobData = { type: 'send-welcome'; kitId: string };
 
@@ -21,6 +23,6 @@ export async function enqueueWelcomeSend(kitId: string): Promise<void> {
   await welcomeQueue.add(
     'send-welcome',
     { type: 'send-welcome', kitId },
-    { jobId: `welcome:send:${kitId}` },
+    { jobId: `welcome-send-${kitId}` },
   );
 }

@@ -128,6 +128,12 @@ export type ThreadMessage = {
   status: string;
   sentAt: Date | null;
   createdAt: Date;
+  /**
+   * La bozza per questo messaggio non e' mai partita (metadata scritto
+   * dal webhook dopo due enqueue falliti, 26/10). Il thread lo dice
+   * invece di tacere.
+   */
+  draftEnqueueFailed: boolean;
 };
 
 export type ThreadDraft = {
@@ -186,6 +192,7 @@ export async function getConversationThread(
       status: messages.status,
       sentAt: messages.sentAt,
       createdAt: messages.createdAt,
+      metadata: messages.metadata,
     })
     .from(messages)
     .where(eq(messages.conversationId, conversationId))
@@ -238,6 +245,7 @@ export async function getConversationThread(
       status: m.status,
       sentAt: m.sentAt,
       createdAt: m.createdAt,
+      draftEnqueueFailed: m.metadata?.draft_enqueue_failed === true,
     })),
     drafts: drafts.map((d) => ({
       id: d.id,
