@@ -31,6 +31,8 @@ export {
   chatIdToPhone,
   checkNumberOnWhatsapp,
   parseWahaWebhook,
+  resolveLidToPhone,
   toChatId,
   type WahaInboundMessage,
+  type WahaWebhookParse,
 } from './whatsapp-waha';

@@ -188,25 +188,37 @@ export async function checkNumberOnWhatsapp(phone: string): Promise<boolean | nu
 //
 // Niente a che vedere con Meta: nessun array entry[].changes[], nessun
 // hub.challenge da rimbalzare. Un evento, un POST.
+//
+// 26/10, prova reale (WEBJS, immagine 2026-10-02): il messaggio arrivava
+// e veniva scartato in silenzio. WAHA manda null — non "assente" — per i
+// campi che non hanno valore (media: null, location: null), e .optional()
+// non accetta null. Ogni campo facoltativo qui e' quindi .nullish().
+
+/** Gli unici eventi che portano un messaggio dell'ospite. */
+const MESSAGE_EVENTS = new Set(['message', 'message.any']);
+
+/** Chat che non sono un ospite: gruppi, stati, canali. */
+const IGNORED_CHAT_SUFFIXES = ['@g.us', '@newsletter'];
+const STATUS_BROADCAST = 'status@broadcast';
 
 const wahaWebhookSchema = z
   .object({
     event: z.string(),
-    session: z.string().optional(),
+    session: z.string().nullish(),
     payload: z
       .object({
         id: z.string(),
-        timestamp: z.number().optional(),
+        timestamp: z.number().nullish(),
         from: z.string(),
-        to: z.string().optional(),
-        fromMe: z.boolean().optional(),
-        body: z.string().optional(),
-        hasMedia: z.boolean().optional(),
-        // Presente sugli eventi message.ack.
-        ack: z.number().optional(),
-        ackName: z.string().optional(),
-        media: z.object({ url: z.string().optional() }).passthrough().optional(),
+        to: z.string().nullish(),
+        fromMe: z.boolean().nullish(),
+        body: z.string().nullish(),
+        hasMedia: z.boolean().nullish(),
+        ack: z.number().nullish(),
+        media: z.object({ url: z.string().nullish() }).passthrough().nullish(),
       })
+      // Tutto cio' che non leggiamo (location, vCards, _data...) passa
+      // com'e': dichiararlo vorrebbe dire solo un modo in piu' di fallire.
       .passthrough(),
   })
   .passthrough();
@@ -215,8 +227,15 @@ export type WahaInboundMessage = {
   event: string;
   session: string | null;
   messageId: string;
-  /** Numero mittente in cifre, senza '@c.us'. Allineato al formato Meta. */
+  /**
+   * Mittente: il numero in cifre senza '@c.us' (allineato al formato
+   * Meta) quando e' noto. Se WhatsApp manda solo un LID e il payload non
+   * porta il numero, resta il LID intero ('163505126793314@lid'): non
+   * sembra un telefono e non puo' agganciare una prenotazione per errore.
+   */
   from: string;
+  /** LID del mittente quando WhatsApp nasconde il numero, altrimenti null. */
+  senderLid: string | null;
   fromMe: boolean;
   timestamp: Date;
   text: string | null;
@@ -225,28 +244,167 @@ export type WahaInboundMessage = {
   ack: number | null;
 };
 
+/**
+ * Esito del parsing. Un payload non letto NON e' null (R2, 26/10): era
+ * cosi' che un messaggio vero spariva a livello debug. Il chiamante deve
+ * distinguere "non ci riguarda" da "non lo so leggere", e il secondo
+ * porta con se' cosa non andava.
+ */
+export type WahaWebhookParse =
+  | { kind: 'message'; message: WahaInboundMessage }
+  | { kind: 'ignored'; reason: string }
+  | { kind: 'invalid'; event: string | null; payloadKeys: string[]; issues: string[] };
+
 /** Estrae il numero da un chatId WAHA: '393514512070@c.us' -> '393514512070'. */
 export function chatIdToPhone(chatId: string): string {
   return chatId.split('@')[0] ?? chatId;
 }
 
-export function parseWahaWebhook(payload: unknown): WahaInboundMessage | null {
+function isLid(chatId: string): boolean {
+  return chatId.endsWith('@lid');
+}
+
+function isPhoneJid(value: unknown): value is string {
+  return (
+    typeof value === 'string' && (value.endsWith('@c.us') || value.endsWith('@s.whatsapp.net'))
+  );
+}
+
+/** Un Wid di whatsapp-web.js arriva come stringa o come { _serialized }. */
+function widToString(value: unknown): unknown {
+  if (value && typeof value === 'object' && '_serialized' in value) {
+    return (value as { _serialized: unknown })._serialized;
+  }
+  return value;
+}
+
+/**
+ * Il numero del mittente, se il payload lo porta gia' accanto al LID.
+ * Si guardano SOLO campi del mittente (mai 'to', che e' il numero della
+ * struttura) e si accetta solo un chatId da telefono.
+ */
+function phoneFromPayload(p: Record<string, unknown>): string | null {
+  const data = (p._data ?? {}) as Record<string, unknown>;
+  const key = (data.key ?? {}) as Record<string, unknown>;
+  const candidates = [
+    p.pn,
+    p.author,
+    data.pn,
+    data.senderPn,
+    data.author,
+    data.from,
+    key.senderPn,
+    key.participantPn,
+  ].map(widToString);
+  const found = candidates.find(isPhoneJid);
+  return found ? chatIdToPhone(found) : null;
+}
+
+function ignoredChat(chatId: string | null | undefined): boolean {
+  if (!chatId) return false;
+  return chatId === STATUS_BROADCAST || IGNORED_CHAT_SUFFIXES.some((s) => chatId.endsWith(s));
+}
+
+export function parseWahaWebhook(payload: unknown): WahaWebhookParse {
+  const raw = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>;
+  const rawEvent = typeof raw.event === 'string' ? raw.event : null;
+  const rawPayload = raw.payload && typeof raw.payload === 'object' ? raw.payload : {};
+  const payloadKeys = Object.keys(rawPayload);
+
+  // Il filtro sull'evento viene PRIMA dello schema: session.status o
+  // presence.update non hanno id e from, e non sono payload "rotti".
+  if (rawEvent && !MESSAGE_EVENTS.has(rawEvent)) {
+    return { kind: 'ignored', reason: `evento ${rawEvent}` };
+  }
+
   const parsed = wahaWebhookSchema.safeParse(payload);
-  if (!parsed.success) return null;
+  if (!parsed.success) {
+    return {
+      kind: 'invalid',
+      event: rawEvent,
+      payloadKeys,
+      issues: parsed.error.issues.map((i) => `${i.path.join('.') || '(radice)'}: ${i.message}`),
+    };
+  }
 
   const { event, session, payload: p } = parsed.data;
+  if (ignoredChat(p.from) || ignoredChat(p.to)) {
+    return {
+      kind: 'ignored',
+      reason: `chat ${p.from === STATUS_BROADCAST ? 'stati' : 'non individuale'}`,
+    };
+  }
+
+  const senderLid = isLid(p.from) ? p.from : null;
+  const from = senderLid ? (phoneFromPayload(p) ?? senderLid) : chatIdToPhone(p.from);
+
   return {
-    event,
-    session: session ?? null,
-    messageId: p.id,
-    from: chatIdToPhone(p.from),
-    fromMe: p.fromMe ?? false,
-    // WAHA usa secondi epoch come Meta. Se manca, il momento di arrivo e'
-    // l'approssimazione migliore che abbiamo.
-    timestamp: p.timestamp ? new Date(p.timestamp * 1000) : new Date(),
-    text: p.body ?? null,
-    hasMedia: p.hasMedia ?? false,
-    mediaUrl: p.media?.url ?? null,
-    ack: p.ack ?? null,
+    kind: 'message',
+    message: {
+      event,
+      session: session ?? null,
+      messageId: p.id,
+      from,
+      senderLid,
+      fromMe: p.fromMe ?? false,
+      // WAHA usa secondi epoch come Meta. Se manca, il momento di arrivo e'
+      // l'approssimazione migliore che abbiamo.
+      timestamp: p.timestamp ? new Date(p.timestamp * 1000) : new Date(),
+      text: p.body ?? null,
+      hasMedia: p.hasMedia ?? false,
+      mediaUrl: p.media?.url ?? null,
+      ack: p.ack ?? null,
+    },
   };
+}
+
+// ─── LID -> numero ──────────────────────────────────────────────────
+//
+// Con i LID WhatsApp nasconde il numero del mittente: '163505126793314@lid'
+// invece di '393383963307@c.us'. Senza il numero non si aggancia nessuna
+// prenotazione, quindi si chiede a WAHA: GET /api/{session}/lids/{lid}
+// risponde { lid, pn }. Il legame non cambia: si tiene in memoria per
+// sessione, cosi' ogni messaggio successivo non paga la chiamata.
+
+const LID_LOOKUP_TIMEOUT_MS = 3_000;
+const lidCache = new Map<string, string>();
+
+const lidLookupSchema = z.object({ pn: z.string().nullish() }).passthrough();
+
+/**
+ * Numero (cifre, senza '@c.us') dietro un LID, o null se WAHA non lo sa
+ * o non risponde. Non lancia MAI: un LID non risolto non deve fermare
+ * l'inbound, il messaggio si salva comunque.
+ */
+export async function resolveLidToPhone(
+  lid: string,
+  session?: string | null,
+): Promise<string | null> {
+  try {
+    const config = getConfig();
+    const sessionName = session || config.session;
+    const cacheKey = `${sessionName}:${lid}`;
+    const cached = lidCache.get(cacheKey);
+    if (cached) return cached;
+
+    const url = `${config.baseUrl}/api/${encodeURIComponent(sessionName)}/lids/${encodeURIComponent(lid)}`;
+    const res = await fetch(url, {
+      headers: { 'X-Api-Key': config.apiKey },
+      signal: AbortSignal.timeout(LID_LOOKUP_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const { pn } = lidLookupSchema.parse(await res.json());
+    if (!isPhoneJid(pn)) return null;
+
+    const phone = chatIdToPhone(pn);
+    lidCache.set(cacheKey, phone);
+    return phone;
+  } catch {
+    return null;
+  }
+}
+
+/** Solo per i test: la cache vive quanto il processo. */
+export function clearLidCache(): void {
+  lidCache.clear();
 }
