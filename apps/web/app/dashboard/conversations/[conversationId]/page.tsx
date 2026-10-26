@@ -25,7 +25,12 @@ function timeLabel(d: Date | null): string {
 }
 
 // Stato in linguaggio umano (principio 29/07: mai codici).
-function outboundStatusPhrase(m: ThreadMessage): string | null {
+function messageStatusPhrase(m: ThreadMessage): string | null {
+  // Un messaggio dell'ospite per cui la bozza non e' mai partita: lo si
+  // dice, invece di lasciare l'host ad aspettare una risposta (26/10).
+  if (m.direction === 'inbound') {
+    return m.draftEnqueueFailed ? 'Premura non ha una risposta pronta per questo messaggio' : null;
+  }
   if (m.direction !== 'outbound') return null;
   switch (m.status) {
     case 'queued':
@@ -89,7 +94,7 @@ export default async function ConversationThreadPage({
       ) : (
         <ol className="flex flex-col gap-2">
           {messages.map((m) => {
-            const statusPhrase = outboundStatusPhrase(m);
+            const statusPhrase = messageStatusPhrase(m);
             const isOut = m.direction === 'outbound';
             return (
               <li key={m.id} className={isOut ? 'flex justify-end' : 'flex justify-start'}>

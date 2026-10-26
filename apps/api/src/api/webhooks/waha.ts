@@ -6,6 +6,7 @@ import {
   resolveLidToPhone,
 } from '@premura/integrations';
 import type { FastifyBaseLogger, FastifyPluginAsync, FastifyRequest } from 'fastify';
+import { enqueueDraftOrMarkFailed } from '../../jobs/draft-enqueue';
 import { enqueueDraftGeneration } from '../../jobs/draft-generation-queue';
 import { maskPhone } from './whatsapp';
 import type { FlatInboundMessage } from './whatsapp-payload';
@@ -215,14 +216,25 @@ export const wahaWebhookRoutes: FastifyPluginAsync<WahaWebhookPluginOptions> = a
           },
           'messaggio WAHA persistito',
         );
-        try {
-          await enqueueDraftGeneration(result.messageId);
-        } catch (err) {
-          // Il messaggio e' salvato: un enqueue fallito si recupera a
-          // mano, non vale un 5xx che farebbe ritentare tutto il batch.
+        // Il messaggio e' salvato: un enqueue fallito non vale un 5xx che
+        // farebbe ritentare tutto. Ma non resta muto (R2): un secondo
+        // tentativo subito, poi lo stato scritto sul messaggio.
+        const enqueued = await enqueueDraftOrMarkFailed(
+          db,
+          result.messageId,
+          enqueueDraftGeneration,
+        );
+        if (enqueued.status === 'failed') {
           req.log.error(
-            { event: 'waha.draft.enqueue_error', err, messageId: result.messageId },
-            'enqueue draft-generation fallito',
+            {
+              event: 'waha.draft.enqueue_error',
+              err: enqueued.error,
+              messageId: result.messageId,
+              marked: enqueued.marked,
+            },
+            enqueued.marked
+              ? 'enqueue draft-generation fallito due volte: segnato sul messaggio'
+              : 'enqueue draft-generation fallito due volte e segno NON scritto sul messaggio',
           );
         }
       } else if (result.status === 'orphan_inserted') {

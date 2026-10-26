@@ -7,6 +7,7 @@ import type { Database } from '@premura/db';
 import { parseStatusEvents } from '@premura/integrations';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { enqueueDraftOrMarkFailed } from '../../jobs/draft-enqueue';
 import { enqueueDraftGeneration } from '../../jobs/draft-generation-queue';
 import { extractInboundMessages, whatsappWebhookPayloadSchema } from './whatsapp-payload';
 import { persistInboundMessage } from './whatsapp-persist';
@@ -271,19 +272,25 @@ export const whatsappWebhookRoutes: FastifyPluginAsync<WhatsappWebhookPluginOpti
           // messageId e' comunque idempotente lato BullMQ (jobId fisso)
           // e lato pipeline (dedup pending_drafts.replyToMessageId).
           if (result.messageId) {
-            try {
-              await enqueueDraftGeneration(result.messageId);
+            // Niente throw: il messaggio e' gia' persistito. Un enqueue
+            // fallito si riprova una volta e poi resta scritto sul
+            // messaggio (R2, 26/10), non solo nel log.
+            const enqueued = await enqueueDraftOrMarkFailed(
+              db,
+              result.messageId,
+              enqueueDraftGeneration,
+            );
+            if (enqueued.status === 'enqueued') {
               drafts_enqueued++;
-            } catch (enqueueErr) {
-              // Niente throw: il messaggio e' gia' persistito, l'enqueue
-              // failure e' recuperabile via reprocess manuale. Log error.
+            } else {
               req.log.error(
                 {
                   event: 'wa.draft.enqueue_error',
-                  err: enqueueErr,
+                  err: enqueued.error,
                   messageId: result.messageId,
+                  marked: enqueued.marked,
                 },
-                'draft-generation enqueue failed (message already persisted)',
+                'draft-generation enqueue failed twice (message already persisted)',
               );
             }
           }

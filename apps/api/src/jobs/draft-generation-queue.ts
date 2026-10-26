@@ -38,11 +38,18 @@ export const draftGenerationQueue = new Queue<DraftGenerationJobData>(DRAFT_GENE
   },
 });
 
-// Helper esposto al webhook handler: enqueue fire-and-forget. JobId =
-// messageId per dedup BullMQ-level (oltre a quello DB-level del pipeline):
-// se per qualunque motivo enqueuiamo due volte lo stesso messageId in
-// rapida successione, BullMQ scarta il duplicato senza creare un secondo
-// job nella coda.
+// Enqueue di un messaggio. JobId = messageId per dedup BullMQ-level
+// (oltre a quello DB-level del pipeline): se per qualunque motivo
+// enqueuiamo due volte lo stesso messageId in rapida successione, BullMQ
+// scarta il duplicato senza creare un secondo job nella coda.
+//
+// Trattino, MAI i due punti (26/10): BullMQ 5 rifiuta un id custom con
+// ':' ("Custom Id cannot contain :"). Con `draft:${id}` ogni messaggio
+// attribuito veniva salvato e nessuna bozza partiva.
+export function draftJobId(messageId: string): string {
+  return `draft-${messageId}`;
+}
+
 export async function enqueueDraftGeneration(messageId: string): Promise<void> {
-  await draftGenerationQueue.add('generate', { messageId }, { jobId: `draft:${messageId}` });
+  await draftGenerationQueue.add('generate', { messageId }, { jobId: draftJobId(messageId) });
 }
